@@ -7,8 +7,12 @@ import {
   Search,
   Calendar,
   X,
-  Trash2
+  Trash2,
+  Edit2,
+  Check
 } from 'lucide-react';
+
+const DIESEL_RATE_STORAGE_KEY = 'PAVETRACK_DEFAULT_DIESEL_RATE_V1';
 
 export const DieselFuelManagementModule: React.FC = () => {
   const {
@@ -25,6 +29,20 @@ export const DieselFuelManagementModule: React.FC = () => {
   const [filterVehicle, setFilterVehicle] = useState('ALL');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
+  // Persistent default fixed diesel rate
+  const [defaultDieselRate, setDefaultDieselRate] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem(DIESEL_RATE_STORAGE_KEY);
+      return saved ? Number(JSON.parse(saved)) : 92.5;
+    } catch {
+      return 92.5;
+    }
+  });
+
+  // Toggle for inline default rate editor
+  const [isEditingDefaultRate, setIsEditingDefaultRate] = useState(false);
+  const [customRateInput, setCustomRateInput] = useState<number | ''>(defaultDieselRate);
+
   // New vehicle inline input mode
   const [isAddingNewVehicle, setIsAddingNewVehicle] = useState(false);
   const [newVehicleInput, setNewVehicleInput] = useState('');
@@ -37,13 +55,34 @@ export const DieselFuelManagementModule: React.FC = () => {
   const [formVehicleNumber, setFormVehicleNumber] = useState(vehicles[0] || '8797');
   const [formDriverName, setFormDriverName] = useState('Santosh Kamble');
   const [formLitres, setFormLitres] = useState<number | ''>(100);
-  const [formRatePerLitre, setFormRatePerLitre] = useState<number | ''>(92.5);
+  const [formRatePerLitre, setFormRatePerLitre] = useState<number | ''>(defaultDieselRate);
 
+  // Auto calculate total cost
   const autoCalculatedTotal = useMemo(() => {
     const litres = typeof formLitres === 'number' ? formLitres : Number(formLitres) || 0;
     const rate = typeof formRatePerLitre === 'number' ? formRatePerLitre : Number(formRatePerLitre) || 0;
     return litres * rate;
   }, [formLitres, formRatePerLitre]);
+
+  const handleSaveDefaultRate = () => {
+    const validRate = Number(customRateInput) || 92.5;
+    setDefaultDieselRate(validRate);
+    setFormRatePerLitre(validRate);
+    localStorage.setItem(DIESEL_RATE_STORAGE_KEY, JSON.stringify(validRate));
+    setIsEditingDefaultRate(false);
+  };
+
+  const handleAddNewVehicle = () => {
+    const cleanNumber = newVehicleInput.trim().toUpperCase();
+    if (!cleanNumber) return;
+
+    if (currentSheet?.siteId && addSiteSheetVehicle) {
+      addSiteSheetVehicle(currentSheet.siteId, cleanNumber);
+    }
+    setFormVehicleNumber(cleanNumber);
+    setNewVehicleInput('');
+    setIsAddingNewVehicle(false);
+  };
 
   const filteredLogs = useMemo(() => {
     return (dieselLogs || []).filter((log) => {
@@ -61,22 +100,10 @@ export const DieselFuelManagementModule: React.FC = () => {
   const totalLitresDispensed = filteredLogs.reduce((sum, l) => sum + (l.litresDispensed || 0), 0);
   const totalDieselValuation = filteredLogs.reduce((sum, l) => sum + (l.totalCost || 0), 0);
 
-  const handleAddNewVehicle = () => {
-    const cleanNumber = newVehicleInput.trim().toUpperCase();
-    if (!cleanNumber) return;
-
-    if (currentSheet?.siteId && addSiteSheetVehicle) {
-      addSiteSheetVehicle(currentSheet.siteId, cleanNumber);
-    }
-    setFormVehicleNumber(cleanNumber);
-    setNewVehicleInput('');
-    setIsAddingNewVehicle(false);
-  };
-
   const handleCreateFuelLog = (e: React.FormEvent) => {
     e.preventDefault();
     const litres = typeof formLitres === 'number' ? formLitres : Number(formLitres) || 0;
-    const rate = typeof formRatePerLitre === 'number' ? formRatePerLitre : Number(formRatePerLitre) || 92.5;
+    const rate = typeof formRatePerLitre === 'number' ? formRatePerLitre : defaultDieselRate;
     const today = new Date().toISOString().substring(0, 10);
     const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
@@ -149,7 +176,10 @@ export const DieselFuelManagementModule: React.FC = () => {
 
         <div className="flex items-center gap-2.5">
           <button
-            onClick={() => setIsAddModalOpen(true)}
+            onClick={() => {
+              setFormRatePerLitre(defaultDieselRate);
+              setIsAddModalOpen(true);
+            }}
             className="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-slate-950 font-black text-xs flex items-center gap-2 transition-all shadow-lg shadow-amber-600/30 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
@@ -187,10 +217,10 @@ export const DieselFuelManagementModule: React.FC = () => {
 
         <div className="p-4 rounded-2xl bg-[#121927] border border-[#1E293B] shadow-sm">
           <span className="text-[11px] font-bold uppercase tracking-wider text-[#94A3B8]">
-            Total Vouchers
+            Fixed Master Rate
           </span>
           <div className="text-2xl font-black text-cyan-400 font-mono mt-1.5">
-            {filteredLogs.length} <span className="text-xs font-sans text-[#94A3B8]">Slips</span>
+            ₹{defaultDieselRate} <span className="text-xs font-sans text-[#94A3B8]">/ Litre</span>
           </div>
         </div>
       </div>
@@ -273,11 +303,11 @@ export const DieselFuelManagementModule: React.FC = () => {
                     </td>
 
                     <td className="py-3.5 px-5 text-right font-mono text-slate-300 whitespace-nowrap">
-                      ₹{log.ratePerLitre || 92.5}
+                      ₹{log.ratePerLitre || defaultDieselRate}
                     </td>
 
                     <td className="py-3.5 px-5 text-right font-mono font-black text-amber-400 text-sm whitespace-nowrap">
-                      ₹{(log.totalCost || (log.litresDispensed * (log.ratePerLitre || 92.5))).toLocaleString('en-IN')}
+                      ₹{(log.totalCost || (log.litresDispensed * (log.ratePerLitre || defaultDieselRate))).toLocaleString('en-IN')}
                     </td>
 
                     <td className="py-3.5 px-4 text-center whitespace-nowrap">
@@ -312,6 +342,7 @@ export const DieselFuelManagementModule: React.FC = () => {
                 onClick={() => {
                   setIsAddModalOpen(false);
                   setIsAddingNewVehicle(false);
+                  setIsEditingDefaultRate(false);
                 }}
                 className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
               >
@@ -320,6 +351,7 @@ export const DieselFuelManagementModule: React.FC = () => {
             </div>
 
             <form onSubmit={handleCreateFuelLog} className="space-y-4 text-xs">
+              {/* Site Name */}
               <div>
                 <label className="block text-slate-300 font-bold mb-1">
                   Site Name <span className="text-amber-400">*</span>
@@ -337,6 +369,7 @@ export const DieselFuelManagementModule: React.FC = () => {
                 </select>
               </div>
 
+              {/* Vehicle Number */}
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-slate-300 font-bold">
@@ -383,6 +416,7 @@ export const DieselFuelManagementModule: React.FC = () => {
                 )}
               </div>
 
+              {/* Driver Name */}
               <div>
                 <label className="block text-slate-300 font-bold mb-1">
                   Driver Name <span className="text-amber-400">*</span>
@@ -397,6 +431,7 @@ export const DieselFuelManagementModule: React.FC = () => {
                 />
               </div>
 
+              {/* Litres Dispensed & Rate per Litre */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-300 font-bold mb-1">
@@ -417,36 +452,83 @@ export const DieselFuelManagementModule: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-slate-300 font-bold mb-1">
-                    Rate per Litre (₹) *
-                  </label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    min="0"
-                    required
-                    value={formRatePerLitre}
-                    onChange={(e) =>
-                      setFormRatePerLitre(e.target.value === '' ? '' : Number(e.target.value))
-                    }
-                    className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono font-bold outline-none focus:border-amber-500"
-                  />
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-slate-300 font-bold">
+                      Rate / Litre (₹) *
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsEditingDefaultRate(!isEditingDefaultRate);
+                        setCustomRateInput(defaultDieselRate);
+                      }}
+                      className="text-amber-400 hover:text-amber-300 text-[10px] font-bold flex items-center gap-0.5 cursor-pointer"
+                    >
+                      <Edit2 className="w-2.5 h-2.5" />
+                      <span>{isEditingDefaultRate ? 'Cancel' : 'Set Default'}</span>
+                    </button>
+                  </div>
+
+                  {isEditingDefaultRate ? (
+                    <div className="flex gap-1.5">
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        value={customRateInput}
+                        onChange={(e) =>
+                          setCustomRateInput(e.target.value === '' ? '' : Number(e.target.value))
+                        }
+                        className="w-full px-2.5 py-2 bg-[#0B1220] border border-amber-500 rounded-xl text-white font-mono font-bold text-xs outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSaveDefaultRate}
+                        className="px-2.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shrink-0 cursor-pointer shadow-md shadow-amber-500/20"
+                        title="Save as permanent default rate"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      required
+                      value={formRatePerLitre}
+                      onChange={(e) =>
+                        setFormRatePerLitre(e.target.value === '' ? '' : Number(e.target.value))
+                      }
+                      className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono font-bold outline-none focus:border-amber-500"
+                    />
+                  )}
                 </div>
               </div>
 
+              {/* Automatic Calculation Card */}
               <div className="p-3.5 bg-[#0D111D] border border-[#1E293B] rounded-2xl flex items-center justify-between">
-                <span className="text-slate-400 font-bold">Total Voucher Cost:</span>
-                <span className="text-lg font-black font-mono text-amber-400">
+                <div>
+                  <div className="text-[11px] text-slate-400 font-semibold">
+                    Rate: ₹{Number(formRatePerLitre || defaultDieselRate).toFixed(2)} / Litre
+                  </div>
+                  <div className="text-xs text-slate-300 font-bold">
+                    Total Voucher Cost:
+                  </div>
+                </div>
+                <div className="text-lg font-black font-mono text-amber-400">
                   ₹{autoCalculatedTotal.toLocaleString('en-IN')}
-                </span>
+                </div>
               </div>
 
+              {/* Actions */}
               <div className="flex justify-end items-center gap-2 pt-3 border-t border-[#1E293B]">
                 <button
                   type="button"
                   onClick={() => {
                     setIsAddModalOpen(false);
                     setIsAddingNewVehicle(false);
+                    setIsEditingDefaultRate(false);
                   }}
                   className="px-4 py-2 rounded-xl text-slate-400 hover:text-white transition-colors cursor-pointer"
                 >

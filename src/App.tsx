@@ -5,6 +5,7 @@ import { LoginPage } from './components/auth/LoginPage';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { SiteCentricMidnightDashboard } from './components/dashboard/SiteCentricMidnightDashboard';
+import { UserManagementModule } from './components/users/UserManagementModule';
 import { MaterialHaulageTripsModule } from './components/trips/MaterialHaulageTripsModule';
 import { DieselFuelManagementModule } from './components/diesel/DieselFuelManagementModule';
 import { SiteCostExpensesModule } from './components/costing/SiteCostExpensesModule';
@@ -50,37 +51,42 @@ export const AppContent: React.FC = () => {
               <SiteCentricMidnightDashboard onNavigateTab={setActiveTab} />
             )}
 
-            {/* 2. Dedicated Section: Road Sites & Stretches */}
+            {/* 2. Dedicated Section: User Management & RBAC */}
+            {activeTab === 'users' && (
+              <UserManagementModule />
+            )}
+
+            {/* 3. Dedicated Section: Road Sites & Stretches */}
             {activeTab === 'road-sites' && (
               <RoadSitesManagerModule onNavigateTab={setActiveTab} />
             )}
 
-            {/* 3. Dedicated Section: Material Trips & Weighbridge */}
+            {/* 4. Dedicated Section: Material Trips & Weighbridge */}
             {activeTab === 'haulage-trips' && (
               <MaterialHaulageTripsModule />
             )}
 
-            {/* 4. Dedicated Section: Diesel & Fuel Management */}
+            {/* 5. Dedicated Section: Diesel & Fuel Management */}
             {activeTab === 'diesel' && (
               <DieselFuelManagementModule />
             )}
 
-            {/* 5. Dedicated Section: Site Cost & Expenses */}
+            {/* 6. Dedicated Section: Site Cost & Expenses */}
             {activeTab === 'site-expenses' && (
               <SiteCostExpensesModule />
             )}
 
-            {/* 6. Engineering: Road Yield Calculator */}
+            {/* 7. Engineering: Road Yield Calculator */}
             {activeTab === 'road-yield' && (
               <RoadYieldCalculatorModule />
             )}
 
-            {/* 7. Fleet: Machinery & Equipment */}
+            {/* 8. Fleet: Machinery & Equipment */}
             {activeTab === 'machinery' && (
               <MachineFleetManagementModule />
             )}
 
-            {/* 8. Reporting: Daily Progress Report */}
+            {/* 9. Reporting: Daily Progress Report */}
             {activeTab === 'reports' && (
               <RoadAnalyticsDPRModule />
             )}

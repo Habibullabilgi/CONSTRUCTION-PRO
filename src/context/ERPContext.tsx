@@ -85,6 +85,7 @@ interface ERPContextType {
   updateProject: (id: string, proj: Partial<Project>) => void;
   deleteProject: (id: string) => void;
   addSiteToProject: (projectId: string, siteName: string, location: string, supervisor: string) => void;
+  deleteSite: (siteId: string) => void;
   addRoadSiteSection: (input: {
     projectId?: string;
     siteName: string;
@@ -212,7 +213,7 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Authentication State
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     const saved = localStorage.getItem(LOCAL_STORAGE_KEY + '_AUTH');
-    return saved ? JSON.parse(saved) : true; // Default to active session for preview convenience
+    return saved ? JSON.parse(saved) : true;
   });
 
   const [currentUser, setCurrentUser] = useState<User>(() => {
@@ -273,7 +274,6 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     localStorage.setItem(LOCAL_STORAGE_KEY + '_AUTH', JSON.stringify(false));
   };
 
-  // Start with workType = null to display the mandatory First Selection Screen if workstream not picked
   const [workType, setWorkType] = useState<WorkType | null>('ROAD');
   const [mobileSiteMode, setMobileSiteMode] = useState<boolean>(false);
 
@@ -401,11 +401,9 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return saved ? JSON.parse(saved) : INITIAL_SITE_EXPENSES;
   });
 
-  // Current selected project and site helper
   const currentProject = projects.find((p) => p.id === selectedProjectId) || projects[0];
   const currentSite = currentProject?.sites.find((s) => s.id === selectedSiteId) || currentProject?.sites[0];
 
-  // Auto sync project type when selecting a project
   const handleSelectProjectId = (id: string) => {
     setSelectedProjectId(id);
     const p = projects.find((x) => x.id === id);
@@ -413,14 +411,12 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (p.sites.length > 0) {
         setSelectedSiteId(p.sites[0].id);
       }
-      // If workType is set, match it or update
       if (workType && p.type !== workType) {
         setWorkType(p.type);
       }
     }
   };
 
-  // Sync state to local storage
   useEffect(() => {
     try {
       localStorage.setItem(LOCAL_STORAGE_KEY + '_PROJECTS', JSON.stringify(projects));
@@ -471,7 +467,6 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     siteExpenses
   ]);
 
-  // Audit Log Helper
   const addAuditLog = (
     module: string,
     transactionId: string,
@@ -496,14 +491,11 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setAuditLogs((prevLogs) => [entry, ...prevLogs]);
   };
 
-  // Stock Ledger Transaction with Automatic Material Balance Update
   const addStockTransaction = (entryData: Omit<StockLedgerEntry, 'id'>) => {
     const newId = 'stk-' + Date.now();
     const newEntry: StockLedgerEntry = { ...entryData, id: newId };
-
     setStockLedger((prev) => [newEntry, ...prev]);
 
-    // Recalculate stock balance in material catalog
     setMaterials((prevMats) =>
       prevMats.map((mat) => {
         if (mat.id === entryData.materialId) {
@@ -518,7 +510,6 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     addAuditLog('Inventory Ledger', newId, 'CREATE', `Stock ${entryData.type}: ${entryData.materialName} (${entryData.quantityIn || entryData.quantityOut} ${entryData.unit})`);
   };
 
-  // Material Consumption with Alert Generation
   const addConsumptionRecord = (rec: Omit<MaterialConsumptionRecord, 'id'>) => {
     const newId = 'con-' + Date.now();
     const newRec: MaterialConsumptionRecord = { ...rec, id: newId };
@@ -541,7 +532,6 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     addAuditLog('Material Consumption', newId, 'CREATE', `Logged consumption for ${rec.activityName} - ${rec.materialName}: ${rec.actualUsedQty} ${rec.unit}`);
   };
 
-  // Projects CRUD
   const addProject = (projData: Partial<Project>): Project => {
     const newId = 'proj-' + Date.now();
     const newProj: Project = {
@@ -585,7 +575,6 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       prev.map((p) => {
         if (p.id === id) {
           const updated = { ...p, ...data };
-          // Recalculate profit
           if (updated.contractValue !== undefined && updated.actualCost !== undefined) {
             updated.profitOrLoss = updated.contractValue - (updated.forecastFinalCost || updated.actualCost);
           }
@@ -631,6 +620,42 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     addAuditLog('Project Master', projectId, 'UPDATE', `Added new site ${siteName} to project ${projectId}`);
   };
 
+  // --- DELETE THE WHOLE SITE FUNCTION ---
+  const deleteSite = (siteId: string) => {
+    // 1. Remove from projects
+    setProjects((prev) =>
+      prev.map((p) => ({
+        ...p,
+        sites: p.sites.filter((s) => s.id !== siteId)
+      }))
+    );
+
+    // 2. Remove site matrix sheets
+    setSiteSheets((prev) => prev.filter((s) => s.siteId !== siteId));
+
+    // 3. Remove road sections
+    setRoadSections((prev) => prev.filter((s) => s.siteId !== siteId));
+
+    // 4. Remove building floors
+    setBuildingFloors((prev) => prev.filter((f) => f.siteId !== siteId));
+
+    // 5. Remove site expenses
+    setSiteExpenses((prev) => prev.filter((e) => e.siteId !== siteId));
+
+    // 6. Remove vehicle trips
+    setVehicleTrips((prev) => prev.filter((t) => t.siteId !== siteId));
+
+    // 7. If currently selected, select another site
+    if (selectedSiteId === siteId) {
+      const remainingSheets = siteSheets.filter((s) => s.siteId !== siteId);
+      if (remainingSheets.length > 0) {
+        setSelectedSiteId(remainingSheets[0].siteId);
+      }
+    }
+
+    addAuditLog('Site Master', siteId, 'DELETE', `Permanently deleted site and all associated matrices: ${siteId}`);
+  };
+
   const addRoadSiteSection = (input: {
     projectId?: string;
     siteName: string;
@@ -650,7 +675,6 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const totalLengthM = Math.max(100, Math.round(Math.abs(input.endChainageKm - input.startChainageKm) * 1000));
     const widthM = input.carriagewayWidthMeters || 7.5;
 
-    // 1. Add site to Project
     const newSite: Site = {
       id: newSiteId,
       projectId: targetProjId,
@@ -669,7 +693,6 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       })
     );
 
-    // 2. Create standard Road Section
     const newRoadSection: RoadSection = {
       id: 'sec-' + Date.now(),
       projectId: targetProjId,
@@ -751,7 +774,6 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     setRoadSections((prev) => [newRoadSection, ...prev]);
 
-    // 3. Create standard Site Matrix Sheet
     const makeDayRow = (d: number, item: string) => {
       const vVals: Record<string, number> = {};
       vehicleList.forEach((v) => {
@@ -826,11 +848,8 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
 
     setSiteSheets((prev) => [...prev, newSheet]);
-
-    // 4. Automatically switch to new site
     setSelectedSiteId(newSiteId);
 
-    // 5. Add Audit Log
     addAuditLog(
       'Site Master',
       newSiteId,
@@ -841,7 +860,6 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return newSiteId;
   };
 
-  // Road Sections & Layer Progress
   const updateRoadLayerProgress = (sectionId: string, layerId: string, completedMeters: number, actualQty: number) => {
     setRoadSections((prev) =>
       prev.map((sec) => {
@@ -868,7 +886,6 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     addAuditLog('Road Chainage', sectionId, 'UPDATE', `Updated progress for layer ${layerId} to ${completedMeters}m`);
   };
 
-  // Building Floors
   const updateBuildingFloor = (floorId: string, data: Partial<BuildingFloor>) => {
     setBuildingFloors((prev) =>
       prev.map((f) => {
@@ -901,13 +918,11 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     addAuditLog('Building Floors', newId, 'CREATE', `Added floor ${newFloor.floorLevel} to ${newFloor.buildingName}`);
   };
 
-  // Vehicle & RMC Trips
   const addVehicleTrip = (tripData: Omit<VehicleTrip, 'id'>) => {
     const newId = 'trip-' + Date.now();
     const newTrip: VehicleTrip = { ...tripData, id: newId };
     setVehicleTrips((prev) => [newTrip, ...prev]);
 
-    // Trace cost into project actual cost
     setProjects((prev) =>
       prev.map((p) => {
         if (p.id === tripData.projectId) {
@@ -928,7 +943,6 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     addAuditLog('Trip Counter', tripId, 'APPROVE', `Trip status changed to ${status}`);
   };
 
-  // Machinery & Diesel
   const addMachineryLog = (logData: Omit<MachineryLog, 'id'>) => {
     const newId = 'mlog-' + Date.now();
     const newLog: MachineryLog = { ...logData, id: newId };
@@ -951,7 +965,6 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const newLog: DieselLog = { ...logData, id: newId };
     setDieselLogs((prev) => [newLog, ...prev]);
 
-    // Also deduct diesel stock if from central store bowser
     setMaterials((prev) =>
       prev.map((m) => {
         if (m.category === 'Fuel / Diesel') {
@@ -973,13 +986,11 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     addAuditLog('Diesel Management', newId, 'CREATE', `Dispensed ${logData.litresDispensed}L diesel to ${logData.vehicleOrMachineName} (Amount: ₹${logData.totalAmount.toLocaleString()})`);
   };
 
-  // Labour & Attendance
   const addAttendanceRecord = (recData: Omit<AttendanceRecord, 'id'>) => {
     const newId = 'att-' + Date.now();
     const newRec: AttendanceRecord = { ...recData, id: newId };
     setAttendanceRecords((prev) => [newRec, ...prev]);
 
-    // Trace wage to project actual cost
     setProjects((prev) =>
       prev.map((p) => {
         if (p.id === recData.projectId) {
@@ -999,7 +1010,6 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }));
     setAttendanceRecords((prev) => [...newEntries, ...prev]);
 
-    // Total wage to project cost
     const totalWage = records.reduce((sum, r) => sum + r.grossWage, 0);
     if (records.length > 0) {
       const projId = records[0].projectId;
@@ -1017,7 +1027,6 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     addAuditLog('Labour Payment', attendanceId, 'POST', `Wage payment processed with Ref ${ref}`);
   };
 
-  // Daily Production
   const addRoadProduction = (prodData: Omit<DailyRoadProduction, 'id'>) => {
     const newId = 'prod-rd-' + Date.now();
     const newProd: DailyRoadProduction = { ...prodData, id: newId };
@@ -1032,7 +1041,6 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     addAuditLog('Building Production', newId, 'CREATE', `Logged ${prodData.completedQty} ${prodData.unit} for ${prodData.activityName} (Cost: ₹${prodData.totalDailyCost.toLocaleString()})`);
   };
 
-  // BOQ & MB
   const addBOQItem = (itemData: Omit<BOQItem, 'id'>) => {
     const newId = 'boq-' + Date.now();
     const newItem: BOQItem = { ...itemData, id: newId };
@@ -1054,7 +1062,6 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     addAuditLog('Measurement Book', newId, 'CREATE', `Recorded MB entry ${newEntry.mbNumber} (${newEntry.calculatedQuantity} ${newEntry.unit} for ${newEntry.activity})`);
   };
 
-  // BBS
   const addBBSItem = (itemData: Omit<BBSItem, 'id'>) => {
     const newId = 'bbs-' + Date.now();
     const newItem: BBSItem = { ...itemData, id: newId };
@@ -1067,7 +1074,6 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     addAuditLog('Bar Bending Schedule', id, 'DELETE', `Deleted BBS item ${id}`);
   };
 
-  // Site Matrix Sheet Operations (Mulwad Site Sheet 1:1)
   const updateSiteCellValue = (
     siteId: string,
     tabKey: string,
@@ -1222,7 +1228,6 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     addAuditLog('Site Sheets', siteId, 'CREATE', `Added new material sheet tab ${label} to ${siteId}`);
   };
 
-  // Site Specific Expenses
   const addSiteExpense = (expData: Omit<SiteExpenseRecord, 'id' | 'createdAt'>) => {
     const newId = 'exp-' + Date.now();
     const now = new Date().toISOString().replace('T', ' ').substring(0, 16);
@@ -1251,9 +1256,7 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
   };
 
-  // Reset & Backup Engine
   const clearAllData = () => {
-    // 1. Wipe all operational and transactional history
     setStockLedger([]);
     setConsumptionRecords([]);
     setVehicleTrips([]);
@@ -1268,10 +1271,8 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setSiteExpenses([]);
     setNotifications([]);
 
-    // 2. Zero-out all site daily matrix sheets
     setSiteSheets((prev) => getZeroedSiteSheets(prev));
 
-    // 3. Reset all road section progress to zero
     setRoadSections((prevSections) =>
       prevSections.map((sec) => ({
         ...sec,
@@ -1285,7 +1286,6 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }))
     );
 
-    // 4. Clean out persistence storage
     try {
       localStorage.removeItem(LOCAL_STORAGE_KEY + '_TRIPS');
       localStorage.removeItem(LOCAL_STORAGE_KEY + '_DIESEL_LOGS');
@@ -1433,6 +1433,7 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         updateProject,
         deleteProject,
         addSiteToProject,
+        deleteSite,
         addRoadSiteSection,
         roadSections,
         updateRoadLayerProgress,

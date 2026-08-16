@@ -219,7 +219,7 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const [userRole, setUserRole] = useState<UserRole>(() => currentUser?.role || 'SUPER_ADMIN');
 
-  const login = (username: string, _password?: string): boolean => {
+const login = (username: string, _password?: string): boolean => {
     const cleanUser = username.trim().toLowerCase();
     let name = 'Admin User';
     let role: UserRole = 'SUPER_ADMIN';
@@ -237,9 +237,9 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       name = 'Er. Amit Sharma';
       role = 'SITE_ENGINEER';
       email = 'amit.billing@bilgicrushers.com';
-    } else if (cleanUser === 'owner' || cleanUser.includes('bilgi')) {
+    } else if (cleanUser === 'owner' || cleanUser.includes('bilgi') || cleanUser === 'admin') {
       name = 'Habibulla Bilgi (Director)';
-      role = 'OWNER';
+      role = 'SUPER_ADMIN';
       email = 'habibullabilgiabu@gmail.com';
     }
 
@@ -253,14 +253,17 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setCurrentUser(usr);
     setUserRole(role);
     setIsAuthenticated(true);
-    localStorage.setItem(LOCAL_STORAGE_KEY + '_AUTH', JSON.stringify(true));
-    localStorage.setItem(LOCAL_STORAGE_KEY + '_USER', JSON.stringify(usr));
+
+    // Save only to sessionStorage
+    sessionStorage.setItem(LOCAL_STORAGE_KEY + '_AUTH', JSON.stringify(true));
+    sessionStorage.setItem(LOCAL_STORAGE_KEY + '_USER', JSON.stringify(usr));
     return true;
   };
 
   const logout = () => {
     setIsAuthenticated(false);
-    localStorage.setItem(LOCAL_STORAGE_KEY + '_AUTH', JSON.stringify(false));
+    sessionStorage.removeItem(LOCAL_STORAGE_KEY + '_AUTH');
+    sessionStorage.removeItem(LOCAL_STORAGE_KEY + '_USER');
   };
 
   const [workType, setWorkType] = useState<WorkType | null>('ROAD');

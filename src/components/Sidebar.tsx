@@ -146,7 +146,7 @@ export const Sidebar: React.FC<Props> = ({ activeTab, setActiveTab }) => {
             </div>
             <div className="truncate">
               <div className="text-xs font-black text-white uppercase tracking-wider truncate">
-                PAVETRACK PRO
+                CONSTRUCTION PRO
               </div>
               <div className="text-[10px] text-blue-400 font-mono truncate">
                 Road Construction ERP

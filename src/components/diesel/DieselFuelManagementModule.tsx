@@ -1,552 +1,312 @@
-import React, { useState, useMemo } from 'react';
-import { useERP } from '../../context/ERPContext';
-import {
-  Fuel,
-  Plus,
-  Download,
-  Search,
-  Calendar,
-  X,
-  Trash2,
-  Edit2,
-  Check
-} from 'lucide-react';
+import React, { useState } from 'react';
+import { Fuel, Calendar, X, Plus, Check, Edit2 } from 'lucide-react';
 
-const DIESEL_RATE_STORAGE_KEY = 'PAVETRACK_DEFAULT_DIESEL_RATE_V1';
+interface Props {
+  isOpen: boolean;
+  onClose: () => void;
+  sites?: string[];
+  vehicles?: string[];
+  onSave: (voucherData: any) => void;
+}
 
-export const DieselFuelManagementModule: React.FC = () => {
-  const {
-    dieselLogs,
-    addDieselLog,
-    deleteDieselLog,
-    selectedSiteId,
-    siteSheets,
-    currentProject,
-    addSiteSheetVehicle
-  } = useERP();
+export const RecordDieselVoucherModal: React.FC<Props> = ({
+  isOpen,
+  onClose,
+  sites = ['Mulwad', 'NH-50 Site Stretch', 'Quarry Site Pit'],
+  vehicles = ['#KA28B8797', '#KA-28-EX-8901', '#MH-12-DT-5510', '#KA-28-TR-1092'],
+  onSave,
+}) => {
+  const todayStr = new Date().toISOString().split('T')[0];
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterVehicle, setFilterVehicle] = useState('ALL');
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [date, setDate] = useState<string>(todayStr);
+  const [siteName, setSiteName] = useState<string>(sites[0] || 'Mulwad');
+  const [vehicleNumber, setVehicleNumber] = useState<string>(vehicles[0] || '#KA28B8797');
+  const [driverName, setDriverName] = useState<string>('Santosh Kamble');
+  const [litresDispensed, setLitresDispensed] = useState<number | ''>(100);
+  const [ratePerLitre, setRatePerLitre] = useState<number>(92.5);
 
-  // Persistent default fixed diesel rate
-  const [defaultDieselRate, setDefaultDieselRate] = useState<number>(() => {
-    try {
-      const saved = localStorage.getItem(DIESEL_RATE_STORAGE_KEY);
-      return saved ? Number(JSON.parse(saved)) : 92.5;
-    } catch {
-      return 92.5;
-    }
-  });
+  const [isEditingRate, setIsEditingRate] = useState<boolean>(false);
+  const [tempRate, setTempRate] = useState<number>(92.5);
 
-  // Toggle for inline default rate editor
-  const [isEditingDefaultRate, setIsEditingDefaultRate] = useState(false);
-  const [customRateInput, setCustomRateInput] = useState<number | ''>(defaultDieselRate);
-
-  // New vehicle inline input mode
-  const [isAddingNewVehicle, setIsAddingNewVehicle] = useState(false);
+  // New Vehicle inline add
+  const [isAddingVehicle, setIsAddingVehicle] = useState(false);
   const [newVehicleInput, setNewVehicleInput] = useState('');
+  const [vehicleListState, setVehicleListState] = useState<string[]>(vehicles);
 
-  const currentSheet = siteSheets.find((s) => s.siteId === selectedSiteId) || siteSheets[0];
-  const vehicles = currentSheet?.vehicles || ['8797', '7352', '7353', '9579', '9580'];
+  if (!isOpen) return null;
 
-  // Form State
-  const [formSiteName, setFormSiteName] = useState(currentSheet?.siteName || 'Ongoing Highway Site');
-  const [formVehicleNumber, setFormVehicleNumber] = useState(vehicles[0] || '8797');
-  const [formDriverName, setFormDriverName] = useState('Santosh Kamble');
-  const [formLitres, setFormLitres] = useState<number | ''>(100);
-  const [formRatePerLitre, setFormRatePerLitre] = useState<number | ''>(defaultDieselRate);
+  const totalCost = Number(litresDispensed || 0) * Number(ratePerLitre || 0);
 
-  // Auto calculate total cost
-  const autoCalculatedTotal = useMemo(() => {
-    const litres = typeof formLitres === 'number' ? formLitres : Number(formLitres) || 0;
-    const rate = typeof formRatePerLitre === 'number' ? formRatePerLitre : Number(formRatePerLitre) || 0;
-    return litres * rate;
-  }, [formLitres, formRatePerLitre]);
-
-  const handleSaveDefaultRate = () => {
-    const validRate = Number(customRateInput) || 92.5;
-    setDefaultDieselRate(validRate);
-    setFormRatePerLitre(validRate);
-    localStorage.setItem(DIESEL_RATE_STORAGE_KEY, JSON.stringify(validRate));
-    setIsEditingDefaultRate(false);
-  };
-
-  const handleAddNewVehicle = () => {
-    const cleanNumber = newVehicleInput.trim().toUpperCase();
-    if (!cleanNumber) return;
-
-    if (currentSheet?.siteId && addSiteSheetVehicle) {
-      addSiteSheetVehicle(currentSheet.siteId, cleanNumber);
-    }
-    setFormVehicleNumber(cleanNumber);
-    setNewVehicleInput('');
-    setIsAddingNewVehicle(false);
-  };
-
-  const filteredLogs = useMemo(() => {
-    return (dieselLogs || []).filter((log) => {
-      const q = searchTerm.toLowerCase();
-      const matchVehicle = filterVehicle === 'ALL' || log.vehicleOrEquipment?.includes(filterVehicle);
-      const matchSearch =
-        !searchTerm ||
-        log.slipNumber?.toLowerCase().includes(q) ||
-        log.vehicleOrEquipment?.toLowerCase().includes(q) ||
-        log.operatorOrDriver?.toLowerCase().includes(q);
-      return matchVehicle && matchSearch;
-    });
-  }, [dieselLogs, filterVehicle, searchTerm]);
-
-  const totalLitresDispensed = filteredLogs.reduce((sum, l) => sum + (l.litresDispensed || 0), 0);
-  const totalDieselValuation = filteredLogs.reduce((sum, l) => sum + (l.totalCost || 0), 0);
-
-  const handleCreateFuelLog = (e: React.FormEvent) => {
+  const handleAddNewVehicle = (e: React.FormEvent) => {
     e.preventDefault();
-    const litres = typeof formLitres === 'number' ? formLitres : Number(formLitres) || 0;
-    const rate = typeof formRatePerLitre === 'number' ? formRatePerLitre : defaultDieselRate;
-    const today = new Date().toISOString().substring(0, 10);
-    const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const clean = newVehicleInput.trim().toUpperCase();
+    if (!clean) return;
+    const formatted = clean.startsWith('#') ? clean : `#${clean}`;
+    if (!vehicleListState.includes(formatted)) {
+      setVehicleListState([formatted, ...vehicleListState]);
+      setVehicleNumber(formatted);
+    }
+    setNewVehicleInput('');
+    setIsAddingVehicle(false);
+  };
 
-    addDieselLog({
-      projectId: currentProject?.id || 'proj-ongoing-1',
-      siteId: selectedSiteId || 'site-ongoing-1',
-      slipNumber: `DSL-${Math.floor(1000 + Math.random() * 9000)}`,
-      date: today,
-      time: timeNow,
-      vehicleOrEquipment: formVehicleNumber,
-      operatorOrDriver: formDriverName,
-      fuelSource: 'Site Bowser / Tank',
-      litresDispensed: litres,
-      ratePerLitre: rate,
-      totalCost: litres * rate,
-      meterReading: 0,
-      approvedBy: 'Admin'
+  const handleApplyRate = () => {
+    setRatePerLitre(Number(tempRate));
+    setIsEditingRate(false);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!litresDispensed || litresDispensed <= 0) return;
+
+    onSave({
+      date,
+      siteName,
+      vehicleNumber,
+      driverName,
+      litresDispensed: Number(litresDispensed),
+      ratePerLitre: Number(ratePerLitre),
+      totalCost,
     });
 
-    setIsAddModalOpen(false);
-  };
-
-  const handleDeleteDieselRecord = (logId: string, slipNumber: string) => {
-    if (window.confirm(`Are you sure you want to delete diesel record "${slipNumber}"?`)) {
-      if (deleteDieselLog) {
-        deleteDieselLog(logId);
-      }
-    }
-  };
-
-  const handleExportCSV = () => {
-    const headers = 'Voucher Slip,Date,Site Name,Vehicle Number,Driver Name,Litres,Rate/Litre (INR),Total Cost (INR)\n';
-    const rows = filteredLogs
-      .map(
-        (l) =>
-          `"${l.slipNumber}","${l.date} ${l.time || ''}","${formSiteName}","${l.vehicleOrEquipment}","${l.operatorOrDriver}","${l.litresDispensed}","${l.ratePerLitre}","${l.totalCost}"`
-      )
-      .join('\n');
-
-    const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `Diesel_Logs_${new Date().toISOString().substring(0, 10)}.csv`;
-    link.click();
+    onClose();
   };
 
   return (
-    <div className="space-y-6 font-sans text-slate-100 selection:bg-amber-500 selection:text-slate-950">
-      {/* 1. Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#121927] border border-[#1E293B] p-5 rounded-3xl shadow-lg">
-        <div className="flex items-center gap-3.5">
-          <div className="w-12 h-12 rounded-2xl bg-amber-600/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 shadow-md shadow-amber-600/20">
-            <Fuel className="w-6 h-6" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150 font-sans">
+      <div className="bg-[#121927] border border-[#1E293B] rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 text-slate-100">
+        
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
+          <div className="flex items-center gap-2 text-white font-bold text-base">
+            <Fuel className="w-5 h-5 text-amber-500" />
+            <span>Record Diesel Refueling Voucher</span>
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-                Diesel
-              </h1>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                Fuel Logs
-              </span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
+          
+          {/* Row 1: Date & Site Name */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-slate-300 font-bold mb-1.5 flex items-center gap-1">
+                <Calendar className="w-3.5 h-3.5 text-amber-400" />
+                <span>Voucher Date *</span>
+              </label>
+              <input
+                type="date"
+                required
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-amber-500 font-medium"
+              />
             </div>
-            <p className="text-xs text-[#94A3B8] mt-0.5">
-              Record vehicle diesel refueling slips, dispensed litres, and total billing.
-            </p>
+
+            <div>
+              <label className="block text-slate-300 font-bold mb-1.5">
+                Site Name *
+              </label>
+              <select
+                value={siteName}
+                onChange={(e) => setSiteName(e.target.value)}
+                className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-amber-500 cursor-pointer font-medium"
+              >
+                {sites.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
-        </div>
 
-        <div className="flex items-center gap-2.5">
-          <button
-            onClick={() => {
-              setFormRatePerLitre(defaultDieselRate);
-              setIsAddModalOpen(true);
-            }}
-            className="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-slate-950 font-black text-xs flex items-center gap-2 transition-all shadow-lg shadow-amber-600/30 cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>+ Record Refueling Voucher</span>
-          </button>
-          <button
-            onClick={handleExportCSV}
-            className="px-3.5 py-2.5 rounded-xl bg-[#162032] hover:bg-slate-800 border border-[#1E293B] text-slate-200 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-all"
-          >
-            <Download className="w-3.5 h-3.5 text-emerald-400" />
-            <span className="hidden sm:inline">Export Statement</span>
-          </button>
-        </div>
-      </div>
-
-      {/* 2. Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-4 rounded-2xl bg-[#121927] border border-[#1E293B] shadow-sm">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-[#94A3B8]">
-            Total Fuel Dispensed
-          </span>
-          <div className="text-2xl font-black text-amber-400 font-mono mt-1.5">
-            {totalLitresDispensed.toLocaleString()} <span className="text-xs font-sans text-[#94A3B8]">Litres</span>
-          </div>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-[#121927] border border-[#1E293B] shadow-sm">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-[#94A3B8]">
-            Total Diesel Cost
-          </span>
-          <div className="text-2xl font-black text-white font-mono mt-1.5">
-            ₹{totalDieselValuation.toLocaleString('en-IN')}
-          </div>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-[#121927] border border-[#1E293B] shadow-sm">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-[#94A3B8]">
-            Fixed Master Rate
-          </span>
-          <div className="text-2xl font-black text-cyan-400 font-mono mt-1.5">
-            ₹{defaultDieselRate} <span className="text-xs font-sans text-[#94A3B8]">/ Litre</span>
-          </div>
-        </div>
-      </div>
-
-      {/* 3. Filter & Search */}
-      <div className="p-3 rounded-2xl bg-[#0D111D] border border-[#1E293B] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <select
-          value={filterVehicle}
-          onChange={(e) => setFilterVehicle(e.target.value)}
-          className="w-full sm:w-52 px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white text-xs outline-none focus:border-amber-500 font-semibold cursor-pointer"
-        >
-          <option value="ALL">All Vehicles</option>
-          {vehicles.map((v) => (
-            <option key={v} value={v}>
-              Vehicle #{v}
-            </option>
-          ))}
-        </select>
-
-        <div className="relative flex-1 w-full">
-          <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3.5 top-3" />
-          <input
-            type="text"
-            placeholder="Search voucher slip, vehicle, driver..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-3.5 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-xs text-white outline-none focus:border-amber-500 placeholder-slate-500"
-          />
-        </div>
-      </div>
-
-      {/* 4. Table with Action Column and Delete Button */}
-      <div className="rounded-3xl bg-[#0B1220] border border-[#1E293B] overflow-hidden shadow-2xl">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="border-b border-[#1E293B] text-[10px] font-extrabold uppercase tracking-wider text-[#94A3B8] bg-[#080D19]">
-                <th className="py-3 px-5">VOUCHER & DATE</th>
-                <th className="py-3 px-5">SITE NAME</th>
-                <th className="py-3 px-5">VEHICLE NUMBER</th>
-                <th className="py-3 px-5">DRIVER NAME</th>
-                <th className="py-3 px-5 text-right">LITRES DISPENSED</th>
-                <th className="py-3 px-5 text-right">RATE / LITRE (₹)</th>
-                <th className="py-3 px-5 text-right">TOTAL AMOUNT (₹)</th>
-                <th className="py-3 px-4 text-center">ACTION</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#1E293B]/60 text-slate-200">
-              {filteredLogs.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="py-12 text-center text-xs text-slate-500">
-                    No diesel refueling vouchers recorded yet. Click <strong>+ Record Refueling Voucher</strong>.
-                  </td>
-                </tr>
-              ) : (
-                filteredLogs.map((log) => (
-                  <tr key={log.id} className="hover:bg-[#121927] transition-colors">
-                    <td className="py-3.5 px-5 whitespace-nowrap font-mono">
-                      <div className="font-bold text-amber-400">{log.slipNumber}</div>
-                      <div className="text-[10px] text-[#94A3B8] flex items-center gap-1 mt-0.5">
-                        <Calendar className="w-3 h-3 text-slate-500" />
-                        <span>{log.date} {log.time && `• ${log.time}`}</span>
-                      </div>
-                    </td>
-
-                    <td className="py-3.5 px-5 text-slate-300 whitespace-nowrap font-medium">
-                      {formSiteName}
-                    </td>
-
-                    <td className="py-3.5 px-5 whitespace-nowrap font-mono font-bold text-blue-400">
-                      #{log.vehicleOrEquipment}
-                    </td>
-
-                    <td className="py-3.5 px-5 text-slate-300 whitespace-nowrap">
-                      {log.operatorOrDriver || 'Driver'}
-                    </td>
-
-                    <td className="py-3.5 px-5 text-right font-mono font-bold text-white text-sm whitespace-nowrap">
-                      {log.litresDispensed} L
-                    </td>
-
-                    <td className="py-3.5 px-5 text-right font-mono text-slate-300 whitespace-nowrap">
-                      ₹{log.ratePerLitre || defaultDieselRate}
-                    </td>
-
-                    <td className="py-3.5 px-5 text-right font-mono font-black text-amber-400 text-sm whitespace-nowrap">
-                      ₹{(log.totalCost || (log.litresDispensed * (log.ratePerLitre || defaultDieselRate))).toLocaleString('en-IN')}
-                    </td>
-
-                    <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteDieselRecord(log.id, log.slipNumber)}
-                        className="p-1.5 rounded-xl text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 border border-transparent hover:border-rose-800/40 transition-colors cursor-pointer"
-                        title="Delete Refueling Record"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* 5. Modal */}
-      {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150 font-sans">
-          <div className="bg-[#121927] border border-[#1E293B] rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-150 text-slate-100">
-            <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
-              <div className="flex items-center gap-2 text-white font-bold text-base">
-                <Fuel className="w-5 h-5 text-amber-400" />
-                <span>Record Diesel Refueling Voucher</span>
-              </div>
+          {/* Row 2: Vehicle Number & Add Vehicle Button */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-slate-300 font-bold">
+                Vehicle Number *
+              </label>
               <button
                 type="button"
-                onClick={() => {
-                  setIsAddModalOpen(false);
-                  setIsAddingNewVehicle(false);
-                  setIsEditingDefaultRate(false);
-                }}
-                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+                onClick={() => setIsAddingVehicle(!isAddingVehicle)}
+                className="text-[11px] font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <Plus className="w-3 h-3" />
+                <span>+ Add New Vehicle</span>
               </button>
             </div>
 
-            <form onSubmit={handleCreateFuelLog} className="space-y-4 text-xs">
-              {/* Site Name */}
-              <div>
-                <label className="block text-slate-300 font-bold mb-1">
-                  Site Name <span className="text-amber-400">*</span>
-                </label>
-                <select
-                  value={formSiteName}
-                  onChange={(e) => setFormSiteName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-amber-500 font-medium cursor-pointer"
+            {isAddingVehicle ? (
+              <div className="flex items-center gap-2 mb-2 p-2 bg-[#162032] border border-amber-500/40 rounded-xl">
+                <input
+                  type="text"
+                  placeholder="e.g. KA28B8797"
+                  value={newVehicleInput}
+                  onChange={(e) => setNewVehicleInput(e.target.value.toUpperCase())}
+                  className="flex-1 px-3 py-1.5 bg-[#0D111D] border border-[#1E293B] rounded-lg text-white font-mono font-bold text-xs outline-none focus:border-amber-500 uppercase"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddNewVehicle}
+                  className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-lg font-bold text-xs flex items-center gap-1"
                 >
-                  {siteSheets.map((s) => (
-                    <option key={s.siteId} value={s.siteName}>
-                      {s.siteName}
-                    </option>
-                  ))}
-                </select>
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Save</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsAddingVehicle(false)}
+                  className="p-1.5 text-slate-400 hover:text-white"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
               </div>
+            ) : (
+              <select
+                value={vehicleNumber}
+                onChange={(e) => setVehicleNumber(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono font-bold outline-none focus:border-amber-500 cursor-pointer"
+              >
+                {vehicleListState.map((v) => (
+                  <option key={v} value={v}>
+                    {v}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
 
-              {/* Vehicle Number */}
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-slate-300 font-bold">
-                    Vehicle Number <span className="text-amber-400">*</span>
-                  </label>
+          {/* Row 3: Driver / Operator Name */}
+          <div>
+            <label className="block text-slate-300 font-bold mb-1.5">
+              Driver / Operator Name *
+            </label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. Santosh Kamble"
+              value={driverName}
+              onChange={(e) => setDriverName(e.target.value)}
+              className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-amber-500 font-medium"
+            />
+          </div>
+
+          {/* Row 4: Litres Dispensed & Rate / Litre */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-slate-300 font-bold mb-1.5">
+                Litres Dispensed *
+              </label>
+              <input
+                type="number"
+                min="1"
+                step="0.1"
+                required
+                value={litresDispensed || ''}
+                onChange={(e) => setLitresDispensed(e.target.value === '' ? '' : Number(e.target.value))}
+                className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-amber-400 font-mono font-black text-sm outline-none focus:border-amber-500"
+              />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-slate-300 font-bold">
+                  Rate / Litre (₹) *
+                </label>
+                {!isEditingRate ? (
                   <button
                     type="button"
-                    onClick={() => setIsAddingNewVehicle(!isAddingNewVehicle)}
-                    className="text-amber-400 hover:text-amber-300 text-[11px] font-bold cursor-pointer"
+                    onClick={() => {
+                      setTempRate(ratePerLitre);
+                      setIsEditingRate(true);
+                    }}
+                    className="text-[10px] text-amber-400 hover:text-amber-300 font-bold flex items-center gap-0.5"
                   >
-                    {isAddingNewVehicle ? '← Select Existing' : '+ Add New Vehicle'}
+                    <Edit2 className="w-2.5 h-2.5" />
+                    <span>Edit</span>
                   </button>
-                </div>
-
-                {isAddingNewVehicle ? (
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="e.g. 9988 or MH-12-AB-1234"
-                      value={newVehicleInput}
-                      onChange={(e) => setNewVehicleInput(e.target.value)}
-                      className="flex-1 px-3.5 py-2 bg-[#162032] border border-amber-500 rounded-xl text-white outline-none font-mono font-bold uppercase placeholder-slate-500"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleAddNewVehicle}
-                      className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-slate-950 font-black text-xs cursor-pointer shadow-md shadow-amber-600/20 shrink-0"
-                    >
-                      Add & Select
-                    </button>
-                  </div>
                 ) : (
-                  <select
-                    value={formVehicleNumber}
-                    onChange={(e) => setFormVehicleNumber(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-amber-500 font-mono font-bold cursor-pointer"
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingRate(false)}
+                    className="text-[10px] text-slate-400 hover:text-white"
                   >
-                    {vehicles.map((v) => (
-                      <option key={v} value={v}>
-                        #{v}
-                      </option>
-                    ))}
-                  </select>
+                    Cancel
+                  </button>
                 )}
               </div>
 
-              {/* Driver Name */}
-              <div>
-                <label className="block text-slate-300 font-bold mb-1">
-                  Driver Name <span className="text-amber-400">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Santosh Kamble"
-                  value={formDriverName}
-                  onChange={(e) => setFormDriverName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-amber-500 font-medium placeholder-slate-500"
-                />
-              </div>
-
-              {/* Litres Dispensed & Rate per Litre */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-300 font-bold mb-1">
-                    Litres Dispensed *
-                  </label>
+              {isEditingRate ? (
+                <div className="flex items-center gap-1.5">
                   <input
                     type="number"
-                    step="1"
-                    min="1"
-                    required
-                    placeholder="e.g. 100"
-                    value={formLitres}
-                    onChange={(e) =>
-                      setFormLitres(e.target.value === '' ? '' : Number(e.target.value))
-                    }
-                    className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-amber-400 font-mono font-black text-sm outline-none focus:border-amber-500"
+                    step="0.01"
+                    min="0"
+                    value={tempRate}
+                    onChange={(e) => setTempRate(Number(e.target.value))}
+                    className="w-full px-2.5 py-2 bg-[#0D111D] border border-amber-500 rounded-xl text-white font-mono font-bold outline-none"
                   />
+                  <button
+                    type="button"
+                    onClick={handleApplyRate}
+                    className="p-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl font-bold"
+                  >
+                    <Check className="w-4 h-4" />
+                  </button>
                 </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-slate-300 font-bold">
-                      Rate / Litre (₹) *
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsEditingDefaultRate(!isEditingDefaultRate);
-                        setCustomRateInput(defaultDieselRate);
-                      }}
-                      className="text-amber-400 hover:text-amber-300 text-[10px] font-bold flex items-center gap-0.5 cursor-pointer"
-                    >
-                      <Edit2 className="w-2.5 h-2.5" />
-                      <span>{isEditingDefaultRate ? 'Cancel' : 'Set Default'}</span>
-                    </button>
-                  </div>
-
-                  {isEditingDefaultRate ? (
-                    <div className="flex gap-1.5">
-                      <input
-                        type="number"
-                        step="0.1"
-                        min="0"
-                        value={customRateInput}
-                        onChange={(e) =>
-                          setCustomRateInput(e.target.value === '' ? '' : Number(e.target.value))
-                        }
-                        className="w-full px-2.5 py-2 bg-[#0B1220] border border-amber-500 rounded-xl text-white font-mono font-bold text-xs outline-none"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleSaveDefaultRate}
-                        className="px-2.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shrink-0 cursor-pointer shadow-md shadow-amber-500/20"
-                        title="Save as permanent default rate"
-                      >
-                        <Check className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ) : (
-                    <input
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      required
-                      value={formRatePerLitre}
-                      onChange={(e) =>
-                        setFormRatePerLitre(e.target.value === '' ? '' : Number(e.target.value))
-                      }
-                      className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono font-bold outline-none focus:border-amber-500"
-                    />
-                  )}
-                </div>
-              </div>
-
-              {/* Automatic Calculation Card */}
-              <div className="p-3.5 bg-[#0D111D] border border-[#1E293B] rounded-2xl flex items-center justify-between">
-                <div>
-                  <div className="text-[11px] text-slate-400 font-semibold">
-                    Rate: ₹{Number(formRatePerLitre || defaultDieselRate).toFixed(2)} / Litre
-                  </div>
-                  <div className="text-xs text-slate-300 font-bold">
-                    Total Voucher Cost:
-                  </div>
-                </div>
-                <div className="text-lg font-black font-mono text-amber-400">
-                  ₹{autoCalculatedTotal.toLocaleString('en-IN')}
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="flex justify-end items-center gap-2 pt-3 border-t border-[#1E293B]">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsAddModalOpen(false);
-                    setIsAddingNewVehicle(false);
-                    setIsEditingDefaultRate(false);
-                  }}
-                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-black shadow-lg shadow-amber-500/20 cursor-pointer transition-all"
-                >
-                  Save & Lock Fuel Slip
-                </button>
-              </div>
-            </form>
+              ) : (
+                <input
+                  type="number"
+                  readOnly
+                  value={ratePerLitre}
+                  className="w-full px-3.5 py-2.5 bg-[#162032]/60 border border-[#1E293B] rounded-xl text-slate-300 font-mono font-bold outline-none cursor-not-allowed"
+                />
+              )}
+            </div>
           </div>
-        </div>
-      )}
+
+          {/* Computed Summary Box */}
+          <div className="p-4 bg-[#080d19] border border-[#1E293B] rounded-2xl flex items-center justify-between">
+            <div>
+              <div className="text-[11px] text-slate-400">
+                Rate: ₹{ratePerLitre.toFixed(2)} / Litre
+              </div>
+              <div className="text-xs font-bold text-slate-200">
+                Total Voucher Cost:
+              </div>
+            </div>
+            <div className="text-xl font-black text-amber-400 font-mono">
+              ₹{totalCost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex justify-end items-center gap-2 pt-2 border-t border-[#1E293B]">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl text-slate-400 hover:text-white transition-colors cursor-pointer font-medium"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-5 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-black shadow-lg shadow-orange-600/30 cursor-pointer transition-all"
+            >
+              Save & Lock Fuel Slip
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 };
 
-export default DieselFuelManagementModule;
+export default RecordDieselVoucherModal;

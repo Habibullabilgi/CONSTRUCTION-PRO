@@ -79,11 +79,11 @@ export const Header: React.FC<Props> = ({
       (erpContext as any).deleteSite(targetId);
     } else {
       try {
-        const savedDeleted = localStorage.getItem('PAVETRACK_DELETED_SITE_IDS');
+        const savedDeleted = localStorage.getItem('CONSTRUCTION_PRO_DELETED_SITE_IDS');
         const list = savedDeleted ? JSON.parse(savedDeleted) : [];
         if (!list.includes(targetId)) {
           list.push(targetId);
-          localStorage.setItem('PAVETRACK_DELETED_SITE_IDS', JSON.stringify(list));
+          localStorage.setItem('CONSTRUCTION_PRO_DELETED_SITE_IDS', JSON.stringify(list));
         }
 
         const savedSheets = localStorage.getItem('INFRABUILD_ERP_STATE_V1_SITE_SHEETS');
@@ -125,11 +125,11 @@ export const Header: React.FC<Props> = ({
     } else if (q.includes('exp') || q.includes('cost') || q.includes('petty')) {
       setActiveTab('site-expenses');
     } else if (q.includes('yield') || q.includes('calc')) {
-      setActiveTab('road-yield');
-    } else if (q.includes('machin') || q.includes('fleet')) {
-      setActiveTab('machinery');
+      setActiveTab('yield_calculator');
+    } else if (q.includes('machin') || q.includes('fleet') || q.includes('vehic') || q.includes('car') || q.includes('jeep') || q.includes('tractor') || q.includes('roller') || q.includes('jcb')) {
+      setActiveTab('machinery_fleet');
     } else if (q.includes('dpr') || q.includes('report')) {
-      setActiveTab('reports');
+      setActiveTab('dpr');
     } else {
       setActiveTab('dashboard');
     }
@@ -366,7 +366,7 @@ export const Header: React.FC<Props> = ({
         </button>
       </div>
 
-      {/* Direct Confirmation Modal (No typing required) */}
+      {/* Direct Confirmation Modal */}
       {siteToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-150">
           <div className="bg-[#121927] border border-rose-900/60 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
@@ -380,7 +380,7 @@ export const Header: React.FC<Props> = ({
                 onClick={() => setSiteToDelete(null)}
                 className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 

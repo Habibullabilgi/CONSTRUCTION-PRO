@@ -9,9 +9,10 @@ import { MaterialHaulageTripsModule } from './components/trips/MaterialHaulageTr
 import { DieselFuelManagementModule } from './components/diesel/DieselFuelManagementModule';
 import { SiteCostExpensesModule } from './components/costing/SiteCostExpensesModule';
 import { RoadSitesManagerModule } from './components/sites/RoadSitesManagerModule';
-import { MachineFleetManagementModule } from './components/fleet/MachineFleetManagementModule';
 import { RoadYieldCalculatorModule } from './components/calculator/RoadYieldCalculatorModule';
 import { RoadAnalyticsDPRModule } from './components/analytics/RoadAnalyticsDPRModule';
+import { MachineryFleetModule } from './components/machinery/MachineryFleetModule';
+
 import {
   Users,
   Plus,
@@ -528,17 +529,17 @@ export const AppContent: React.FC = () => {
             )}
 
             {/* 7. Engineering: Road Yield Calculator */}
-            {activeTab === 'road-yield' && (
+            {(activeTab === 'yield_calculator' || activeTab === 'road-yield') && (
               <RoadYieldCalculatorModule />
             )}
 
-            {/* 8. Fleet: Machinery & Equipment */}
-            {activeTab === 'machinery' && (
-              <MachineFleetManagementModule />
+            {/* 8. Fleet: Machinery & Equipment (Supports both IDs) */}
+            {(activeTab === 'machinery_fleet' || activeTab === 'machinery') && (
+              <MachineryFleetModule />
             )}
 
-            {/* 9. Reporting: Daily Progress Report */}
-            {activeTab === 'reports' && (
+            {/* 9. Reporting: Daily Progress Report (Supports both IDs) */}
+            {(activeTab === 'dpr' || activeTab === 'reports') && (
               <RoadAnalyticsDPRModule />
             )}
           </div>

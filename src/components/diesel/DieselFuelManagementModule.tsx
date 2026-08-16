@@ -75,7 +75,6 @@ export const RecordDieselVoucherModal: React.FC<Props> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150 font-sans">
       <div className="bg-[#121927] border border-[#1E293B] rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 text-slate-100">
-        
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
           <div className="flex items-center gap-2 text-white font-bold text-base">
@@ -92,8 +91,7 @@ export const RecordDieselVoucherModal: React.FC<Props> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
-          
-          {/* Row 1: Date & Site Name */}
+          {/* Row 1: Voucher Date & Site Name */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-slate-300 font-bold mb-1.5 flex items-center gap-1">
@@ -136,7 +134,7 @@ export const RecordDieselVoucherModal: React.FC<Props> = ({
               <button
                 type="button"
                 onClick={() => setIsAddingVehicle(!isAddingVehicle)}
-                className="text-[11px] font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 cursor-pointer"
+                className="text-[11px] font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 cursor-pointer transition-colors"
               >
                 <Plus className="w-3 h-3" />
                 <span>+ Add New Vehicle</span>

@@ -112,6 +112,7 @@ interface ERPContextType {
   // Trips & Weighbridge
   vehicleTrips: VehicleTrip[];
   addVehicleTrip: (trip: Omit<VehicleTrip, 'id'>) => void;
+  deleteVehicleTrip: (tripId: string) => void;
   updateVehicleTripStatus: (tripId: string, status: ApprovalStatus) => void;
 
   // Site Matrix Sheets
@@ -120,6 +121,7 @@ interface ERPContextType {
   updateSiteRowRate: (siteId: string, tabKey: string, rowId: string, rate: number) => void;
   addSiteSheetRow: (siteId: string, tabKey: string, date: string, item: string) => void;
   addSiteSheetVehicle: (siteId: string, vehicleNumber: string) => void;
+  deleteSiteSheetVehicle: (siteId: string, vehicleNumber: string) => void;
   addSiteSheetTab: (siteId: string, tabKey: string, label: string, defaultRate: number, unit: string) => void;
 
   // Expenses & Accounts
@@ -172,7 +174,7 @@ interface ERPContextType {
 
 const ERPContext = createContext<ERPContextType | undefined>(undefined);
 
-// V4 forces automatic invalidation of stale 9-site data in localStorage
+// V4 forces automatic invalidation of stale data in localStorage
 const LOCAL_STORAGE_KEY = 'INFRABUILD_ERP_STATE_V4';
 const DELETED_SITES_KEY = 'PAVETRACK_DELETED_SITE_IDS';
 
@@ -197,7 +199,6 @@ const getZeroedSiteSheets = (sheets: SiteMatrixSheet[]): SiteMatrixSheet[] => {
 };
 
 export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // One-time cleanup of legacy keys from prior versions
   useEffect(() => {
     try {
       localStorage.removeItem('INFRABUILD_ERP_STATE_V1_PROJECTS');
@@ -297,7 +298,7 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   });
 
-  // 3. Database Entities (Fresh ongoing data)
+  // 3. Database Entities
   const [projects, setProjects] = useState<Project[]>(() => {
     try {
       const savedDeleted = localStorage.getItem(DELETED_SITES_KEY);
@@ -813,9 +814,14 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setBuildingFloors((prev) => [...prev, newFloor]);
   };
 
+  // Trips Functions
   const addVehicleTrip = (tripData: Omit<VehicleTrip, 'id'>) => {
     const newId = 'trip-' + Date.now();
     setVehicleTrips((prev) => [{ ...tripData, id: newId }, ...prev]);
+  };
+
+  const deleteVehicleTrip = (tripId: string) => {
+    setVehicleTrips((prev) => prev.filter((t) => t.id !== tripId));
   };
 
   const updateVehicleTripStatus = (tripId: string, status: ApprovalStatus) => {
@@ -969,6 +975,30 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     );
   };
 
+  const deleteSiteSheetVehicle = (siteId: string, vehicleNumber: string) => {
+    const cleanNum = vehicleNumber.trim().toUpperCase();
+    setSiteSheets((prevSheets) =>
+      (prevSheets || []).map((sheet) => {
+        if (sheet.siteId !== siteId) return sheet;
+        return {
+          ...sheet,
+          vehicles: sheet.vehicles.filter((v) => v !== cleanNum),
+          tabs: sheet.tabs.map((tab) => ({
+            ...tab,
+            rows: tab.rows.map((row) => {
+              const updatedValues = { ...row.vehicleValues };
+              delete updatedValues[cleanNum];
+              return {
+                ...row,
+                vehicleValues: updatedValues
+              };
+            })
+          }))
+        };
+      })
+    );
+  };
+
   const addSiteSheetTab = (siteId: string, tabKey: string, label: string, defaultRate: number, unit: string) => {
     setSiteSheets((prevSheets) =>
       (prevSheets || []).map((sheet) => {
@@ -1016,7 +1046,7 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
   };
 
-  // --- Total Data Purge Engine ---
+  // Total Data Purge Engine
   const clearAllData = () => {
     setStockLedger([]);
     setConsumptionRecords([]);
@@ -1149,12 +1179,14 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         addConsumptionRecord,
         vehicleTrips,
         addVehicleTrip,
+        deleteVehicleTrip,
         updateVehicleTripStatus,
         siteSheets,
         updateSiteCellValue,
         updateSiteRowRate,
         addSiteSheetRow,
         addSiteSheetVehicle,
+        deleteSiteSheetVehicle,
         addSiteSheetTab,
         siteExpenses,
         addSiteExpense,

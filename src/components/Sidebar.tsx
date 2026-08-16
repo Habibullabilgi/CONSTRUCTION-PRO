@@ -49,13 +49,13 @@ export const Sidebar: React.FC<Props> = ({ activeTab, setActiveTab }) => {
   badge: 'Trips',
   badgeStyle: 'bg-[#064E3B] text-[#34D399] border border-[#065F46]'
 },
-    {
-      id: 'diesel',
-      label: 'Diesel & Fuel Management',
-      icon: Fuel,
-      badge: 'Fuel Logs',
-      badgeStyle: 'bg-[#451A03] text-[#FBBF24] border border-[#78350F]'
-    },
+   {
+  id: 'diesel',
+  label: 'Diesel',
+  icon: Fuel,
+  badge: 'Diesel',
+  badgeStyle: 'bg-amber-950/60 text-amber-300 border border-amber-800'
+},
     {
       id: 'site-expenses',
       label: 'Site Cost & Expenses',

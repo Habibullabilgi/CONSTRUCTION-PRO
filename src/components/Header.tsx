@@ -15,7 +15,8 @@ import {
   Plus,
   Trash2,
   AlertTriangle,
-  X
+  X,
+  LogOut
 } from 'lucide-react';
 import CreateRoadSiteModal from './modals/CreateRoadSiteModal';
 import { ClearDataModal } from './modals/ClearDataModal';
@@ -43,7 +44,8 @@ export const Header: React.FC<Props> = ({
     siteSheets,
     userRole,
     setUserRole,
-    currentUser
+    currentUser,
+    logout
   } = erpContext;
 
   const [isSiteOpen, setIsSiteOpen] = useState(false);
@@ -55,6 +57,8 @@ export const Header: React.FC<Props> = ({
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [isOnline, setIsOnline] = useState(true);
+
+  const isSuperAdmin = userRole === 'SUPER_ADMIN' || userRole === 'OWNER';
 
   const roles: { role: UserRole; label: string }[] = [
     { role: 'SUPER_ADMIN', label: 'Admin User (Habibulla Bilgi)' },
@@ -73,11 +77,9 @@ export const Header: React.FC<Props> = ({
 
     const targetId = siteToDelete.id;
 
-    // 1. Call context deleteSite if available
     if (typeof (erpContext as any).deleteSite === 'function') {
       (erpContext as any).deleteSite(targetId);
     } else {
-      // 2. Direct fallback cleanup via localStorage
       try {
         const savedSheets = localStorage.getItem('INFRABUILD_ERP_STATE_V1_SITE_SHEETS');
         if (savedSheets) {
@@ -94,6 +96,18 @@ export const Header: React.FC<Props> = ({
     setSiteToDelete(null);
     setDeleteConfirmText('');
     setIsSiteOpen(false);
+  };
+
+  const handleLogout = () => {
+    if (window.confirm('Are you sure you want to log out of PaveTrack Pro?')) {
+      if (typeof logout === 'function') {
+        logout();
+      } else {
+        sessionStorage.clear();
+        localStorage.removeItem('INFRABUILD_ERP_STATE_V1_AUTH');
+        window.location.reload();
+      }
+    }
   };
 
   const handleSearchSubmit = (e: React.FormEvent) => {
@@ -175,36 +189,40 @@ export const Header: React.FC<Props> = ({
                     <div className="flex items-center gap-2">
                       {selectedSiteId === s.siteId && <Check className="w-3.5 h-3.5 text-blue-400" />}
 
-                      {/* Delete Site Button (Shows on row hover) */}
-                      <button
-                        type="button"
-                        title={`Delete ${s.siteName}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSiteToDelete({ id: s.siteId, name: s.siteName });
-                        }}
-                        className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-950/50 rounded-lg transition-all cursor-pointer"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      {/* Delete Site Button (Super Admin Only) */}
+                      {isSuperAdmin && siteSheets.length > 1 && (
+                        <button
+                          type="button"
+                          title={`Delete ${s.siteName}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSiteToDelete({ id: s.siteId, name: s.siteName });
+                          }}
+                          className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-950/50 rounded-lg transition-all cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
               </div>
 
               {/* Add New Road Site Section Action */}
-              <div className="p-2 border-t border-[#1E293B] bg-[#0D111D] rounded-b-2xl">
-                <button
-                  onClick={() => {
-                    setIsSiteOpen(false);
-                    setIsAddRoadSiteOpen(true);
-                  }}
-                  className="w-full py-2 px-3 rounded-xl bg-blue-600/20 hover:bg-blue-600 border border-blue-500/30 hover:border-blue-500 text-blue-300 hover:text-white font-black text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>+ Add New Road Site Section</span>
-                </button>
-              </div>
+              {isSuperAdmin && (
+                <div className="p-2 border-t border-[#1E293B] bg-[#0D111D] rounded-b-2xl">
+                  <button
+                    onClick={() => {
+                      setIsSiteOpen(false);
+                      setIsAddRoadSiteOpen(true);
+                    }}
+                    className="w-full py-2 px-3 rounded-xl bg-blue-600/20 hover:bg-blue-600 border border-blue-500/30 hover:border-blue-500 text-blue-300 hover:text-white font-black text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>+ Add New Road Site Section</span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -225,7 +243,7 @@ export const Header: React.FC<Props> = ({
         />
       </form>
 
-      {/* Right: Site Status Indicator + Notifications + Connectivity + Role */}
+      {/* Right: Actions */}
       <div className="flex items-center gap-2 sm:gap-3">
         {/* Site Status Indicator */}
         <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#064E3B] text-[#34D399] border border-[#065F46] text-[11px] font-black">
@@ -279,15 +297,17 @@ export const Header: React.FC<Props> = ({
           <span>{isOnline ? 'Online' : 'Offline'}</span>
         </button>
 
-        {/* Clear Data / Reset Database Button */}
-        <button
-          onClick={() => setIsClearDataOpen(true)}
-          title="Clear all transactional data or reset database"
-          className="p-1.5 rounded-xl bg-[#121927] hover:bg-rose-950/60 border border-[#1E293B] hover:border-rose-700/50 text-slate-400 hover:text-rose-300 transition-colors cursor-pointer flex items-center gap-1"
-        >
-          <Trash2 className="w-3.5 h-3.5" />
-          <span className="hidden md:inline text-[11px] font-semibold">Clear Data</span>
-        </button>
+        {/* Clear Data / Reset Database Button (Super Admin Only) */}
+        {isSuperAdmin && (
+          <button
+            onClick={() => setIsClearDataOpen(true)}
+            title="Clear all transactional data or reset database"
+            className="p-1.5 rounded-xl bg-[#121927] hover:bg-rose-950/60 border border-[#1E293B] hover:border-rose-700/50 text-slate-400 hover:text-rose-300 transition-colors cursor-pointer flex items-center gap-1"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span className="hidden md:inline text-[11px] font-semibold">Clear Data</span>
+          </button>
+        )}
 
         {/* User Role Switcher Dropdown */}
         <div className="relative">
@@ -299,7 +319,7 @@ export const Header: React.FC<Props> = ({
             <span className="truncate max-w-[110px]">
               {roles.find((r) => r.role === userRole)?.label.split(' ')[0] || 'Admin'}
             </span>
-            <ChevronDown className="w-3 h-3 text-[#94A3B8]" />
+            <ChevronDown className="w-3.5 h-3.5 text-[#94A3B8]" />
           </button>
 
           {isRoleOpen && (
@@ -325,6 +345,17 @@ export const Header: React.FC<Props> = ({
             </div>
           )}
         </div>
+
+        {/* Logout Button */}
+        <button
+          type="button"
+          onClick={handleLogout}
+          title="Sign out of PaveTrack Pro"
+          className="p-1.5 rounded-xl bg-[#121927] hover:bg-rose-950/40 border border-[#1E293B] hover:border-rose-700/50 text-slate-400 hover:text-rose-400 transition-colors cursor-pointer flex items-center gap-1"
+        >
+          <LogOut className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline text-[11px] font-semibold">Logout</span>
+        </button>
       </div>
 
       {/* Embedded Danger Zone Modal: Delete Whole Site */}

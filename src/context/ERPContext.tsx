@@ -148,7 +148,12 @@ interface ERPContextType {
   updateBuildingFloor: (floorId: string, data: Partial<BuildingFloor>) => void;
   addBuildingFloor: (floor: Partial<BuildingFloor>) => void;
 
+  // Materials & Fixed Rates Management
   materials: MaterialItem[];
+  addMaterial: (item: Omit<MaterialItem, 'id'>) => void;
+  updateMaterial: (id: string, data: Partial<MaterialItem>) => void;
+  deleteMaterial: (id: string) => void;
+
   stockLedger: StockLedgerEntry[];
   addStockTransaction: (entry: Omit<StockLedgerEntry, 'id'>) => void;
   consumptionRecords: MaterialConsumptionRecord[];
@@ -360,6 +365,19 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [materials, setMaterials] = useState<MaterialItem[]>(() =>
     safeGetJSON(LOCAL_STORAGE_KEY + '_MATERIALS', INITIAL_MATERIALS)
   );
+
+  const addMaterial = (itemData: Omit<MaterialItem, 'id'>) => {
+    const newId = `mat-${Date.now()}`;
+    setMaterials((prev) => [{ ...itemData, id: newId }, ...prev]);
+  };
+
+  const updateMaterial = (id: string, data: Partial<MaterialItem>) => {
+    setMaterials((prev) => prev.map((m) => (m.id === id ? { ...m, ...data } : m)));
+  };
+
+  const deleteMaterial = (id: string) => {
+    setMaterials((prev) => prev.filter((m) => m.id !== id));
+  };
 
   const [stockLedger, setStockLedger] = useState<StockLedgerEntry[]>(() =>
     safeGetJSON(LOCAL_STORAGE_KEY + '_STOCK_LEDGER', INITIAL_STOCK_LEDGER)
@@ -1085,6 +1103,9 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         updateBuildingFloor,
         addBuildingFloor,
         materials,
+        addMaterial,
+        updateMaterial,
+        deleteMaterial,
         stockLedger,
         addStockTransaction,
         consumptionRecords,

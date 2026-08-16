@@ -37,7 +37,6 @@ import {
   INITIAL_STOCK_LEDGER,
   INITIAL_CONSUMPTION_RECORDS,
   INITIAL_VEHICLE_TRIPS,
-  INITIAL_MACHINERY,
   INITIAL_MACHINERY_LOGS,
   INITIAL_DIESEL_LOGS,
   INITIAL_WORKERS,
@@ -173,9 +172,14 @@ interface ERPContextType {
   deleteSiteExpense: (id: string) => void;
   updateSiteExpenseStatus: (id: string, status: 'PAID' | 'PENDING' | 'APPROVED') => void;
 
+  // Machinery & Heavy Fleet
   machinery: MachineryRecord[];
+  addMachinery: (machine: Omit<MachineryRecord, 'id'>) => void;
+  deleteMachinery: (id: string) => void;
+  clearAllMachinery: () => void;
   machineryLogs: MachineryLog[];
   addMachineryLog: (log: Omit<MachineryLog, 'id'>) => void;
+
   dieselLogs: DieselLog[];
   addDieselLog: (log: Omit<DieselLog, 'id'>) => void;
   deleteDieselLog: (logId: string) => void;
@@ -368,9 +372,33 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     safeGetJSON(LOCAL_STORAGE_KEY + '_TRIPS', INITIAL_VEHICLE_TRIPS)
   );
 
+  // Default to empty array [] so sample fleet is purged
   const [machinery, setMachinery] = useState<MachineryRecord[]>(() =>
-    safeGetJSON(LOCAL_STORAGE_KEY + '_MACHINERY', INITIAL_MACHINERY)
+    safeGetJSON(LOCAL_STORAGE_KEY + '_MACHINERY', [])
   );
+
+  // Auto-purge any stale sample equipment from earlier sessions
+  useEffect(() => {
+    const legacy = safeGetJSON(LOCAL_STORAGE_KEY + '_MACHINERY', []);
+    if (legacy.length > 0 && legacy.some((m: any) => m.code === 'EX-01' || m.code === 'JCB-02')) {
+      setMachinery([]);
+      localStorage.setItem(LOCAL_STORAGE_KEY + '_MACHINERY', JSON.stringify([]));
+    }
+  }, []);
+
+  const addMachinery = (machineData: Omit<MachineryRecord, 'id'>) => {
+    const newId = `mch-${Date.now()}`;
+    setMachinery((prev) => [{ ...machineData, id: newId }, ...prev]);
+  };
+
+  const deleteMachinery = (machineId: string) => {
+    setMachinery((prev) => prev.filter((m) => m.id !== machineId));
+  };
+
+  const clearAllMachinery = () => {
+    setMachinery([]);
+    localStorage.setItem(LOCAL_STORAGE_KEY + '_MACHINERY', JSON.stringify([]));
+  };
 
   const [machineryLogs, setMachineryLogs] = useState<MachineryLog[]>(() =>
     safeGetJSON(LOCAL_STORAGE_KEY + '_MACHINERY_LOGS', INITIAL_MACHINERY_LOGS)
@@ -728,6 +756,7 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setVehicleTrips((prev) => prev.map((t) => (t.id === tripId ? { ...t, approvalStatus: status } : t)));
   };
 
+  // Machinery CRUD
   const addMachineryLog = (logData: Omit<MachineryLog, 'id'>) => {
     const newId = 'mlog-' + Date.now();
     setMachineryLogs((prev) => [{ ...logData, id: newId }, ...prev]);
@@ -936,6 +965,7 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setStockLedger([]);
     setConsumptionRecords([]);
     setVehicleTrips([]);
+    setMachinery([]);
     setDieselLogs([]);
     setMachineryLogs([]);
     setAttendanceRecords([]);
@@ -949,6 +979,7 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     try {
       localStorage.removeItem(LOCAL_STORAGE_KEY + '_TRIPS');
+      localStorage.removeItem(LOCAL_STORAGE_KEY + '_MACHINERY');
       localStorage.removeItem(LOCAL_STORAGE_KEY + '_DIESEL_LOGS');
       localStorage.removeItem(LOCAL_STORAGE_KEY + '_SITE_EXPENSES');
       localStorage.removeItem(LOCAL_STORAGE_KEY + '_STOCK_LEDGER');
@@ -975,7 +1006,7 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setStockLedger(INITIAL_STOCK_LEDGER);
     setConsumptionRecords(INITIAL_CONSUMPTION_RECORDS);
     setVehicleTrips(INITIAL_VEHICLE_TRIPS);
-    setMachinery(INITIAL_MACHINERY);
+    setMachinery([]);
     setMachineryLogs(INITIAL_MACHINERY_LOGS);
     setDieselLogs(INITIAL_DIESEL_LOGS);
     setWorkers(INITIAL_WORKERS);
@@ -1020,6 +1051,7 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (data.materials) setMaterials(data.materials);
       if (data.deletedSiteIds) setDeletedSiteIds(data.deletedSiteIds);
       if (data.usersList) setUsersList(data.usersList);
+      if (data.machinery) setMachinery(data.machinery);
       return true;
     } catch {
       return false;
@@ -1081,6 +1113,9 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         deleteSiteExpense,
         updateSiteExpenseStatus,
         machinery,
+        addMachinery,
+        deleteMachinery,
+        clearAllMachinery,
         machineryLogs,
         addMachineryLog,
         dieselLogs,

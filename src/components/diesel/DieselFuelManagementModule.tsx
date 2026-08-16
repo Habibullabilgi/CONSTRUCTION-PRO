@@ -7,16 +7,10 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock,
-  Truck,
-  TrendingDown,
-  ShieldAlert,
-  ShieldCheck,
   Download,
   Trash2,
   Filter,
-  Search,
-  Zap,
-  DollarSign
+  Search
 } from 'lucide-react';
 
 const FUEL_SOURCES: { id: FuelSourceType; label: string; rate: number }[] = [
@@ -204,28 +198,31 @@ export const DieselFuelManagementModule: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 font-sans">
+    <div className="space-y-6 font-sans text-slate-100 selection:bg-amber-500 selection:text-slate-950">
       {/* Top Header Card */}
       <div className="p-6 rounded-3xl bg-[#0c1427] border border-[#1b2845] shadow-xl">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-slate-950 font-bold shadow-lg shadow-amber-500/20">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-slate-950 font-bold shadow-lg shadow-amber-500/20 shrink-0">
               <Fuel className="w-6 h-6" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                  MODULE C • BOWSER & STATIC TANK FUEL LOGS
+                <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                  Diesel
+                </h1>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                  Fuel Logs
                 </span>
                 {kpis.flaggedFuelAnomaliesCount > 0 && (
-                  <span className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30 animate-pulse">
+                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30 animate-pulse">
                     <AlertTriangle className="w-3 h-3" /> {kpis.flaggedFuelAnomaliesCount} Pilferage Spike Flagged
                   </span>
                 )}
               </div>
-              <h1 className="text-2xl font-black text-white tracking-tight mt-0.5">
-                Diesel & Fuel Management with Meter Verification
-              </h1>
+              <p className="text-xs text-[#94A3B8] mt-0.5">
+                Bowser and static tank dispensing logs, meter readings, and machine fuel consumption.
+              </p>
             </div>
           </div>
 
@@ -238,7 +235,7 @@ export const DieselFuelManagementModule: React.FC = () => {
               className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-extrabold text-xs flex items-center gap-1.5 shadow-lg shadow-amber-500/20 cursor-pointer transition-all"
             >
               <Plus className="w-4 h-4" />
-              <span>Record Refueling Voucher</span>
+              <span>+ Record Refueling Voucher</span>
             </button>
             <button
               onClick={handleExportCSV}
@@ -443,7 +440,7 @@ export const DieselFuelManagementModule: React.FC = () => {
                     <td className="py-3 px-3 text-center">
                       <button
                         onClick={() => deleteFuelLog(log.id)}
-                        className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 transition-colors"
+                        className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 transition-colors cursor-pointer"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -463,7 +460,7 @@ export const DieselFuelManagementModule: React.FC = () => {
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
                 <Fuel className="w-5 h-5 text-amber-500" />
-                <span>Record Diesel Fuel Dispensation Voucher</span>
+                <span>Record Diesel Refueling Voucher</span>
               </h3>
               <button
                 onClick={() => setIsAddModalOpen(false)}
@@ -482,7 +479,7 @@ export const DieselFuelManagementModule: React.FC = () => {
                 <select
                   value={formMachineId}
                   onChange={(e) => handleSelectMachine(e.target.value)}
-                  className="w-full px-3 py-2 bg-[#070c18] border border-[#1b2845] rounded-xl text-white outline-none"
+                  className="w-full px-3 py-2 bg-[#070c18] border border-[#1b2845] rounded-xl text-white outline-none cursor-pointer"
                 >
                   {machines.map((m) => (
                     <option key={m.id} value={m.id}>
@@ -506,7 +503,7 @@ export const DieselFuelManagementModule: React.FC = () => {
                       const opt = FUEL_SOURCES.find((f) => f.id === s);
                       if (opt) setFormRatePerLitre(opt.rate);
                     }}
-                    className="w-full px-3 py-2 bg-[#070c18] border border-[#1b2845] rounded-xl text-white outline-none"
+                    className="w-full px-3 py-2 bg-[#070c18] border border-[#1b2845] rounded-xl text-white outline-none cursor-pointer"
                   >
                     {FUEL_SOURCES.map((s) => (
                       <option key={s.id} value={s.id}>
@@ -561,7 +558,7 @@ export const DieselFuelManagementModule: React.FC = () => {
                 </div>
               </div>
 
-              {/* Meter Verification Section (Mandatory Anti-Pilferage Lock) */}
+              {/* Meter Verification Section */}
               <div className="p-3.5 bg-[#070c18] rounded-2xl border border-amber-500/30 space-y-2.5">
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-amber-400 flex items-center gap-1.5 text-xs">
@@ -664,7 +661,7 @@ export const DieselFuelManagementModule: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 text-slate-950 font-bold shadow-lg shadow-amber-500/20"
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 text-slate-950 font-bold shadow-lg shadow-amber-500/20 cursor-pointer"
                 >
                   Save & Lock Fuel Slip
                 </button>

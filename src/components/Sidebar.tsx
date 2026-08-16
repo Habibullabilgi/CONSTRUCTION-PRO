@@ -6,12 +6,9 @@ import {
   Fuel,
   DollarSign,
   FileText,
-  Cpu,
   Calculator,
   HardHat,
   LogOut,
-  Layers,
-  Wrench,
   Milestone
 } from 'lucide-react';
 
@@ -21,7 +18,7 @@ interface Props {
   onOpenArchitecture?: () => void;
 }
 
-export const Sidebar: React.FC<Props> = ({ activeTab, setActiveTab, onOpenArchitecture }) => {
+export const Sidebar: React.FC<Props> = ({ activeTab, setActiveTab }) => {
   const { currentUser, logout } = useERP();
 
   interface NavItem {
@@ -32,7 +29,7 @@ export const Sidebar: React.FC<Props> = ({ activeTab, setActiveTab, onOpenArchit
     badgeStyle?: string;
   }
 
-  // 1. OPERATIONS (Distinct, separated modules)
+  // 1. OPERATIONS
   const operationsItems: NavItem[] = [
     { id: 'dashboard', label: 'Site Overview', icon: LayoutDashboard },
     {
@@ -78,17 +75,6 @@ export const Sidebar: React.FC<Props> = ({ activeTab, setActiveTab, onOpenArchit
     { id: 'reports', label: 'Daily Progress Report (DPR)', icon: FileText }
   ];
 
-  // 3. SYSTEM & ARCHITECTURE
-  const configItems: NavItem[] = [
-    {
-      id: 'architecture',
-      label: 'System Architecture & ERD',
-      icon: Cpu,
-      badge: 'v3.2',
-      badgeStyle: 'bg-[#162032] text-slate-400 font-mono'
-    }
-  ];
-
   const renderNavGroup = (title: string, items: NavItem[]) => (
     <div className="space-y-1">
       <div className="px-3 text-[10px] font-extrabold uppercase tracking-widest text-[#94A3B8] mb-1">
@@ -99,18 +85,10 @@ export const Sidebar: React.FC<Props> = ({ activeTab, setActiveTab, onOpenArchit
           const Icon = item.icon;
           const isActive = activeTab === item.id;
 
-          const handleClick = () => {
-            if (item.id === 'architecture' && onOpenArchitecture) {
-              onOpenArchitecture();
-            } else {
-              setActiveTab(item.id);
-            }
-          };
-
           return (
             <button
               key={item.id}
-              onClick={handleClick}
+              onClick={() => setActiveTab(item.id)}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 isActive
                   ? 'bg-[#2563EB] text-white shadow-lg shadow-blue-600/30'
@@ -157,14 +135,11 @@ export const Sidebar: React.FC<Props> = ({ activeTab, setActiveTab, onOpenArchit
           </div>
         </div>
 
-        {/* Section 1: SITE OPERATIONS (Trips and Diesel are strictly separated) */}
+        {/* Section 1: SITE OPERATIONS */}
         {renderNavGroup('SITE OPERATIONS', operationsItems)}
 
         {/* Section 2: ENGINEERING & FLEET */}
         {renderNavGroup('ENGINEERING & FLEET', engineeringItems)}
-
-        {/* Section 3: CONFIGURATION */}
-        {renderNavGroup('SYSTEM & SPECIFICATION', configItems)}
       </div>
 
       {/* User Profile Card at Bottom */}

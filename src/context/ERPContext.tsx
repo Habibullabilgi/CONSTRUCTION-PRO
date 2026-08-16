@@ -197,14 +197,16 @@ const getZeroedSiteSheets = (sheets: SiteMatrixSheet[]): SiteMatrixSheet[] => {
 export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const isClearedSlate = typeof window !== 'undefined' && localStorage.getItem('ERP_DATA_CLEARED_SLATE') === 'true';
 
-  // --- 1. Persistent Authentication State ---
+ // 1. Session-only authentication (resets to false on app/browser close)
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEY + '_AUTH');
-    return saved !== null ? JSON.parse(saved) : true;
+    if (typeof window === 'undefined') return false;
+    const saved = sessionStorage.getItem(LOCAL_STORAGE_KEY + '_AUTH');
+    return saved ? JSON.parse(saved) : false; // Defaults to false so login is required
   });
 
   const [currentUser, setCurrentUser] = useState<User>(() => {
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEY + '_USER');
+    if (typeof window === 'undefined') return { id: 'usr-owner-1', name: 'Admin User', email: 'admin@bilgicrushers.com', role: 'SUPER_ADMIN' };
+    const saved = sessionStorage.getItem(LOCAL_STORAGE_KEY + '_USER');
     return saved
       ? JSON.parse(saved)
       : {

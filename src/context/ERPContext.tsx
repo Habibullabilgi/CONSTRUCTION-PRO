@@ -178,10 +178,25 @@ const safeGetJSON = <T,>(key: string, fallback: T): T => {
 export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const isHydrated = useRef(false);
 
-  // 1. Persistent Authentication (Saved in localStorage instead of sessionStorage)
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() =>
-    safeGetJSON(LOCAL_STORAGE_KEY + '_AUTH', true)
-  );
+  // Clean old persistent authentication so closed tabs require login
+  useEffect(() => {
+    try {
+      localStorage.removeItem(LOCAL_STORAGE_KEY + '_AUTH');
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // 1. Session-Based Authentication (requires login every time app closes)
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      const sessionAuth = sessionStorage.getItem(LOCAL_STORAGE_KEY + '_AUTH');
+      return sessionAuth ? JSON.parse(sessionAuth) : false;
+    } catch {
+      return false;
+    }
+  });
 
   const [currentUser, setCurrentUser] = useState<User>(() =>
     safeGetJSON(LOCAL_STORAGE_KEY + '_USER', {
@@ -223,14 +238,14 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setUserRole(role);
     setIsAuthenticated(true);
 
-    localStorage.setItem(LOCAL_STORAGE_KEY + '_AUTH', JSON.stringify(true));
+    sessionStorage.setItem(LOCAL_STORAGE_KEY + '_AUTH', JSON.stringify(true));
     localStorage.setItem(LOCAL_STORAGE_KEY + '_USER', JSON.stringify(usr));
     return true;
   };
 
   const logout = () => {
     setIsAuthenticated(false);
-    localStorage.setItem(LOCAL_STORAGE_KEY + '_AUTH', JSON.stringify(false));
+    sessionStorage.removeItem(LOCAL_STORAGE_KEY + '_AUTH');
   };
 
   const [workType, setWorkType] = useState<WorkType | null>('ROAD');
@@ -241,7 +256,7 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     safeGetJSON(DELETED_SITES_KEY, [])
   );
 
-  // 3. Database Entities with Robust Hydration
+  // 3. Database Entities (Permanently preserved in localStorage)
   const [projects, setProjects] = useState<Project[]>(() => {
     const purged: string[] = safeGetJSON(DELETED_SITES_KEY, []);
     const base: Project[] = safeGetJSON(LOCAL_STORAGE_KEY + '_PROJECTS', INITIAL_PROJECTS);

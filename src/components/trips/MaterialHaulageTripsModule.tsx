@@ -294,82 +294,123 @@ export const MaterialHaulageTripsModule: React.FC = () => {
         </div>
       </div>
 
-      {/* 5. Quick Log Trip Modal */}
-      {isLogModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="bg-[#121927] border border-[#1E293B] rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
-              <div className="flex items-center gap-2 text-white font-bold text-base">
-                <Truck className="w-5 h-5 text-blue-400" />
-                <span>Log New Trip</span>
-              </div>
-              <button
-                onClick={() => setIsLogModalOpen(false)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      {/* Log New Trip Modal */}
+{isLogModalOpen && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150 font-sans">
+    <div className="bg-[#121927] border border-[#1E293B] rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-150 text-slate-100">
+      
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
+        <div className="flex items-center gap-2 text-white font-bold text-base">
+          <Truck className="w-5 h-5 text-blue-400" />
+          <span>Log New Trip</span>
+        </div>
+        <button
+          type="button"
+          onClick={() => setIsLogModalOpen(false)}
+          className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
 
-            <form onSubmit={handleCreateTrip} className="space-y-3 text-xs">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-400 font-bold mb-1">Slip Number</label>
-                  <input
-                    type="text"
-                    placeholder="Auto or e.g. SLIP-101"
-                    value={tripForm.slipNumber}
-                    onChange={(e) => setTripForm({ ...tripForm, slipNumber: e.target.value })}
-                    className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-blue-500 font-mono"
-                  />
-                </div>
+      <form onSubmit={handleCreateTrip} className="space-y-4 text-xs">
+        
+        {/* 1. Site Name */}
+        <div>
+          <label className="block text-slate-300 font-bold mb-1">
+            Site Name <span className="text-blue-400">*</span>
+          </label>
+          <select
+            value={tripForm.siteName || (currentSheet?.siteName || '')}
+            onChange={(e) => setTripForm({ ...tripForm, siteName: e.target.value })}
+            className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-blue-500 font-medium cursor-pointer"
+          >
+            {siteSheets.map((s) => (
+              <option key={s.siteId} value={s.siteName}>
+                {s.siteName}
+              </option>
+            ))}
+          </select>
+        </div>
 
-                <div>
-                  <label className="block text-slate-400 font-bold mb-1">Vehicle *</label>
-                  <select
-                    value={tripForm.vehicleNumber}
-                    onChange={(e) => setTripForm({ ...tripForm, vehicleNumber: e.target.value })}
-                    className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-blue-500 font-mono"
-                  >
-                    {vehicles.map((v) => (
-                      <option key={v} value={v}>
-                        #{v}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+        {/* 2. Vehicle Number */}
+        <div>
+          <label className="block text-slate-300 font-bold mb-1">
+            Vehicle Number <span className="text-blue-400">*</span>
+          </label>
+          <select
+            value={tripForm.vehicleNumber}
+            onChange={(e) => setTripForm({ ...tripForm, vehicleNumber: e.target.value })}
+            className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-blue-500 font-mono font-bold cursor-pointer"
+          >
+            {vehicles.map((v) => (
+              <option key={v} value={v}>
+                #{v}
+              </option>
+            ))}
+          </select>
+        </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-400 font-bold mb-1">Material *</label>
-                  <select
-                    value={tripForm.materialName}
-                    onChange={(e) => setTripForm({ ...tripForm, materialName: e.target.value })}
-                    className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-blue-500"
-                  >
-                    <option value="Murum">Murum</option>
-                    <option value="GSB">GSB</option>
-                    <option value="WMM">WMM</option>
-                    <option value="20 MM">20 MM Aggregate</option>
-                    <option value="M SAND">M-Sand</option>
-                  </select>
-                </div>
+        {/* 3. Material Name */}
+        <div>
+          <label className="block text-slate-300 font-bold mb-1">
+            Material Name <span className="text-blue-400">*</span>
+          </label>
+          <select
+            value={tripForm.materialName}
+            onChange={(e) => setTripForm({ ...tripForm, materialName: e.target.value })}
+            className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-blue-500 font-medium cursor-pointer"
+          >
+            <option value="Murum">Murum</option>
+            <option value="GSB">GSB</option>
+            <option value="WMM">WMM</option>
+            <option value="20 MM">20 MM Aggregate</option>
+            <option value="M SAND">M-Sand</option>
+            <option value="40 MM">40 MM Aggregate</option>
+            <option value="Grit / Dust">Grit / Dust</option>
+          </select>
+        </div>
 
-                <div>
-                  <label className="block text-slate-400 font-bold mb-1">Net Weight (Tons) *</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    required
-                    value={tripForm.netWeightTons}
-                    onChange={(e) =>
-                      setTripForm({ ...tripForm, netWeightTons: Number(e.target.value) })
-                    }
-                    className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-blue-500 font-mono"
-                  />
-                </div>
-              </div>
+        {/* 4. Material Quantity (in Brass) */}
+        <div>
+          <label className="block text-slate-300 font-bold mb-1">
+            Material (in Brass) <span className="text-blue-400">*</span>
+          </label>
+          <input
+            type="number"
+            step="0.01"
+            min="0.1"
+            required
+            placeholder="e.g. 4.50"
+            value={tripForm.brassQty ?? ''}
+            onChange={(e) =>
+              setTripForm({ ...tripForm, brassQty: e.target.value === '' ? '' : Number(e.target.value) })
+            }
+            className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-blue-500 font-mono font-bold placeholder-slate-500"
+          />
+        </div>
+
+        {/* Footer Actions */}
+        <div className="flex justify-end items-center gap-2 pt-3 border-t border-[#1E293B]">
+          <button
+            type="button"
+            onClick={() => setIsLogModalOpen(false)}
+            className="px-4 py-2 rounded-xl text-slate-400 hover:text-white transition-colors cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold transition-all shadow-lg shadow-blue-600/30 cursor-pointer"
+          >
+            Save Trip
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+)}
 
               <div>
                 <label className="block text-slate-400 font-bold mb-1">Drop-off Chainage *</label>

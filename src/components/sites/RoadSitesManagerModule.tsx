@@ -10,15 +10,17 @@ import {
   Layers,
   CheckCircle2,
   Trash2,
-  Power
+  Power,
+  X,
+  ArrowRight
 } from 'lucide-react';
-import CreateRoadSiteModal from '../modals/CreateRoadSiteModal';
 
 interface Props {
   onNavigateTab?: (tab: string) => void;
 }
 
 export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
+  const erp = useERP();
   const {
     projects = [],
     setSelectedProjectId,
@@ -28,11 +30,19 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
     siteSheets = [],
     vehicleTrips = [],
     dieselLogs = [],
-    deleteSite
-  } = useERP();
+    deleteSite,
+    addRoadSiteSection
+  } = erp;
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [filterQuery, setFilterQuery] = useState('');
+
+  // Form State for Adding New Site
+  const [newSiteName, setNewSiteName] = useState('');
+  const [newLocation, setNewLocation] = useState('');
+  const [newSupervisor, setNewSupervisor] = useState('Er. Habibulla Bilgi');
+  const [newStartKm, setNewStartKm] = useState<number | ''>(0);
+  const [newEndKm, setNewEndKm] = useState<number | ''>(12.5);
 
   // Local site active/inactive state map
   const [siteStatuses, setSiteStatuses] = useState<Record<string, 'Active' | 'Inactive'>>(() => {
@@ -52,80 +62,100 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
     localStorage.setItem('CONSTRUCTION_PRO_SITE_STATUSES', JSON.stringify(updated));
   };
 
-  // Safe mapping that handles empty or undefined projects/sites
-  const safeProjects = Array.isArray(projects) && projects.length > 0
-    ? projects
-    : [{ id: 'proj-1', name: 'National Highway Expansion', sites: [] }];
+  // Safe site collection
+  const allRoadSites = Array.isArray(siteSheets) && siteSheets.length > 0
+    ? siteSheets.map((sh, idx) => {
+        const matchingSec = Array.isArray(roadSections)
+          ? roadSections.find((r) => r && (r.siteId === sh.siteId || (r.name && r.name.toLowerCase().includes(sh.siteName.toLowerCase()))))
+          : undefined;
+        const matchingTrips = Array.isArray(vehicleTrips) ? vehicleTrips.filter((t) => t && t.siteId === sh.siteId) : [];
+        const matchingDiesel = Array.isArray(dieselLogs) ? dieselLogs.filter((d) => d && d.siteId === sh.siteId) : [];
+        const totalDieselL = matchingDiesel.reduce((sum, d) => sum + (d.litresDispensed || 0), 0);
+        const status = siteStatuses[sh.siteId] || 'Active';
 
-  const allRoadSites = safeProjects.flatMap((p) => {
-    const sites = Array.isArray(p.sites) && p.sites.length > 0
-      ? p.sites
-      : siteSheets.map((sh) => ({
+        return {
           id: sh.siteId,
-          projectId: p.id,
           name: sh.siteName,
+          code: `ST-${101 + idx}`,
+          projectName: 'NH-50 Flexible Pavement Construction',
+          projectId: projects[0]?.id || 'proj-ongoing-1',
+          location: 'Main Highway Stretch Corridor',
+          supervisor: 'Er. Habibulla Bilgi',
+          tripsCount: matchingTrips.length,
+          totalDieselL,
+          status,
+          vehicles: sh.vehicles || ['KA28B8797', 'KA-28-EX-8901', 'MH-12-DT-5510'],
+          startKm: matchingSec?.startChainage ?? 0.0,
+          endKm: matchingSec?.endChainage ?? 12.5,
+          lengthKm: matchingSec && typeof matchingSec.endChainage === 'number' && typeof matchingSec.startChainage === 'number'
+            ? Math.abs(matchingSec.endChainage - matchingSec.startChainage)
+            : 12.5
+        };
+      })
+    : [
+        {
+          id: 'site-ongoing-1',
+          name: 'NH-50 Ongoing Site Stretch',
           code: 'ST-101',
-          location: 'Highway Stretch Corridor',
-          supervisor: 'Site Incharge'
-        }));
+          projectName: 'National Highway Expansion',
+          projectId: 'proj-ongoing-1',
+          location: 'Km 10+000 to Km 22+500',
+          supervisor: 'Er. Habibulla Bilgi',
+          tripsCount: 138,
+          totalDieselL: 4200,
+          status: 'Active',
+          vehicles: ['KA28B8797', 'KA-28-EX-8901', 'MH-12-DT-5510'],
+          startKm: 10.0,
+          endKm: 22.5,
+          lengthKm: 12.5
+        }
+      ];
 
-    return sites.map((s) => {
-      const roadSec = Array.isArray(roadSections)
-        ? roadSections.find(
-            (r) => r && (r.siteId === s.id || (r.name && r.name.toLowerCase().includes(s.name.toLowerCase())))
-          )
-        : undefined;
-      const sheet = Array.isArray(siteSheets) ? siteSheets.find((sh) => sh && sh.siteId === s.id) : undefined;
-      const siteTrips = Array.isArray(vehicleTrips) ? vehicleTrips.filter((t) => t && t.siteId === s.id) : [];
-      const siteDiesel = Array.isArray(dieselLogs) ? dieselLogs.filter((d) => d && d.siteId === s.id) : [];
-      const totalDieselL = siteDiesel.reduce((sum, d) => sum + (d.litresDispensed || 0), 0);
-      const status = siteStatuses[s.id] || 'Active';
+  const handleCreateSite = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSiteName.trim()) return;
 
-      return {
-        site: s,
-        project: p,
-        roadSec,
-        sheet,
-        tripsCount: siteTrips.length,
-        totalDieselL,
-        status,
-        vehicles: sheet?.vehicles || ['KA-28-EX-8901', 'KA-28-JC-3342', 'MH-12-DT-5510'],
-        lengthKm: roadSec && typeof roadSec.endChainage === 'number' && typeof roadSec.startChainage === 'number'
-          ? Math.abs(roadSec.endChainage - roadSec.startChainage)
-          : 15.0
-      };
-    });
-  });
+    if (typeof addRoadSiteSection === 'function') {
+      addRoadSiteSection({
+        siteName: newSiteName.trim(),
+        location: newLocation.trim() || 'Main Highway Corridor',
+        supervisor: newSupervisor.trim() || 'Site Incharge',
+        startChainageKm: Number(newStartKm) || 0,
+        endChainageKm: Number(newEndKm) || 10,
+        vehicles: ['KA28B8797', 'KA-28-EX-8901', 'MH-12-DT-5510']
+      });
+    }
+
+    setIsAddModalOpen(false);
+    setNewSiteName('');
+    setNewLocation('');
+  };
+
+  const handleDeleteSite = (siteId: string, siteName: string) => {
+    if (window.confirm(`Are you sure you want to permanently remove "${siteName}"?`)) {
+      if (typeof deleteSite === 'function') {
+        deleteSite(siteId);
+      }
+    }
+  };
 
   const filteredSites = allRoadSites.filter((item) => {
     if (!filterQuery.trim()) return true;
     const q = filterQuery.toLowerCase();
     return (
-      (item.site?.name || '').toLowerCase().includes(q) ||
-      (item.site?.code || '').toLowerCase().includes(q) ||
-      (item.project?.name || '').toLowerCase().includes(q) ||
-      (item.site?.location || '').toLowerCase().includes(q) ||
-      (item.site?.supervisor || '').toLowerCase().includes(q)
+      item.name.toLowerCase().includes(q) ||
+      item.code.toLowerCase().includes(q) ||
+      item.location.toLowerCase().includes(q) ||
+      item.supervisor.toLowerCase().includes(q)
     );
   });
 
   const totalLengthKm = allRoadSites.reduce((sum, s) => sum + s.lengthKm, 0);
   const totalVehiclesCount = Array.from(new Set(allRoadSites.flatMap((s) => s.vehicles))).length;
 
-  const handleSelectSite = (siteId: string, projId: string) => {
-    if (typeof setSelectedProjectId === 'function') setSelectedProjectId(projId);
-    if (typeof setSelectedSiteId === 'function') setSelectedSiteId(siteId);
-  };
-
-  const handleDeleteSiteCard = (siteId: string, siteName: string) => {
-    if (window.confirm(`Are you sure you want to permanently delete "${siteName}"?`)) {
-      if (typeof deleteSite === 'function') deleteSite(siteId);
-    }
-  };
-
   return (
     <div className="space-y-6 font-sans text-slate-100 selection:bg-blue-600 selection:text-white">
-      {/* Top Banner / Title Header */}
+      {/* 1. Top Banner */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#121927] border border-[#1E293B] p-5 rounded-3xl shadow-lg">
         <div className="flex items-center gap-3.5">
           <div className="w-12 h-12 rounded-2xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0 shadow-md shadow-blue-600/20">
@@ -137,7 +167,7 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
                 Ongoing Site & Highway Execution
               </h1>
               <span className="px-2 py-0.5 rounded-full bg-[#064E3B] text-[#34D399] border border-[#065F46] text-[10px] font-black uppercase">
-                Ongoing Site
+                Active Sites
               </span>
             </div>
             <p className="text-xs text-[#94A3B8] mt-0.5">
@@ -146,41 +176,33 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
           </div>
         </div>
 
-        {/* Add Ongoing Site Section Button */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setIsAddModalOpen(true)}
-            className="px-4 py-2.5 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs font-black shadow-lg shadow-blue-600/30 flex items-center gap-2 transition-all cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>+ Add Ongoing Site Section</span>
-          </button>
-        </div>
+        <button
+          onClick={() => setIsAddModalOpen(true)}
+          className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-black shadow-lg shadow-blue-600/30 flex items-center gap-2 transition-all cursor-pointer"
+        >
+          <Plus className="w-4 h-4" />
+          <span>+ Add Ongoing Site Section</span>
+        </button>
       </div>
 
-      {/* 4-Column Executive Summary Cards */}
+      {/* 2. Executive Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Ongoing Site Sections */}
-        <div className="p-4 rounded-2xl bg-[#121927] border border-[#1E293B] shadow-sm relative overflow-hidden group">
+        <div className="p-4 rounded-2xl bg-[#121927] border border-[#1E293B] shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold uppercase tracking-wider text-[#94A3B8]">
-              Ongoing Site
+              Ongoing Sites
             </span>
             <div className="w-8 h-8 rounded-xl bg-blue-600/15 border border-blue-500/30 flex items-center justify-center text-blue-400">
               <Milestone className="w-4 h-4" />
             </div>
           </div>
           <div className="text-2xl font-black text-white mt-2">
-            {allRoadSites.length}{' '}
-            <span className="text-xs font-semibold text-[#94A3B8]">Section</span>
+            {allRoadSites.length} <span className="text-xs font-semibold text-[#94A3B8]">Sections</span>
           </div>
-          <div className="text-[11px] text-blue-400 font-medium mt-1">
-            Active Construction Zone
-          </div>
+          <div className="text-[11px] text-blue-400 font-medium mt-1">Active Execution Zones</div>
         </div>
 
-        {/* Card 2: Highway Execution */}
-        <div className="p-4 rounded-2xl bg-[#121927] border border-[#1E293B] shadow-sm relative overflow-hidden group">
+        <div className="p-4 rounded-2xl bg-[#121927] border border-[#1E293B] shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold uppercase tracking-wider text-[#94A3B8]">
               Highway Execution
@@ -190,16 +212,12 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
             </div>
           </div>
           <div className="text-2xl font-black text-white mt-2">
-            {totalLengthKm.toFixed(1)}{' '}
-            <span className="text-xs font-semibold text-[#94A3B8]">KM Length</span>
+            {totalLengthKm.toFixed(1)} <span className="text-xs font-semibold text-[#94A3B8]">KM Length</span>
           </div>
-          <div className="text-[11px] text-emerald-400 font-medium mt-1">
-            MoRTH Flexible Pavement Specs
-          </div>
+          <div className="text-[11px] text-emerald-400 font-medium mt-1">MoRTH Flexible Pavement Specs</div>
         </div>
 
-        {/* Card 3: Tipper Fleet */}
-        <div className="p-4 rounded-2xl bg-[#121927] border border-[#1E293B] shadow-sm relative overflow-hidden group">
+        <div className="p-4 rounded-2xl bg-[#121927] border border-[#1E293B] shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold uppercase tracking-wider text-[#94A3B8]">
               Assigned Tippers
@@ -209,39 +227,32 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
             </div>
           </div>
           <div className="text-2xl font-black text-white mt-2">
-            {totalVehiclesCount}{' '}
-            <span className="text-xs font-semibold text-[#94A3B8]">Vehicles</span>
+            {totalVehiclesCount} <span className="text-xs font-semibold text-[#94A3B8]">Vehicles</span>
           </div>
-          <div className="text-[11px] text-amber-400 font-medium mt-1">
-            Active Multi-Axle Fleet
-          </div>
+          <div className="text-[11px] text-amber-400 font-medium mt-1">Active Multi-Axle Fleet</div>
         </div>
 
-        {/* Card 4: Site Incharge */}
-        <div className="p-4 rounded-2xl bg-[#121927] border border-[#1E293B] shadow-sm relative overflow-hidden group">
+        <div className="p-4 rounded-2xl bg-[#121927] border border-[#1E293B] shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold uppercase tracking-wider text-[#94A3B8]">
-              Site Incharge
+              Site Supervisor
             </span>
             <div className="w-8 h-8 rounded-xl bg-purple-600/15 border border-purple-500/30 flex items-center justify-center text-purple-400">
               <HardHat className="w-4 h-4" />
             </div>
           </div>
           <div className="text-2xl font-black text-white mt-2">
-            {allRoadSites.length}{' '}
-            <span className="text-xs font-semibold text-[#94A3B8]">Engineer</span>
+            {allRoadSites.length} <span className="text-xs font-semibold text-[#94A3B8]">Engineers</span>
           </div>
-          <div className="text-[11px] text-purple-400 font-medium mt-1">
-            Field Logins & Offline Delta Sync
-          </div>
+          <div className="text-[11px] text-purple-400 font-medium mt-1">Field Incharge & Reporting</div>
         </div>
       </div>
 
-      {/* Filter / Search Bar */}
+      {/* 3. Search Bar */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-[#0D111D] border border-[#1E293B] p-3 rounded-2xl">
         <input
           type="text"
-          placeholder="Filter ongoing site sections by name, package code, location..."
+          placeholder="Filter ongoing site sections by name, code, location..."
           value={filterQuery}
           onChange={(e) => setFilterQuery(e.target.value)}
           className="w-full sm:w-96 px-3.5 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white text-xs placeholder-[#64748B] focus:border-blue-500 outline-none"
@@ -253,52 +264,48 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
         </div>
       </div>
 
-      {/* Ongoing Site Sections List */}
+      {/* 4. Site Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {filteredSites.map((item) => {
-          const isCurrent = item.site.id === selectedSiteId;
-          const startKm = item.roadSec?.startChainage ?? 0.0;
-          const endKm = item.roadSec?.endChainage ?? startKm + item.lengthKm;
+          const isCurrent = item.id === selectedSiteId;
           const isActiveStatus = item.status === 'Active';
 
           return (
             <div
-              key={item.site.id}
+              key={item.id}
               className={`rounded-3xl border p-5 flex flex-col justify-between transition-all relative overflow-hidden ${
                 isCurrent
                   ? 'bg-[#162032] border-blue-500/60 shadow-xl shadow-blue-600/10'
                   : 'bg-[#121927] border-[#1E293B] hover:border-slate-700'
               }`}
             >
-              {/* Active Context Banner */}
               {isCurrent && (
-                <div className="absolute top-0 right-0 px-3 py-1 bg-[#2563EB] text-white text-[10px] font-black rounded-bl-xl uppercase tracking-wider flex items-center gap-1 shadow-sm z-10">
+                <div className="absolute top-0 right-0 px-3 py-1 bg-blue-600 text-white text-[10px] font-black rounded-bl-xl uppercase tracking-wider flex items-center gap-1 shadow-sm z-10">
                   <CheckCircle2 className="w-3 h-3" />
                   <span>Ongoing Site Context</span>
                 </div>
               )}
 
-              {/* Section Header + Status Toggle + Delete Button */}
               <div>
+                {/* Header info */}
                 <div className="flex items-start justify-between gap-3 mb-2 pr-2">
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <span className="px-2 py-0.5 rounded bg-[#162032] border border-[#1E293B] text-blue-400 font-mono text-[10px] font-bold">
-                        {item.site.code || 'ST-101'}
+                        {item.code}
                       </span>
                       <span className="text-[11px] text-[#94A3B8] font-semibold">
-                        {item.project.name}
+                        {item.projectName}
                       </span>
                     </div>
-                    <h3 className="text-base font-black text-white mt-1">{item.site.name}</h3>
+                    <h3 className="text-base font-black text-white mt-1">{item.name}</h3>
                   </div>
 
-                  {/* Actions: Active/Inactive Button & Delete Button */}
                   <div className="flex items-center gap-1.5 shrink-0">
                     <button
                       type="button"
-                      onClick={() => toggleSiteStatus(item.site.id)}
-                      title={`Click to set ${isActiveStatus ? 'Inactive' : 'Active'}`}
+                      onClick={() => toggleSiteStatus(item.id)}
+                      title={`Click to toggle status`}
                       className={`px-2.5 py-1 rounded-xl text-[10px] font-extrabold uppercase border flex items-center gap-1.5 transition-all cursor-pointer ${
                         isActiveStatus
                           ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-300 hover:bg-emerald-900/60'
@@ -311,8 +318,8 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
 
                     <button
                       type="button"
-                      title={`Delete ${item.site.name}`}
-                      onClick={() => handleDeleteSiteCard(item.site.id, item.site.name)}
+                      title={`Delete ${item.name}`}
+                      onClick={() => handleDeleteSite(item.id, item.name)}
                       className="p-1.5 rounded-xl text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 border border-transparent hover:border-rose-800/40 transition-colors cursor-pointer"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -320,7 +327,7 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
                   </div>
                 </div>
 
-                {/* Chainage & Geometry Details */}
+                {/* Chainage Details */}
                 <div className="p-3 bg-[#0D111D] border border-[#1E293B] rounded-2xl my-3 space-y-2">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-[#94A3B8] font-semibold flex items-center gap-1">
@@ -328,7 +335,7 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
                       <span>Chainage Stretch:</span>
                     </span>
                     <span className="text-white font-mono font-bold">
-                      Ch. {startKm.toFixed(3)} → Ch. {endKm.toFixed(3)}
+                      Ch. {item.startKm.toFixed(3)} → Ch. {item.endKm.toFixed(3)}
                     </span>
                   </div>
 
@@ -348,7 +355,7 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
                       <span>Location:</span>
                     </span>
                     <span className="text-[#94A3B8] font-medium truncate max-w-[200px]">
-                      {item.site.location}
+                      {item.location}
                     </span>
                   </div>
 
@@ -357,11 +364,11 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
                       <HardHat className="w-3.5 h-3.5 text-amber-400" />
                       <span>Site Supervisor:</span>
                     </span>
-                    <span className="text-white font-bold">{item.site.supervisor}</span>
+                    <span className="text-white font-bold">{item.supervisor}</span>
                   </div>
                 </div>
 
-                {/* Assigned Tipper Fleet */}
+                {/* Tippers Assigned */}
                 <div className="space-y-1.5 mb-4">
                   <div className="flex items-center justify-between text-[11px]">
                     <span className="text-[#94A3B8] font-bold uppercase tracking-wider flex items-center gap-1">
@@ -385,12 +392,15 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
                 </div>
               </div>
 
-              {/* Action Buttons */}
+              {/* Footer Actions */}
               <div className="pt-3 border-t border-[#1E293B] space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   {!isCurrent ? (
                     <button
-                      onClick={() => handleSelectSite(item.site.id, item.project.id)}
+                      onClick={() => {
+                        if (typeof setSelectedProjectId === 'function') setSelectedProjectId(item.projectId);
+                        if (typeof setSelectedSiteId === 'function') setSelectedSiteId(item.id);
+                      }}
                       className="w-full py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-blue-600/20"
                     >
                       <CheckCircle2 className="w-4 h-4" />
@@ -403,21 +413,20 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
                   )}
                 </div>
 
-                {/* Quick Module Navigation */}
                 {onNavigateTab && (
                   <div className="grid grid-cols-4 gap-1.5 pt-1">
                     <button
                       onClick={() => {
-                        handleSelectSite(item.site.id, item.project.id);
+                        if (typeof setSelectedSiteId === 'function') setSelectedSiteId(item.id);
                         onNavigateTab('haulage-trips');
                       }}
                       className="p-1.5 rounded-lg bg-[#0D111D] hover:bg-[#162032] text-slate-300 hover:text-white border border-[#1E293B] text-[10px] font-bold text-center transition-colors cursor-pointer"
                     >
-                      🚛 Trips Log
+                      🚛 Trips
                     </button>
                     <button
                       onClick={() => {
-                        handleSelectSite(item.site.id, item.project.id);
+                        if (typeof setSelectedSiteId === 'function') setSelectedSiteId(item.id);
                         onNavigateTab('diesel');
                       }}
                       className="p-1.5 rounded-lg bg-[#0D111D] hover:bg-[#162032] text-slate-300 hover:text-white border border-[#1E293B] text-[10px] font-bold text-center transition-colors cursor-pointer"
@@ -426,21 +435,21 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
                     </button>
                     <button
                       onClick={() => {
-                        handleSelectSite(item.site.id, item.project.id);
+                        if (typeof setSelectedSiteId === 'function') setSelectedSiteId(item.id);
                         onNavigateTab('yield_calculator');
                       }}
                       className="p-1.5 rounded-lg bg-[#0D111D] hover:bg-[#162032] text-slate-300 hover:text-white border border-[#1E293B] text-[10px] font-bold text-center transition-colors cursor-pointer"
                     >
-                      📐 Yield Calc
+                      📐 Yield
                     </button>
                     <button
                       onClick={() => {
-                        handleSelectSite(item.site.id, item.project.id);
+                        if (typeof setSelectedSiteId === 'function') setSelectedSiteId(item.id);
                         onNavigateTab('site-expenses');
                       }}
                       className="p-1.5 rounded-lg bg-[#0D111D] hover:bg-[#162032] text-slate-300 hover:text-white border border-[#1E293B] text-[10px] font-bold text-center transition-colors cursor-pointer"
                     >
-                      💰 Expenses
+                      💰 Expense
                     </button>
                   </div>
                 )}
@@ -450,11 +459,103 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
         })}
       </div>
 
-      {/* Add New Section Modal */}
-      <CreateRoadSiteModal
-        isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
-      />
+      {/* Embedded Add Ongoing Site Section Modal */}
+      {isAddModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150 font-sans">
+          <div className="bg-[#121927] border border-[#1E293B] rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-150 text-slate-100">
+            <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
+              <div className="flex items-center gap-2 text-white font-bold text-base">
+                <Milestone className="w-5 h-5 text-blue-400" />
+                <span>Add Ongoing Site Section</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddModalOpen(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateSite} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">
+                  Site Section Name <span className="text-blue-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. NH-50 Section Package B"
+                  value={newSiteName}
+                  onChange={(e) => setNewSiteName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-blue-500 font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">Location / Corridor</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Km 12+000 to 24+500"
+                  value={newLocation}
+                  onChange={(e) => setNewLocation(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-blue-500 font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">Site Supervisor</label>
+                <input
+                  type="text"
+                  value={newSupervisor}
+                  onChange={(e) => setNewSupervisor(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-blue-500 font-medium"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">Start Km</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={newStartKm}
+                    onChange={(e) => setNewStartKm(e.target.value === '' ? '' : Number(e.target.value))}
+                    className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">End Km</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={newEndKm}
+                    onChange={(e) => setNewEndKm(e.target.value === '' ? '' : Number(e.target.value))}
+                    className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono outline-none focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end items-center gap-2 pt-3 border-t border-[#1E293B]">
+                <button
+                  type="button"
+                  onClick={() => setIsAddModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black shadow-lg shadow-blue-600/30 cursor-pointer transition-all"
+                >
+                  Create Site Section
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

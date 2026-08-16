@@ -12,7 +12,7 @@ import {
   Trash2,
   Power
 } from 'lucide-react';
-import { CreateRoadSiteModal } from '../modals/CreateRoadSiteModal';
+import CreateRoadSiteModal from '../modals/CreateRoadSiteModal';
 
 interface Props {
   onNavigateTab?: (tab: string) => void;
@@ -20,14 +20,14 @@ interface Props {
 
 export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
   const {
-    projects,
+    projects = [],
     setSelectedProjectId,
     selectedSiteId,
     setSelectedSiteId,
-    roadSections,
-    siteSheets,
-    vehicleTrips,
-    dieselLogs,
+    roadSections = [],
+    siteSheets = [],
+    vehicleTrips = [],
+    dieselLogs = [],
     deleteSite
   } = useERP();
 
@@ -37,7 +37,7 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
   // Local site active/inactive state map
   const [siteStatuses, setSiteStatuses] = useState<Record<string, 'Active' | 'Inactive'>>(() => {
     try {
-      const saved = localStorage.getItem('PAVETRACK_SITE_STATUSES');
+      const saved = localStorage.getItem('CONSTRUCTION_PRO_SITE_STATUSES');
       return saved ? JSON.parse(saved) : {};
     } catch {
       return {};
@@ -49,18 +49,35 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
     const nextStatus = current === 'Active' ? 'Inactive' : 'Active';
     const updated = { ...siteStatuses, [siteId]: nextStatus };
     setSiteStatuses(updated);
-    localStorage.setItem('PAVETRACK_SITE_STATUSES', JSON.stringify(updated));
+    localStorage.setItem('CONSTRUCTION_PRO_SITE_STATUSES', JSON.stringify(updated));
   };
 
-  // Collect all ongoing sites across projects
-  const allRoadSites = projects.flatMap((p) =>
-    p.sites.map((s) => {
-      const roadSec = roadSections.find(
-        (r) => r.siteId === s.id || r.name.toLowerCase().includes(s.name.toLowerCase())
-      );
-      const sheet = siteSheets.find((sh) => sh.siteId === s.id);
-      const siteTrips = vehicleTrips.filter((t) => t.siteId === s.id);
-      const siteDiesel = dieselLogs.filter((d) => d.siteId === s.id);
+  // Safe mapping that handles empty or undefined projects/sites
+  const safeProjects = Array.isArray(projects) && projects.length > 0
+    ? projects
+    : [{ id: 'proj-1', name: 'National Highway Expansion', sites: [] }];
+
+  const allRoadSites = safeProjects.flatMap((p) => {
+    const sites = Array.isArray(p.sites) && p.sites.length > 0
+      ? p.sites
+      : siteSheets.map((sh) => ({
+          id: sh.siteId,
+          projectId: p.id,
+          name: sh.siteName,
+          code: 'ST-101',
+          location: 'Highway Stretch Corridor',
+          supervisor: 'Site Incharge'
+        }));
+
+    return sites.map((s) => {
+      const roadSec = Array.isArray(roadSections)
+        ? roadSections.find(
+            (r) => r && (r.siteId === s.id || (r.name && r.name.toLowerCase().includes(s.name.toLowerCase())))
+          )
+        : undefined;
+      const sheet = Array.isArray(siteSheets) ? siteSheets.find((sh) => sh && sh.siteId === s.id) : undefined;
+      const siteTrips = Array.isArray(vehicleTrips) ? vehicleTrips.filter((t) => t && t.siteId === s.id) : [];
+      const siteDiesel = Array.isArray(dieselLogs) ? dieselLogs.filter((d) => d && d.siteId === s.id) : [];
       const totalDieselL = siteDiesel.reduce((sum, d) => sum + (d.litresDispensed || 0), 0);
       const status = siteStatuses[s.id] || 'Active';
 
@@ -72,21 +89,23 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
         tripsCount: siteTrips.length,
         totalDieselL,
         status,
-        vehicles: sheet?.vehicles || ['8797', '7352', '7353', '9579', '9580'],
-        lengthKm: roadSec ? Math.abs(roadSec.endChainage - roadSec.startChainage) : 15.0
+        vehicles: sheet?.vehicles || ['KA-28-EX-8901', 'KA-28-JC-3342', 'MH-12-DT-5510'],
+        lengthKm: roadSec && typeof roadSec.endChainage === 'number' && typeof roadSec.startChainage === 'number'
+          ? Math.abs(roadSec.endChainage - roadSec.startChainage)
+          : 15.0
       };
-    })
-  );
+    });
+  });
 
   const filteredSites = allRoadSites.filter((item) => {
     if (!filterQuery.trim()) return true;
     const q = filterQuery.toLowerCase();
     return (
-      item.site.name.toLowerCase().includes(q) ||
-      item.site.code.toLowerCase().includes(q) ||
-      item.project.name.toLowerCase().includes(q) ||
-      item.site.location.toLowerCase().includes(q) ||
-      item.site.supervisor.toLowerCase().includes(q)
+      (item.site?.name || '').toLowerCase().includes(q) ||
+      (item.site?.code || '').toLowerCase().includes(q) ||
+      (item.project?.name || '').toLowerCase().includes(q) ||
+      (item.site?.location || '').toLowerCase().includes(q) ||
+      (item.site?.supervisor || '').toLowerCase().includes(q)
     );
   });
 
@@ -94,13 +113,13 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
   const totalVehiclesCount = Array.from(new Set(allRoadSites.flatMap((s) => s.vehicles))).length;
 
   const handleSelectSite = (siteId: string, projId: string) => {
-    setSelectedProjectId(projId);
-    setSelectedSiteId(siteId);
+    if (typeof setSelectedProjectId === 'function') setSelectedProjectId(projId);
+    if (typeof setSelectedSiteId === 'function') setSelectedSiteId(siteId);
   };
 
   const handleDeleteSiteCard = (siteId: string, siteName: string) => {
     if (window.confirm(`Are you sure you want to permanently delete "${siteName}"?`)) {
-      deleteSite(siteId);
+      if (typeof deleteSite === 'function') deleteSite(siteId);
     }
   };
 
@@ -265,7 +284,7 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <span className="px-2 py-0.5 rounded bg-[#162032] border border-[#1E293B] text-blue-400 font-mono text-[10px] font-bold">
-                        {item.site.code}
+                        {item.site.code || 'ST-101'}
                       </span>
                       <span className="text-[11px] text-[#94A3B8] font-semibold">
                         {item.project.name}
@@ -408,7 +427,7 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
                     <button
                       onClick={() => {
                         handleSelectSite(item.site.id, item.project.id);
-                        onNavigateTab('road-yield');
+                        onNavigateTab('yield_calculator');
                       }}
                       className="p-1.5 rounded-lg bg-[#0D111D] hover:bg-[#162032] text-slate-300 hover:text-white border border-[#1E293B] text-[10px] font-bold text-center transition-colors cursor-pointer"
                     >
@@ -435,9 +454,6 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
       <CreateRoadSiteModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
-        onSuccess={(newId) => {
-          setSelectedSiteId(newId);
-        }}
       />
     </div>
   );

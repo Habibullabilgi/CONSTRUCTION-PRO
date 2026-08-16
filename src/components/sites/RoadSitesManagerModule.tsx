@@ -8,7 +8,9 @@ import {
   MapPin,
   Compass,
   Layers,
-  CheckCircle2
+  CheckCircle2,
+  Trash2,
+  Power
 } from 'lucide-react';
 import { CreateRoadSiteModal } from '../modals/CreateRoadSiteModal';
 
@@ -25,20 +27,42 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
     roadSections,
     siteSheets,
     vehicleTrips,
-    dieselLogs
+    dieselLogs,
+    deleteSite
   } = useERP();
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [filterQuery, setFilterQuery] = useState('');
 
+  // Local site active/inactive state map
+  const [siteStatuses, setSiteStatuses] = useState<Record<string, 'Active' | 'Inactive'>>(() => {
+    try {
+      const saved = localStorage.getItem('PAVETRACK_SITE_STATUSES');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const toggleSiteStatus = (siteId: string) => {
+    const current = siteStatuses[siteId] || 'Active';
+    const nextStatus = current === 'Active' ? 'Inactive' : 'Active';
+    const updated = { ...siteStatuses, [siteId]: nextStatus };
+    setSiteStatuses(updated);
+    localStorage.setItem('PAVETRACK_SITE_STATUSES', JSON.stringify(updated));
+  };
+
   // Collect all ongoing sites across projects
   const allRoadSites = projects.flatMap((p) =>
     p.sites.map((s) => {
-      const roadSec = roadSections.find((r) => r.siteId === s.id || r.name.toLowerCase().includes(s.name.toLowerCase()));
+      const roadSec = roadSections.find(
+        (r) => r.siteId === s.id || r.name.toLowerCase().includes(s.name.toLowerCase())
+      );
       const sheet = siteSheets.find((sh) => sh.siteId === s.id);
       const siteTrips = vehicleTrips.filter((t) => t.siteId === s.id);
       const siteDiesel = dieselLogs.filter((d) => d.siteId === s.id);
       const totalDieselL = siteDiesel.reduce((sum, d) => sum + (d.litresDispensed || 0), 0);
+      const status = siteStatuses[s.id] || 'Active';
 
       return {
         site: s,
@@ -47,6 +71,7 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
         sheet,
         tripsCount: siteTrips.length,
         totalDieselL,
+        status,
         vehicles: sheet?.vehicles || ['8797', '7352', '7353', '9579', '9580'],
         lengthKm: roadSec ? Math.abs(roadSec.endChainage - roadSec.startChainage) : 15.0
       };
@@ -71,6 +96,12 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
   const handleSelectSite = (siteId: string, projId: string) => {
     setSelectedProjectId(projId);
     setSelectedSiteId(siteId);
+  };
+
+  const handleDeleteSiteCard = (siteId: string, siteName: string) => {
+    if (window.confirm(`Are you sure you want to permanently delete "${siteName}"?`)) {
+      deleteSite(siteId);
+    }
   };
 
   return (
@@ -198,7 +229,8 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
         />
 
         <div className="text-xs text-[#94A3B8] font-semibold">
-          Showing <span className="text-white font-bold">{filteredSites.length}</span> of {allRoadSites.length} Ongoing Site Sections
+          Showing <span className="text-white font-bold">{filteredSites.length}</span> of{' '}
+          {allRoadSites.length} Ongoing Site Sections
         </div>
       </div>
 
@@ -207,7 +239,8 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
         {filteredSites.map((item) => {
           const isCurrent = item.site.id === selectedSiteId;
           const startKm = item.roadSec?.startChainage ?? 0.0;
-          const endKm = item.roadSec?.endChainage ?? (startKm + item.lengthKm);
+          const endKm = item.roadSec?.endChainage ?? startKm + item.lengthKm;
+          const isActiveStatus = item.status === 'Active';
 
           return (
             <div
@@ -218,17 +251,18 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
                   : 'bg-[#121927] border-[#1E293B] hover:border-slate-700'
               }`}
             >
+              {/* Active Context Banner */}
               {isCurrent && (
-                <div className="absolute top-0 right-0 px-3 py-1 bg-[#2563EB] text-white text-[10px] font-black rounded-bl-xl uppercase tracking-wider flex items-center gap-1 shadow-sm">
+                <div className="absolute top-0 right-0 px-3 py-1 bg-[#2563EB] text-white text-[10px] font-black rounded-bl-xl uppercase tracking-wider flex items-center gap-1 shadow-sm z-10">
                   <CheckCircle2 className="w-3 h-3" />
                   <span>Ongoing Site Context</span>
                 </div>
               )}
 
-              {/* Section Header */}
+              {/* Section Header + Status Toggle + Delete Button */}
               <div>
-                <div className="flex items-start justify-between gap-3 mb-2">
-                  <div>
+                <div className="flex items-start justify-between gap-3 mb-2 pr-2">
+                  <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <span className="px-2 py-0.5 rounded bg-[#162032] border border-[#1E293B] text-blue-400 font-mono text-[10px] font-bold">
                         {item.site.code}
@@ -237,9 +271,33 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
                         {item.project.name}
                       </span>
                     </div>
-                    <h3 className="text-base font-black text-white mt-1">
-                      {item.site.name}
-                    </h3>
+                    <h3 className="text-base font-black text-white mt-1">{item.site.name}</h3>
+                  </div>
+
+                  {/* Actions: Active/Inactive Button & Delete Button */}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => toggleSiteStatus(item.site.id)}
+                      title={`Click to set ${isActiveStatus ? 'Inactive' : 'Active'}`}
+                      className={`px-2.5 py-1 rounded-xl text-[10px] font-extrabold uppercase border flex items-center gap-1.5 transition-all cursor-pointer ${
+                        isActiveStatus
+                          ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-300 hover:bg-emerald-900/60'
+                          : 'bg-rose-950/60 border-rose-500/40 text-rose-300 hover:bg-rose-900/60'
+                      }`}
+                    >
+                      <Power className="w-3 h-3" />
+                      <span>{isActiveStatus ? 'Active' : 'Inactive'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      title={`Delete ${item.site.name}`}
+                      onClick={() => handleDeleteSiteCard(item.site.id, item.site.name)}
+                      className="p-1.5 rounded-xl text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 border border-transparent hover:border-rose-800/40 transition-colors cursor-pointer"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
 
@@ -280,9 +338,7 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
                       <HardHat className="w-3.5 h-3.5 text-amber-400" />
                       <span>Site Supervisor:</span>
                     </span>
-                    <span className="text-white font-bold">
-                      {item.site.supervisor}
-                    </span>
+                    <span className="text-white font-bold">{item.site.supervisor}</span>
                   </div>
                 </div>
 

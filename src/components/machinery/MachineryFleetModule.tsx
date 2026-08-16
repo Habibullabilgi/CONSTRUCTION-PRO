@@ -9,11 +9,12 @@ import {
   CheckCircle2,
   AlertCircle,
   X,
-  Gauge
+  Gauge,
+  AlertTriangle
 } from 'lucide-react';
 
 export const MachineryFleetModule: React.FC = () => {
-  const { machinery, addMachinery, deleteMachinery } = useERP();
+  const { machinery, addMachinery, deleteMachinery, clearAllMachinery } = useERP();
 
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
@@ -86,6 +87,14 @@ export const MachineryFleetModule: React.FC = () => {
     }
   };
 
+  const handleClearAll = () => {
+    if (window.confirm('Are you sure you want to delete ALL fleet units and start with an empty list?')) {
+      if (clearAllMachinery) {
+        clearAllMachinery();
+      }
+    }
+  };
+
   return (
     <div className="space-y-6 font-sans text-slate-100 selection:bg-amber-500 selection:text-slate-950">
       {/* 1. Header Banner */}
@@ -109,13 +118,25 @@ export const MachineryFleetModule: React.FC = () => {
           </div>
         </div>
 
-        <button
-          onClick={() => setIsRegisterModalOpen(true)}
-          className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-2 transition-all shadow-lg shadow-amber-500/30 cursor-pointer shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          <span>+ Register Machine / Tipper</span>
-        </button>
+        <div className="flex items-center gap-2.5">
+          {machinery.length > 0 && (
+            <button
+              onClick={handleClearAll}
+              className="px-3.5 py-2.5 rounded-xl bg-[#162032] hover:bg-rose-950/40 text-slate-400 hover:text-rose-400 border border-[#1E293B] hover:border-rose-800/40 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Clear All Data</span>
+            </button>
+          )}
+
+          <button
+            onClick={() => setIsRegisterModalOpen(true)}
+            className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-2 transition-all shadow-lg shadow-amber-500/30 cursor-pointer shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            <span>+ Register Machine / Tipper</span>
+          </button>
+        </div>
       </div>
 
       {/* 2. Category Filters */}
@@ -197,7 +218,7 @@ export const MachineryFleetModule: React.FC = () => {
       {filteredFleet.length === 0 ? (
         <div className="bg-[#0B1220] border border-[#1E293B] rounded-3xl p-12 text-center text-slate-500 space-y-2">
           <Truck className="w-10 h-10 mx-auto text-slate-600 mb-2" />
-          <div className="text-sm font-bold text-slate-300">No machinery or equipment found.</div>
+          <div className="text-sm font-bold text-slate-300">No machinery or equipment in registry.</div>
           <div className="text-xs">Click <strong>+ Register Machine / Tipper</strong> above to add units.</div>
         </div>
       ) : (
@@ -207,7 +228,6 @@ export const MachineryFleetModule: React.FC = () => {
               key={machine.id}
               className="p-5 rounded-3xl bg-[#121927] border border-[#1E293B] hover:border-[#334155] transition-all space-y-4 shadow-lg flex flex-col justify-between"
             >
-              {/* Top Row */}
               <div>
                 <div className="flex items-center justify-between gap-2 mb-2">
                   <div className="flex items-center gap-2">

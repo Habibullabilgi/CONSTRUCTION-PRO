@@ -8,14 +8,7 @@ import {
   MapPin,
   Compass,
   Layers,
-  Fuel,
-  DollarSign,
-  Calculator,
-  ChevronRight,
-  CheckCircle2,
-  Calendar,
-  Sparkles,
-  ArrowRight
+  CheckCircle2
 } from 'lucide-react';
 import { CreateRoadSiteModal } from '../modals/CreateRoadSiteModal';
 
@@ -26,11 +19,9 @@ interface Props {
 export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
   const {
     projects,
-    selectedProjectId,
     setSelectedProjectId,
     selectedSiteId,
     setSelectedSiteId,
-    currentProject,
     roadSections,
     siteSheets,
     vehicleTrips,
@@ -40,7 +31,7 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [filterQuery, setFilterQuery] = useState('');
 
-  // Collect all road sites across projects
+  // Collect all ongoing sites across projects
   const allRoadSites = projects.flatMap((p) =>
     p.sites.map((s) => {
       const roadSec = roadSections.find((r) => r.siteId === s.id || r.name.toLowerCase().includes(s.name.toLowerCase()));
@@ -57,7 +48,7 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
         tripsCount: siteTrips.length,
         totalDieselL,
         vehicles: sheet?.vehicles || ['8797', '7352', '7353', '9579', '9580'],
-        lengthKm: roadSec ? Math.abs(roadSec.endChainage - roadSec.startChainage) : 12.5
+        lengthKm: roadSec ? Math.abs(roadSec.endChainage - roadSec.startChainage) : 15.0
       };
     })
   );
@@ -93,37 +84,37 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-                Road Sites & Highway Stretches
+                Ongoing Site & Highway Execution
               </h1>
               <span className="px-2 py-0.5 rounded-full bg-[#064E3B] text-[#34D399] border border-[#065F46] text-[10px] font-black uppercase">
-                Active Sections
+                Ongoing Site
               </span>
             </div>
             <p className="text-xs text-[#94A3B8] mt-0.5">
-              Manage multi-package road sections, chainage boundaries, supervisory teams, and fleet deployments.
+              Manage ongoing site execution, chainage progression, supervisory teams, and fleet deployments.
             </p>
           </div>
         </div>
 
-        {/* Add New Road Site Button */}
+        {/* Add Ongoing Site Section Button */}
         <div className="flex items-center gap-3">
           <button
             onClick={() => setIsAddModalOpen(true)}
             className="px-4 py-2.5 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs font-black shadow-lg shadow-blue-600/30 flex items-center gap-2 transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4" />
-            <span>+ Add New Road Site Section</span>
+            <span>+ Add Ongoing Site Section</span>
           </button>
         </div>
       </div>
 
       {/* 4-Column Executive Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Total Stretches */}
+        {/* Card 1: Ongoing Site Sections */}
         <div className="p-4 rounded-2xl bg-[#121927] border border-[#1E293B] shadow-sm relative overflow-hidden group">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold uppercase tracking-wider text-[#94A3B8]">
-              Active Road Sites
+              Ongoing Site
             </span>
             <div className="w-8 h-8 rounded-xl bg-blue-600/15 border border-blue-500/30 flex items-center justify-center text-blue-400">
               <Milestone className="w-4 h-4" />
@@ -131,14 +122,14 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
           </div>
           <div className="text-2xl font-black text-white mt-2">
             {allRoadSites.length}{' '}
-            <span className="text-xs font-semibold text-[#94A3B8]">Sections</span>
+            <span className="text-xs font-semibold text-[#94A3B8]">Section</span>
           </div>
           <div className="text-[11px] text-blue-400 font-medium mt-1">
-            {projects.length} Parent Projects Configured
+            Active Construction Zone
           </div>
         </div>
 
-        {/* Card 2: Total Road Length */}
+        {/* Card 2: Highway Execution */}
         <div className="p-4 rounded-2xl bg-[#121927] border border-[#1E293B] shadow-sm relative overflow-hidden group">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold uppercase tracking-wider text-[#94A3B8]">
@@ -172,11 +163,11 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
             <span className="text-xs font-semibold text-[#94A3B8]">Vehicles</span>
           </div>
           <div className="text-[11px] text-amber-400 font-medium mt-1">
-            Active Multi-Axle & 10-Tyre Fleet
+            Active Multi-Axle Fleet
           </div>
         </div>
 
-        {/* Card 4: Supervisors */}
+        {/* Card 4: Site Incharge */}
         <div className="p-4 rounded-2xl bg-[#121927] border border-[#1E293B] shadow-sm relative overflow-hidden group">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold uppercase tracking-wider text-[#94A3B8]">
@@ -188,7 +179,7 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
           </div>
           <div className="text-2xl font-black text-white mt-2">
             {allRoadSites.length}{' '}
-            <span className="text-xs font-semibold text-[#94A3B8]">Engineers</span>
+            <span className="text-xs font-semibold text-[#94A3B8]">Engineer</span>
           </div>
           <div className="text-[11px] text-purple-400 font-medium mt-1">
             Field Logins & Offline Delta Sync
@@ -200,22 +191,22 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-[#0D111D] border border-[#1E293B] p-3 rounded-2xl">
         <input
           type="text"
-          placeholder="Filter road sites by name, package code, location, or supervisor..."
+          placeholder="Filter ongoing site sections by name, package code, location..."
           value={filterQuery}
           onChange={(e) => setFilterQuery(e.target.value)}
           className="w-full sm:w-96 px-3.5 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white text-xs placeholder-[#64748B] focus:border-blue-500 outline-none"
         />
 
         <div className="text-xs text-[#94A3B8] font-semibold">
-          Showing <span className="text-white font-bold">{filteredSites.length}</span> of {allRoadSites.length} Road Sections
+          Showing <span className="text-white font-bold">{filteredSites.length}</span> of {allRoadSites.length} Ongoing Site Sections
         </div>
       </div>
 
-      {/* Road Site Sections Grid */}
+      {/* Ongoing Site Sections List */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {filteredSites.map((item) => {
           const isCurrent = item.site.id === selectedSiteId;
-          const startKm = item.roadSec?.startChainage ?? 14.0;
+          const startKm = item.roadSec?.startChainage ?? 0.0;
           const endKm = item.roadSec?.endChainage ?? (startKm + item.lengthKm);
 
           return (
@@ -230,7 +221,7 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
               {isCurrent && (
                 <div className="absolute top-0 right-0 px-3 py-1 bg-[#2563EB] text-white text-[10px] font-black rounded-bl-xl uppercase tracking-wider flex items-center gap-1 shadow-sm">
                   <CheckCircle2 className="w-3 h-3" />
-                  <span>Active Site Context</span>
+                  <span>Ongoing Site Context</span>
                 </div>
               )}
 
@@ -295,7 +286,7 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
                   </div>
                 </div>
 
-                {/* Assigned Tipper Roster */}
+                {/* Assigned Tipper Fleet */}
                 <div className="space-y-1.5 mb-4">
                   <div className="flex items-center justify-between text-[11px]">
                     <span className="text-[#94A3B8] font-bold uppercase tracking-wider flex items-center gap-1">
@@ -328,16 +319,16 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
                       className="w-full py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-blue-600/20"
                     >
                       <CheckCircle2 className="w-4 h-4" />
-                      <span>Set as Active Site Context</span>
+                      <span>Set as Ongoing Site Context</span>
                     </button>
                   ) : (
                     <div className="w-full py-1.5 text-center text-xs font-bold text-emerald-400 bg-emerald-950/30 border border-emerald-800/40 rounded-xl">
-                      ✓ Currently Active Site Context
+                      ✓ Active Ongoing Site
                     </div>
                   )}
                 </div>
 
-                {/* Quick Navigation Links */}
+                {/* Quick Module Navigation */}
                 {onNavigateTab && (
                   <div className="grid grid-cols-4 gap-1.5 pt-1">
                     <button
@@ -384,7 +375,7 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
         })}
       </div>
 
-      {/* Add New Road Site Modal */}
+      {/* Add New Section Modal */}
       <CreateRoadSiteModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
@@ -395,4 +386,5 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
     </div>
   );
 };
+
 export default RoadSitesManagerModule;

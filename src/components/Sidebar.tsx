@@ -63,17 +63,58 @@ export const Sidebar: React.FC<Props> = ({ activeTab, setActiveTab }) => {
     }
   ];
 
-  // 2. ENGINEERING
-  const engineeringItems: NavItem[] = [
-    {
-      id: 'road-yield',
-      label: 'Road Yield Calculator',
-      icon: Calculator,
-      badge: 'MoRTH',
-      badgeStyle: 'bg-[#162032] text-blue-400 border border-[#1E293B]'
-    },
-    { id: 'reports', label: 'Daily Progress Report (DPR)', icon: FileText }
-  ];
+ {/* ENGINEERING SECTION */}
+<div className="space-y-1">
+  <p className="px-3 text-[10px] font-black uppercase tracking-wider text-slate-500">
+    Engineering
+  </p>
+
+  {/* Existing Road Yield Calculator */}
+  <button
+    onClick={() => setActiveTab('yield_calculator')}
+    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${
+      activeTab === 'yield_calculator'
+        ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
+        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+    }`}
+  >
+    <div className="flex items-center gap-2.5">
+      <Calculator className="w-4 h-4" />
+      <span>Road Yield Calculator</span>
+    </div>
+    <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-900/60 text-blue-300 font-mono">
+      MoRTH
+    </span>
+  </button>
+
+  {/* NEW: Machinery & Equipment Fleet */}
+  <button
+    onClick={() => setActiveTab('machinery_fleet')}
+    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${
+      activeTab === 'machinery_fleet'
+        ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
+        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+    }`}
+  >
+    <div className="flex items-center gap-2.5">
+      <HardHat className="w-4 h-4" />
+      <span>Machinery & Equipment</span>
+    </div>
+  </button>
+
+  {/* Existing DPR */}
+  <button
+    onClick={() => setActiveTab('dpr')}
+    className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${
+      activeTab === 'dpr'
+        ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
+        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+    }`}
+  >
+    <FileText className="w-4 h-4" />
+    <span>Daily Progress Report (DPR)</span>
+  </button>
+</div>
 
   // 3. ADMINISTRATION
   const administrationItems: NavItem[] = [

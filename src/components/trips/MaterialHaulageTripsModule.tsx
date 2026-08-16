@@ -7,7 +7,90 @@ import {
   Search,
   Calendar,
   X,
-  Trash2,
+  Trash2,{/* 4. Trips Table */}
+<div className="bg-[#0B1220] border border-[#1E293B] rounded-2xl overflow-hidden shadow-2xl">
+  <div className="overflow-x-auto">
+    <table className="w-full text-left text-xs border-collapse">
+      <thead>
+        <tr className="border-b border-[#1E293B] text-[10px] font-extrabold uppercase tracking-wider text-[#94A3B8] bg-[#080D19]">
+          <th className="py-3 px-5">Trip Slip & Date</th>
+          <th className="py-3 px-5">Site Name</th>
+          <th className="py-3 px-5">Vehicle Number</th>
+          <th className="py-3 px-5">Material Name</th>
+          <th className="py-3 px-5 text-right">Material (Brass)</th>
+          <th className="py-3 px-5 text-right">Rate / 1 Brass (₹)</th>
+          <th className="py-3 px-5 text-right">Billing (₹)</th>
+          <th className="py-3 px-4 text-center">Action</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-[#1E293B]/60 text-slate-200">
+        {filteredTrips.length === 0 ? (
+          <tr>
+            <td colSpan={8} className="py-12 text-center text-xs text-slate-500">
+              No trips recorded yet. Click <strong>+ Log Trip</strong> to create an entry.
+            </td>
+          </tr>
+        ) : (
+          filteredTrips.map((t) => (
+            <tr key={t.id} className="hover:bg-[#121927] transition-colors">
+              <td className="py-3.5 px-5 whitespace-nowrap">
+                <div className="font-bold text-white font-mono">{t.slipNumber}</div>
+                <div className="text-[10px] text-[#94A3B8] flex items-center gap-1 mt-0.5">
+                  <Calendar className="w-3 h-3 text-slate-500" />
+                  <span>
+                    {t.date} {t.time && `• ${t.time}`}
+                  </span>
+                </div>
+              </td>
+
+              <td className="py-3.5 px-5 text-slate-300 whitespace-nowrap font-medium">
+                {t.sourceLocation || currentSheet?.siteName || 'Ongoing Highway Site'}
+              </td>
+
+              <td className="py-3.5 px-5 whitespace-nowrap">
+                <div className="font-bold text-blue-400 font-mono">#{t.vehicleNumber}</div>
+              </td>
+
+              <td className="py-3.5 px-5 whitespace-nowrap">
+                <span className="px-2.5 py-0.5 rounded-full bg-blue-950/40 border border-blue-600/40 text-blue-300 text-[11px] font-bold">
+                  {t.materialName}
+                </span>
+              </td>
+
+              <td className="py-3.5 px-5 text-right font-mono font-bold text-cyan-400 whitespace-nowrap">
+                {t.netWeightTons ? `${t.netWeightTons.toFixed(2)} Brass` : '1.00 Brass'}
+              </td>
+
+              <td className="py-3.5 px-5 text-right font-mono text-slate-300 whitespace-nowrap">
+                ₹{(t.ratePerUnitOrTrip || 1400).toLocaleString('en-IN')}
+              </td>
+
+              <td className="py-3.5 px-5 text-right font-mono font-bold text-amber-400 whitespace-nowrap">
+                ₹{(t.totalAmount || ((t.netWeightTons || 1) * (t.ratePerUnitOrTrip || 1400))).toLocaleString('en-IN')}
+              </td>
+
+              {/* Delete Button */}
+              <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm(`Are you sure you want to delete trip "${t.slipNumber}"?`)) {
+                      deleteVehicleTrip(t.id);
+                    }
+                  }}
+                  className="p-1.5 rounded-xl text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 border border-transparent hover:border-rose-800/40 transition-colors cursor-pointer"
+                  title="Delete Trip"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </td>
+            </tr>
+          ))
+        )}
+      </tbody>
+    </table>
+  </div>
+</div>
   Edit2,
   Check,
   Settings2

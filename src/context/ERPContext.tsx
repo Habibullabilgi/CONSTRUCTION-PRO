@@ -178,6 +178,7 @@ interface ERPContextType {
   addMachineryLog: (log: Omit<MachineryLog, 'id'>) => void;
   dieselLogs: DieselLog[];
   addDieselLog: (log: Omit<DieselLog, 'id'>) => void;
+  deleteDieselLog: (logId: string) => void;
 
   workers: Worker[];
   attendanceRecords: AttendanceRecord[];
@@ -226,7 +227,6 @@ const safeGetJSON = <T,>(key: string, fallback: T): T => {
 };
 
 export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // 1. Persistent User Database
   const [usersList, setUsersList] = useState<ManagedUser[]>(() =>
     safeGetJSON(LOCAL_STORAGE_KEY + '_USER_ACCOUNTS', DEFAULT_MANAGED_USERS)
   );
@@ -235,7 +235,6 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     localStorage.setItem(LOCAL_STORAGE_KEY + '_USER_ACCOUNTS', JSON.stringify(usersList));
   }, [usersList]);
 
-  // Session-based authentication
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     try {
@@ -252,7 +251,6 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const [userRole, setUserRole] = useState<UserRole>(() => currentUser?.role || 'SUPER_ADMIN');
 
-  // Login that verifies username and password against User Management
   const login = (username: string, password?: string): { success: boolean; message?: string } => {
     const cleanUser = username.trim().toLowerCase();
     const cleanPass = (password || '').trim();
@@ -716,6 +714,7 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setBuildingFloors((prev) => [...prev, newFloor]);
   };
 
+  // Trips CRUD
   const addVehicleTrip = (tripData: Omit<VehicleTrip, 'id'>) => {
     const newId = 'trip-' + Date.now();
     setVehicleTrips((prev) => [{ ...tripData, id: newId }, ...prev]);
@@ -734,9 +733,14 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setMachineryLogs((prev) => [{ ...logData, id: newId }, ...prev]);
   };
 
+  // Diesel Logs CRUD
   const addDieselLog = (logData: Omit<DieselLog, 'id'>) => {
     const newId = 'dsl-' + Date.now();
     setDieselLogs((prev) => [{ ...logData, id: newId }, ...prev]);
+  };
+
+  const deleteDieselLog = (logId: string) => {
+    setDieselLogs((prev) => prev.filter((d) => d.id !== logId));
   };
 
   const addAttendanceRecord = (recData: Omit<AttendanceRecord, 'id'>) => {
@@ -1081,6 +1085,7 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         addMachineryLog,
         dieselLogs,
         addDieselLog,
+        deleteDieselLog,
         workers,
         attendanceRecords,
         addAttendanceRecord,

@@ -84,7 +84,7 @@ export const MachineryFleetModule: React.FC = () => {
   };
 
   const handleDelete = (id: string, name: string, code: string) => {
-    if (window.confirm(`Are you sure you want to delete [${code}] ${name}?`)) {
+    if (window.confirm(`Are you sure you want to delete [${code}] ${name}? This action cannot be undone.`)) {
       deleteMachinery(id);
     }
   };
@@ -116,7 +116,7 @@ export const MachineryFleetModule: React.FC = () => {
           {machinery.length > 0 && (
             <button
               onClick={() => {
-                if (window.confirm('Delete all machinery records?')) {
+                if (window.confirm('Are you sure you want to delete all machinery records?')) {
                   clearAllMachinery();
                 }
               }}
@@ -212,7 +212,7 @@ export const MachineryFleetModule: React.FC = () => {
         </div>
       </div>
 
-      {/* 4. Fleet Grid with Delete Buttons */}
+      {/* 4. Fleet Cards Grid */}
       {filteredFleet.length === 0 ? (
         <div className="bg-[#0B1220] border border-[#1E293B] rounded-3xl p-12 text-center text-slate-500 space-y-2">
           <Truck className="w-10 h-10 mx-auto text-slate-600 mb-2" />
@@ -252,12 +252,12 @@ export const MachineryFleetModule: React.FC = () => {
                       {machine.status}
                     </span>
 
-                    {/* Top Delete Button */}
+                    {/* Quick Action Top Delete Button */}
                     <button
                       type="button"
                       onClick={() => handleDelete(machine.id, machine.name, machine.code)}
                       className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 border border-transparent hover:border-rose-800/40 transition-colors cursor-pointer"
-                      title="Delete Machine"
+                      title="Delete Equipment"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -317,7 +317,7 @@ export const MachineryFleetModule: React.FC = () => {
                 )}
               </div>
 
-              {/* Card Footer: Operator + Update Meter + Delete Button */}
+              {/* Card Footer: Operator info, Update Meter & Delete Action */}
               <div className="pt-2 border-t border-[#182643] flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 overflow-hidden">
                   <div className="w-8 h-8 rounded-full bg-[#162032] border border-[#1e2d4a] flex items-center justify-center text-slate-400 shrink-0">

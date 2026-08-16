@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import {
   WorkType,
   UserRole,
@@ -188,6 +188,7 @@ interface ERPContextType {
   attendanceRecords: AttendanceRecord[];
   addAttendanceRecord: (rec: Omit<AttendanceRecord, 'id'>) => void;
   bulkAddAttendance: (records: Omit<AttendanceRecord, 'id'>[]) => void;
+  markAttendancePaid: (attendanceId: string, ref: string) => void;
   paymentSheets: LabourPaymentSheet[];
 
   roadProductions: DailyRoadProduction[];
@@ -217,8 +218,8 @@ interface ERPContextType {
 
 const ERPContext = createContext<ERPContextType | undefined>(undefined);
 
-const LOCAL_STORAGE_KEY = 'PAVETRACK_ERP_STORAGE_V5';
-const DELETED_SITES_KEY = 'PAVETRACK_DELETED_SITE_IDS_V5';
+const LOCAL_STORAGE_KEY = 'CONSTRUCTION_PRO_ERP_STORAGE_V6';
+const DELETED_SITES_KEY = 'CONSTRUCTION_PRO_DELETED_SITE_IDS_V6';
 
 const safeGetJSON = <T,>(key: string, fallback: T): T => {
   if (typeof window === 'undefined') return fallback;
@@ -372,19 +373,10 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     safeGetJSON(LOCAL_STORAGE_KEY + '_TRIPS', INITIAL_VEHICLE_TRIPS)
   );
 
-  // Default to empty array [] so sample fleet is purged
+  // Machinery & Fleet State
   const [machinery, setMachinery] = useState<MachineryRecord[]>(() =>
     safeGetJSON(LOCAL_STORAGE_KEY + '_MACHINERY', [])
   );
-
-  // Auto-purge any stale sample equipment from earlier sessions
-  useEffect(() => {
-    const legacy = safeGetJSON(LOCAL_STORAGE_KEY + '_MACHINERY', []);
-    if (legacy.length > 0 && legacy.some((m: any) => m.code === 'EX-01' || m.code === 'JCB-02')) {
-      setMachinery([]);
-      localStorage.setItem(LOCAL_STORAGE_KEY + '_MACHINERY', JSON.stringify([]));
-    }
-  }, []);
 
   const addMachinery = (machineData: Omit<MachineryRecord, 'id'>) => {
     const newId = `mch-${Date.now()}`;
@@ -674,7 +666,7 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       projectId: targetProjId,
       name: input.siteName,
       code: input.siteCode || 'ST-' + Math.floor(100 + Math.random() * 900),
-      location: input.location,
+      location,
       supervisor: input.supervisor
     };
 
@@ -756,7 +748,7 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setVehicleTrips((prev) => prev.map((t) => (t.id === tripId ? { ...t, approvalStatus: status } : t)));
   };
 
-  // Machinery CRUD
+  // Machinery Logs CRUD
   const addMachineryLog = (logData: Omit<MachineryLog, 'id'>) => {
     const newId = 'mlog-' + Date.now();
     setMachineryLogs((prev) => [{ ...logData, id: newId }, ...prev]);

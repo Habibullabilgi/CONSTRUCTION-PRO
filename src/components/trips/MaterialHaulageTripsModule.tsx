@@ -7,90 +7,7 @@ import {
   Search,
   Calendar,
   X,
-  Trash2,{/* 4. Trips Table */}
-<div className="bg-[#0B1220] border border-[#1E293B] rounded-2xl overflow-hidden shadow-2xl">
-  <div className="overflow-x-auto">
-    <table className="w-full text-left text-xs border-collapse">
-      <thead>
-        <tr className="border-b border-[#1E293B] text-[10px] font-extrabold uppercase tracking-wider text-[#94A3B8] bg-[#080D19]">
-          <th className="py-3 px-5">Trip Slip & Date</th>
-          <th className="py-3 px-5">Site Name</th>
-          <th className="py-3 px-5">Vehicle Number</th>
-          <th className="py-3 px-5">Material Name</th>
-          <th className="py-3 px-5 text-right">Material (Brass)</th>
-          <th className="py-3 px-5 text-right">Rate / 1 Brass (₹)</th>
-          <th className="py-3 px-5 text-right">Billing (₹)</th>
-          <th className="py-3 px-4 text-center">Action</th>
-        </tr>
-      </thead>
-      <tbody className="divide-y divide-[#1E293B]/60 text-slate-200">
-        {filteredTrips.length === 0 ? (
-          <tr>
-            <td colSpan={8} className="py-12 text-center text-xs text-slate-500">
-              No trips recorded yet. Click <strong>+ Log Trip</strong> to create an entry.
-            </td>
-          </tr>
-        ) : (
-          filteredTrips.map((t) => (
-            <tr key={t.id} className="hover:bg-[#121927] transition-colors">
-              <td className="py-3.5 px-5 whitespace-nowrap">
-                <div className="font-bold text-white font-mono">{t.slipNumber}</div>
-                <div className="text-[10px] text-[#94A3B8] flex items-center gap-1 mt-0.5">
-                  <Calendar className="w-3 h-3 text-slate-500" />
-                  <span>
-                    {t.date} {t.time && `• ${t.time}`}
-                  </span>
-                </div>
-              </td>
-
-              <td className="py-3.5 px-5 text-slate-300 whitespace-nowrap font-medium">
-                {t.sourceLocation || currentSheet?.siteName || 'Ongoing Highway Site'}
-              </td>
-
-              <td className="py-3.5 px-5 whitespace-nowrap">
-                <div className="font-bold text-blue-400 font-mono">#{t.vehicleNumber}</div>
-              </td>
-
-              <td className="py-3.5 px-5 whitespace-nowrap">
-                <span className="px-2.5 py-0.5 rounded-full bg-blue-950/40 border border-blue-600/40 text-blue-300 text-[11px] font-bold">
-                  {t.materialName}
-                </span>
-              </td>
-
-              <td className="py-3.5 px-5 text-right font-mono font-bold text-cyan-400 whitespace-nowrap">
-                {t.netWeightTons ? `${t.netWeightTons.toFixed(2)} Brass` : '1.00 Brass'}
-              </td>
-
-              <td className="py-3.5 px-5 text-right font-mono text-slate-300 whitespace-nowrap">
-                ₹{(t.ratePerUnitOrTrip || 1400).toLocaleString('en-IN')}
-              </td>
-
-              <td className="py-3.5 px-5 text-right font-mono font-bold text-amber-400 whitespace-nowrap">
-                ₹{(t.totalAmount || ((t.netWeightTons || 1) * (t.ratePerUnitOrTrip || 1400))).toLocaleString('en-IN')}
-              </td>
-
-              {/* Delete Button */}
-              <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (window.confirm(`Are you sure you want to delete trip "${t.slipNumber}"?`)) {
-                      deleteVehicleTrip(t.id);
-                    }
-                  }}
-                  className="p-1.5 rounded-xl text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 border border-transparent hover:border-rose-800/40 transition-colors cursor-pointer"
-                  title="Delete Trip"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </td>
-            </tr>
-          ))
-        )}
-      </tbody>
-    </table>
-  </div>
-</div>
+  Trash2,
   Edit2,
   Check,
   Settings2
@@ -115,10 +32,12 @@ export const MaterialHaulageTripsModule: React.FC = () => {
   const {
     vehicleTrips,
     addVehicleTrip,
+    deleteVehicleTrip,
     selectedSiteId,
     siteSheets,
     currentProject,
-    addSiteSheetVehicle
+    addSiteSheetVehicle,
+    deleteSiteSheetVehicle
   } = useERP();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -148,7 +67,8 @@ export const MaterialHaulageTripsModule: React.FC = () => {
   const [editingMatName, setEditingMatName] = useState<string | null>(null);
   const [editingMatRate, setEditingMatRate] = useState<number | ''>('');
 
-  // Inline Vehicle Input
+  // Inline Vehicle Input & Vehicle Management
+  const [isManagingVehicles, setIsManagingVehicles] = useState(false);
   const [isAddingNewVehicle, setIsAddingNewVehicle] = useState(false);
   const [newVehicleInput, setNewVehicleInput] = useState('');
 
@@ -170,7 +90,6 @@ export const MaterialHaulageTripsModule: React.FC = () => {
     ratePerBrass: materialsList[0]?.defaultRate || 1400
   });
 
-  // When material changes, auto-populate its preset rate
   const handleMaterialChange = (selectedName: string) => {
     const found = materialsList.find((m) => m.name === selectedName);
     const newRate = found ? found.defaultRate : 1400;
@@ -181,7 +100,6 @@ export const MaterialHaulageTripsModule: React.FC = () => {
     }));
   };
 
-  // Real-time automatic total calculation
   const autoCalculatedTotal = useMemo(() => {
     const brass = typeof tripForm.brassQty === 'number' ? tripForm.brassQty : Number(tripForm.brassQty) || 0;
     const rate = typeof tripForm.ratePerBrass === 'number' ? tripForm.ratePerBrass : Number(tripForm.ratePerBrass) || 0;
@@ -233,12 +151,28 @@ export const MaterialHaulageTripsModule: React.FC = () => {
     const cleanNumber = newVehicleInput.trim().toUpperCase();
     if (!cleanNumber) return;
 
-    if (currentSheet?.siteId) {
+    if (currentSheet?.siteId && addSiteSheetVehicle) {
       addSiteSheetVehicle(currentSheet.siteId, cleanNumber);
     }
     setTripForm((prev) => ({ ...prev, vehicleNumber: cleanNumber }));
     setNewVehicleInput('');
     setIsAddingNewVehicle(false);
+  };
+
+  const handleDeleteVehicle = (vehNo: string) => {
+    if (vehicles.length <= 1) {
+      alert('At least one vehicle must remain in the roster.');
+      return;
+    }
+    if (window.confirm(`Are you sure you want to delete Vehicle #${vehNo}?`)) {
+      if (currentSheet?.siteId && deleteSiteSheetVehicle) {
+        deleteSiteSheetVehicle(currentSheet.siteId, vehNo);
+      }
+      const remaining = vehicles.filter((v) => v !== vehNo);
+      if (tripForm.vehicleNumber === vehNo) {
+        setTripForm((prev) => ({ ...prev, vehicleNumber: remaining[0] || '' }));
+      }
+    }
   };
 
   const siteTrips = vehicleTrips.filter(
@@ -293,6 +227,14 @@ export const MaterialHaulageTripsModule: React.FC = () => {
     });
 
     setIsLogModalOpen(false);
+  };
+
+  const handleDeleteTripLog = (tripId: string, slipNo: string) => {
+    if (window.confirm(`Are you sure you want to delete trip "${slipNo}"?`)) {
+      if (deleteVehicleTrip) {
+        deleteVehicleTrip(tripId);
+      }
+    }
   };
 
   const handleExportCSV = () => {
@@ -435,12 +377,13 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                 <th className="py-3 px-5 text-right">Material (Brass)</th>
                 <th className="py-3 px-5 text-right">Rate / 1 Brass (₹)</th>
                 <th className="py-3 px-5 text-right">Billing (₹)</th>
+                <th className="py-3 px-4 text-center">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#1E293B]/60 text-slate-200">
               {filteredTrips.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-xs text-slate-500">
+                  <td colSpan={8} className="py-12 text-center text-xs text-slate-500">
                     No trips recorded yet. Click <strong>+ Log Trip</strong> to create an entry.
                   </td>
                 </tr>
@@ -458,7 +401,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                     </td>
 
                     <td className="py-3.5 px-5 text-slate-300 whitespace-nowrap font-medium">
-                      {t.sourceLocation || currentSheet?.siteName || 'Ongoing Site'}
+                      {t.sourceLocation || currentSheet?.siteName || 'Ongoing Highway Site'}
                     </td>
 
                     <td className="py-3.5 px-5 whitespace-nowrap">
@@ -482,6 +425,17 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                     <td className="py-3.5 px-5 text-right font-mono font-bold text-amber-400 whitespace-nowrap">
                       ₹{(t.totalAmount || ((t.netWeightTons || 1) * (t.ratePerUnitOrTrip || 1400))).toLocaleString('en-IN')}
                     </td>
+
+                    <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteTripLog(t.id, t.slipNumber || 'Trip Entry')}
+                        className="p-1.5 rounded-xl text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 border border-transparent hover:border-rose-800/40 transition-colors cursor-pointer"
+                        title="Delete Logged Trip"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
                   </tr>
                 ))
               )}
@@ -504,7 +458,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                 type="button"
                 onClick={() => {
                   setIsLogModalOpen(false);
-                  setIsAddingNewVehicle(false);
+                  setIsManagingVehicles(false);
                   setIsManagingMaterials(false);
                 }}
                 className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
@@ -514,7 +468,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
             </div>
 
             <form onSubmit={handleCreateTrip} className="space-y-4 text-xs">
-              {/* 1. Site Name */}
+              {/* Site Name */}
               <div>
                 <label className="block text-slate-300 font-bold mb-1">
                   Site Name <span className="text-blue-400">*</span>
@@ -532,7 +486,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                 </select>
               </div>
 
-              {/* 2. Vehicle Number + Inline New Vehicle Creator */}
+              {/* Vehicle Number */}
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-slate-300 font-bold">
@@ -540,29 +494,56 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                   </label>
                   <button
                     type="button"
-                    onClick={() => setIsAddingNewVehicle(!isAddingNewVehicle)}
-                    className="text-blue-400 hover:text-blue-300 text-[11px] font-bold cursor-pointer"
+                    onClick={() => setIsManagingVehicles(!isManagingVehicles)}
+                    className="text-blue-400 hover:text-blue-300 text-[11px] font-bold flex items-center gap-1 cursor-pointer"
                   >
-                    {isAddingNewVehicle ? '← Select Existing' : '+ Add New Vehicle'}
+                    <Settings2 className="w-3 h-3" />
+                    <span>{isManagingVehicles ? 'Done' : 'Manage / Delete V.No'}</span>
                   </button>
                 </div>
 
-                {isAddingNewVehicle ? (
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="e.g. 9988 or KA-28-M-1234"
-                      value={newVehicleInput}
-                      onChange={(e) => setNewVehicleInput(e.target.value)}
-                      className="flex-1 px-3.5 py-2 bg-[#162032] border border-blue-500 rounded-xl text-white outline-none font-mono font-bold uppercase placeholder-slate-500"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleAddNewVehicle}
-                      className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs cursor-pointer shadow-md shadow-blue-600/20 shrink-0"
-                    >
-                      Add
-                    </button>
+                {isManagingVehicles ? (
+                  <div className="p-3 bg-[#0D111D] border border-[#1E293B] rounded-2xl space-y-3">
+                    <div className="text-[10px] text-slate-400 uppercase font-bold">
+                      Vehicle Roster (Click trash icon to delete):
+                    </div>
+                    <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                      {vehicles.map((v) => (
+                        <div
+                          key={v}
+                          className="flex items-center justify-between gap-2 p-1.5 rounded-lg bg-[#162032] border border-[#1E293B]"
+                        >
+                          <span className="font-mono font-bold text-blue-400 text-xs">
+                            #{v}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteVehicle(v)}
+                            className="p-1 text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 rounded transition-colors"
+                            title={`Delete Vehicle #${v}`}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="pt-2 border-t border-[#1E293B] flex gap-1.5">
+                      <input
+                        type="text"
+                        placeholder="e.g. 9988 or KA-28-M-1234"
+                        value={newVehicleInput}
+                        onChange={(e) => setNewVehicleInput(e.target.value)}
+                        className="flex-1 px-2.5 py-1 bg-[#162032] border border-[#1E293B] rounded-lg text-white font-mono uppercase text-xs outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddNewVehicle}
+                        className="px-3 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shrink-0"
+                      >
+                        + Add V.No
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <select
@@ -579,7 +560,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                 )}
               </div>
 
-              {/* 3. Material Name + Manage Rates/Delete Option */}
+              {/* Material Name */}
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-slate-300 font-bold">
@@ -591,7 +572,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                     className="text-amber-400 hover:text-amber-300 text-[11px] font-bold flex items-center gap-1 cursor-pointer"
                   >
                     <Settings2 className="w-3 h-3" />
-                    <span>{isManagingMaterials ? 'Done Editing' : 'Manage Rates / Delete'}</span>
+                    <span>{isManagingMaterials ? 'Done' : 'Manage Rates / Delete'}</span>
                   </button>
                 </div>
 
@@ -600,7 +581,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                     <div className="text-[10px] text-slate-400 uppercase font-bold">
                       Edit Default Rates or Delete Materials:
                     </div>
-                    <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                    <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
                       {materialsList.map((m) => (
                         <div
                           key={m.name}
@@ -656,7 +637,6 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                       ))}
                     </div>
 
-                    {/* Add New Material Form */}
                     <div className="pt-2 border-t border-[#1E293B] flex gap-1.5">
                       <input
                         type="text"
@@ -698,7 +678,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                 )}
               </div>
 
-              {/* 4. Material Quantity (in Brass) */}
+              {/* Material Quantity */}
               <div>
                 <label className="block text-slate-300 font-bold mb-1">
                   Material (in Brass) <span className="text-blue-400">*</span>
@@ -720,7 +700,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                 />
               </div>
 
-              {/* 5. Rate per 1 Brass (₹) */}
+              {/* Rate per 1 Brass */}
               <div>
                 <label className="block text-slate-300 font-bold mb-1">
                   Rate per 1 Brass (₹) <span className="text-blue-400">*</span>
@@ -742,7 +722,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                 />
               </div>
 
-              {/* 6. Real-Time Calculation Card */}
+              {/* Real-Time Calculation Card */}
               <div className="p-3.5 bg-[#0D111D] border border-blue-500/30 rounded-2xl flex items-center justify-between">
                 <div>
                   <div className="text-[11px] text-slate-400 font-semibold">
@@ -763,7 +743,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                   type="button"
                   onClick={() => {
                     setIsLogModalOpen(false);
-                    setIsAddingNewVehicle(false);
+                    setIsManagingVehicles(false);
                     setIsManagingMaterials(false);
                   }}
                   className="px-4 py-2 rounded-xl text-slate-400 hover:text-white transition-colors cursor-pointer"

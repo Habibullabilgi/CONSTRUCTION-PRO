@@ -16,9 +16,16 @@ export const RecordDieselVoucherModal: React.FC<Props> = ({
   vehicles = ['#KA28B8797', '#KA-28-EX-8901', '#MH-12-DT-5510', '#KA-28-TR-1092'],
   onSave,
 }) => {
-  const todayStr = new Date().toISOString().split('T')[0];
+  // Format today's date in YYYY-MM-DD format
+  const getTodayDate = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
 
-  const [date, setDate] = useState<string>(todayStr);
+  const [date, setDate] = useState<string>(getTodayDate());
   const [siteName, setSiteName] = useState<string>(sites[0] || 'Mulwad');
   const [vehicleNumber, setVehicleNumber] = useState<string>(vehicles[0] || '#KA28B8797');
   const [driverName, setDriverName] = useState<string>('Santosh Kamble');
@@ -28,7 +35,7 @@ export const RecordDieselVoucherModal: React.FC<Props> = ({
   const [isEditingRate, setIsEditingRate] = useState<boolean>(false);
   const [tempRate, setTempRate] = useState<number>(92.5);
 
-  // New Vehicle inline add
+  // Inline Vehicle Addition State
   const [isAddingVehicle, setIsAddingVehicle] = useState(false);
   const [newVehicleInput, setNewVehicleInput] = useState('');
   const [vehicleListState, setVehicleListState] = useState<string[]>(vehicles);
@@ -43,7 +50,8 @@ export const RecordDieselVoucherModal: React.FC<Props> = ({
     if (!clean) return;
     const formatted = clean.startsWith('#') ? clean : `#${clean}`;
     if (!vehicleListState.includes(formatted)) {
-      setVehicleListState([formatted, ...vehicleListState]);
+      const updatedList = [formatted, ...vehicleListState];
+      setVehicleListState(updatedList);
       setVehicleNumber(formatted);
     }
     setNewVehicleInput('');
@@ -57,7 +65,7 @@ export const RecordDieselVoucherModal: React.FC<Props> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!litresDispensed || litresDispensed <= 0) return;
+    if (!litresDispensed || Number(litresDispensed) <= 0) return;
 
     onSave({
       date,
@@ -74,7 +82,8 @@ export const RecordDieselVoucherModal: React.FC<Props> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150 font-sans">
-      <div className="bg-[#121927] border border-[#1E293B] rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 text-slate-100">
+      <div className="bg-[#121927] border border-[#1E293B] rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 text-slate-100 max-h-[92vh] overflow-y-auto">
+        
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
           <div className="flex items-center gap-2 text-white font-bold text-base">
@@ -84,15 +93,16 @@ export const RecordDieselVoucherModal: React.FC<Props> = ({
           <button
             type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+            className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
+          
           {/* Row 1: Voucher Date & Site Name */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-slate-300 font-bold mb-1.5 flex items-center gap-1">
                 <Calendar className="w-3.5 h-3.5 text-amber-400" />
@@ -103,7 +113,7 @@ export const RecordDieselVoucherModal: React.FC<Props> = ({
                 required
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-amber-500 font-medium"
+                className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-amber-500 font-medium cursor-pointer"
               />
             </div>
 
@@ -153,7 +163,7 @@ export const RecordDieselVoucherModal: React.FC<Props> = ({
                 <button
                   type="button"
                   onClick={handleAddNewVehicle}
-                  className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-lg font-bold text-xs flex items-center gap-1"
+                  className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-lg font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors"
                 >
                   <Check className="w-3.5 h-3.5" />
                   <span>Save</span>
@@ -161,7 +171,7 @@ export const RecordDieselVoucherModal: React.FC<Props> = ({
                 <button
                   type="button"
                   onClick={() => setIsAddingVehicle(false)}
-                  className="p-1.5 text-slate-400 hover:text-white"
+                  className="p-1.5 text-slate-400 hover:text-white cursor-pointer"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -197,7 +207,7 @@ export const RecordDieselVoucherModal: React.FC<Props> = ({
           </div>
 
           {/* Row 4: Litres Dispensed & Rate / Litre */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-slate-300 font-bold mb-1.5">
                 Litres Dispensed *
@@ -225,7 +235,7 @@ export const RecordDieselVoucherModal: React.FC<Props> = ({
                       setTempRate(ratePerLitre);
                       setIsEditingRate(true);
                     }}
-                    className="text-[10px] text-amber-400 hover:text-amber-300 font-bold flex items-center gap-0.5"
+                    className="text-[10px] text-amber-400 hover:text-amber-300 font-bold flex items-center gap-0.5 cursor-pointer"
                   >
                     <Edit2 className="w-2.5 h-2.5" />
                     <span>Edit</span>
@@ -234,7 +244,7 @@ export const RecordDieselVoucherModal: React.FC<Props> = ({
                   <button
                     type="button"
                     onClick={() => setIsEditingRate(false)}
-                    className="text-[10px] text-slate-400 hover:text-white"
+                    className="text-[10px] text-slate-400 hover:text-white cursor-pointer"
                   >
                     Cancel
                   </button>
@@ -254,7 +264,7 @@ export const RecordDieselVoucherModal: React.FC<Props> = ({
                   <button
                     type="button"
                     onClick={handleApplyRate}
-                    className="p-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl font-bold"
+                    className="p-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl font-bold cursor-pointer"
                   >
                     <Check className="w-4 h-4" />
                   </button>

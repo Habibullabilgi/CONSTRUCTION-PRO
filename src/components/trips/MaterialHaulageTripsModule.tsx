@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useERP } from '../../context/ERPContext';
 import {
   Truck,
@@ -6,8 +6,27 @@ import {
   Download,
   Search,
   Calendar,
-  X
+  X,
+  Trash2,
+  Edit2,
+  Check,
+  Settings2
 } from 'lucide-react';
+
+interface MaterialRateItem {
+  name: string;
+  defaultRate: number;
+}
+
+const INITIAL_MATERIAL_RATES: MaterialRateItem[] = [
+  { name: 'Murum', defaultRate: 1400 },
+  { name: 'GSB', defaultRate: 1950 },
+  { name: 'WMM', defaultRate: 2400 },
+  { name: '20 MM Aggregate', defaultRate: 2800 },
+  { name: 'M-Sand', defaultRate: 3200 },
+  { name: '40 MM Aggregate', defaultRate: 2600 },
+  { name: 'Grit / Dust', defaultRate: 1800 }
+];
 
 export const MaterialHaulageTripsModule: React.FC = () => {
   const {
@@ -24,7 +43,29 @@ export const MaterialHaulageTripsModule: React.FC = () => {
   const [filterVehicle, setFilterVehicle] = useState('ALL');
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
 
-  // New vehicle inline input mode
+  // Persistent Material Catalog with Rates
+  const [materialsList, setMaterialsList] = useState<MaterialRateItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('PAVETRACK_MATERIAL_RATES_V1');
+      return saved ? JSON.parse(saved) : INITIAL_MATERIAL_RATES;
+    } catch {
+      return INITIAL_MATERIAL_RATES;
+    }
+  });
+
+  const saveMaterialsList = (newList: MaterialRateItem[]) => {
+    setMaterialsList(newList);
+    localStorage.setItem('PAVETRACK_MATERIAL_RATES_V1', JSON.stringify(newList));
+  };
+
+  // Manage Materials Mode
+  const [isManagingMaterials, setIsManagingMaterials] = useState(false);
+  const [newMatName, setNewMatName] = useState('');
+  const [newMatRate, setNewMatRate] = useState<number | ''>('');
+  const [editingMatName, setEditingMatName] = useState<string | null>(null);
+  const [editingMatRate, setEditingMatRate] = useState<number | ''>('');
+
+  // Inline Vehicle Input
   const [isAddingNewVehicle, setIsAddingNewVehicle] = useState(false);
   const [newVehicleInput, setNewVehicleInput] = useState('');
 
@@ -41,10 +82,81 @@ export const MaterialHaulageTripsModule: React.FC = () => {
   }>({
     siteName: currentSheet?.siteName || 'Ongoing Highway Site',
     vehicleNumber: vehicles[0] || '8797',
-    materialName: 'Murum',
+    materialName: materialsList[0]?.name || 'Murum',
     brassQty: 6,
-    ratePerBrass: 1400
+    ratePerBrass: materialsList[0]?.defaultRate || 1400
   });
+
+  // When material changes, auto-populate its preset rate
+  const handleMaterialChange = (selectedName: string) => {
+    const found = materialsList.find((m) => m.name === selectedName);
+    const newRate = found ? found.defaultRate : 1400;
+    setTripForm((prev) => ({
+      ...prev,
+      materialName: selectedName,
+      ratePerBrass: newRate
+    }));
+  };
+
+  // Real-time automatic total calculation
+  const autoCalculatedTotal = useMemo(() => {
+    const brass = typeof tripForm.brassQty === 'number' ? tripForm.brassQty : Number(tripForm.brassQty) || 0;
+    const rate = typeof tripForm.ratePerBrass === 'number' ? tripForm.ratePerBrass : Number(tripForm.ratePerBrass) || 0;
+    return brass * rate;
+  }, [tripForm.brassQty, tripForm.ratePerBrass]);
+
+  const handleAddNewMaterial = () => {
+    const trimmed = newMatName.trim();
+    if (!trimmed) return;
+    const rateVal = Number(newMatRate) || 1400;
+    const updated = [...materialsList, { name: trimmed, defaultRate: rateVal }];
+    saveMaterialsList(updated);
+    setTripForm((prev) => ({ ...prev, materialName: trimmed, ratePerBrass: rateVal }));
+    setNewMatName('');
+    setNewMatRate('');
+  };
+
+  const handleDeleteMaterial = (nameToDelete: string) => {
+    if (materialsList.length <= 1) {
+      alert('At least one material must remain in the catalog.');
+      return;
+    }
+    if (window.confirm(`Are you sure you want to delete material "${nameToDelete}"?`)) {
+      const updated = materialsList.filter((m) => m.name !== nameToDelete);
+      saveMaterialsList(updated);
+      if (tripForm.materialName === nameToDelete) {
+        setTripForm((prev) => ({
+          ...prev,
+          materialName: updated[0].name,
+          ratePerBrass: updated[0].defaultRate
+        }));
+      }
+    }
+  };
+
+  const handleSaveEditedRate = (matName: string) => {
+    const rateVal = Number(editingMatRate) || 1400;
+    const updated = materialsList.map((m) =>
+      m.name === matName ? { ...m, defaultRate: rateVal } : m
+    );
+    saveMaterialsList(updated);
+    if (tripForm.materialName === matName) {
+      setTripForm((prev) => ({ ...prev, ratePerBrass: rateVal }));
+    }
+    setEditingMatName(null);
+  };
+
+  const handleAddNewVehicle = () => {
+    const cleanNumber = newVehicleInput.trim().toUpperCase();
+    if (!cleanNumber) return;
+
+    if (currentSheet?.siteId) {
+      addSiteSheetVehicle(currentSheet.siteId, cleanNumber);
+    }
+    setTripForm((prev) => ({ ...prev, vehicleNumber: cleanNumber }));
+    setNewVehicleInput('');
+    setIsAddingNewVehicle(false);
+  };
 
   const siteTrips = vehicleTrips.filter(
     (t) => !selectedSiteId || t.siteId === selectedSiteId || (t as any).siteId === 'all'
@@ -68,18 +180,6 @@ export const MaterialHaulageTripsModule: React.FC = () => {
     (acc, t) => acc + (t.totalAmount || (t.netWeightTons || 1) * (t.ratePerUnitOrTrip || 1400)),
     0
   );
-
-  const handleAddNewVehicle = () => {
-    const cleanNumber = newVehicleInput.trim().toUpperCase();
-    if (!cleanNumber) return;
-
-    if (currentSheet?.siteId) {
-      addSiteSheetVehicle(currentSheet.siteId, cleanNumber);
-    }
-    setTripForm((prev) => ({ ...prev, vehicleNumber: cleanNumber }));
-    setNewVehicleInput('');
-    setIsAddingNewVehicle(false);
-  };
 
   const handleCreateTrip = (e: React.FormEvent) => {
     e.preventDefault();
@@ -207,13 +307,11 @@ export const MaterialHaulageTripsModule: React.FC = () => {
           className="w-full sm:w-48 px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white text-xs outline-none focus:border-blue-500 font-semibold cursor-pointer"
         >
           <option value="ALL">All Materials</option>
-          <option value="Murum">Murum</option>
-          <option value="GSB">GSB</option>
-          <option value="WMM">WMM</option>
-          <option value="20 MM">20 MM Aggregate</option>
-          <option value="M SAND">M-Sand</option>
-          <option value="40 MM">40 MM Aggregate</option>
-          <option value="Grit / Dust">Grit / Dust</option>
+          {materialsList.map((m) => (
+            <option key={m.name} value={m.name}>
+              {m.name}
+            </option>
+          ))}
         </select>
 
         <select
@@ -252,7 +350,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                 <th className="py-3 px-5">Vehicle Number</th>
                 <th className="py-3 px-5">Material Name</th>
                 <th className="py-3 px-5 text-right">Material (Brass)</th>
-                <th className="py-3 px-5 text-right">Rate / Brass (₹)</th>
+                <th className="py-3 px-5 text-right">Rate / 1 Brass (₹)</th>
                 <th className="py-3 px-5 text-right">Billing (₹)</th>
               </tr>
             </thead>
@@ -324,6 +422,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                 onClick={() => {
                   setIsLogModalOpen(false);
                   setIsAddingNewVehicle(false);
+                  setIsManagingMaterials(false);
                 }}
                 className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
               >
@@ -369,7 +468,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                   <div className="flex gap-2">
                     <input
                       type="text"
-                      placeholder="e.g. 9988 or MH-12-AB-1234"
+                      placeholder="e.g. 9988 or KA-28-M-1234"
                       value={newVehicleInput}
                       onChange={(e) => setNewVehicleInput(e.target.value)}
                       className="flex-1 px-3.5 py-2 bg-[#162032] border border-blue-500 rounded-xl text-white outline-none font-mono font-bold uppercase placeholder-slate-500"
@@ -379,7 +478,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                       onClick={handleAddNewVehicle}
                       className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs cursor-pointer shadow-md shadow-blue-600/20 shrink-0"
                     >
-                      Add & Select
+                      Add
                     </button>
                   </div>
                 ) : (
@@ -397,24 +496,123 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                 )}
               </div>
 
-              {/* 3. Material Name */}
+              {/* 3. Material Name + Manage Rates/Delete Option */}
               <div>
-                <label className="block text-slate-300 font-bold mb-1">
-                  Material Name <span className="text-blue-400">*</span>
-                </label>
-                <select
-                  value={tripForm.materialName}
-                  onChange={(e) => setTripForm({ ...tripForm, materialName: e.target.value })}
-                  className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-blue-500 font-medium cursor-pointer"
-                >
-                  <option value="Murum">Murum</option>
-                  <option value="GSB">GSB</option>
-                  <option value="WMM">WMM</option>
-                  <option value="20 MM">20 MM Aggregate</option>
-                  <option value="M SAND">M-Sand</option>
-                  <option value="40 MM">40 MM Aggregate</option>
-                  <option value="Grit / Dust">Grit / Dust</option>
-                </select>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-slate-300 font-bold">
+                    Material Name <span className="text-blue-400">*</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setIsManagingMaterials(!isManagingMaterials)}
+                    className="text-amber-400 hover:text-amber-300 text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                  >
+                    <Settings2 className="w-3 h-3" />
+                    <span>{isManagingMaterials ? 'Done Editing' : 'Manage Rates / Delete'}</span>
+                  </button>
+                </div>
+
+                {isManagingMaterials ? (
+                  <div className="p-3 bg-[#0D111D] border border-[#1E293B] rounded-2xl space-y-3">
+                    <div className="text-[10px] text-slate-400 uppercase font-bold">
+                      Edit Default Rates or Delete Materials:
+                    </div>
+                    <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                      {materialsList.map((m) => (
+                        <div
+                          key={m.name}
+                          className="flex items-center justify-between gap-2 p-1.5 rounded-lg bg-[#162032] border border-[#1E293B]"
+                        >
+                          <span className="font-semibold text-slate-200 truncate flex-1">
+                            {m.name}
+                          </span>
+
+                          {editingMatName === m.name ? (
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="number"
+                                className="w-20 px-1.5 py-0.5 bg-[#0B1220] border border-blue-500 rounded text-right font-mono text-white text-xs"
+                                value={editingMatRate}
+                                onChange={(e) =>
+                                  setEditingMatRate(e.target.value === '' ? '' : Number(e.target.value))
+                                }
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleSaveEditedRate(m.name)}
+                                className="p-1 text-emerald-400 hover:bg-emerald-950/40 rounded"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-mono text-amber-400 text-xs">
+                                ₹{m.defaultRate}/Brass
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingMatName(m.name);
+                                  setEditingMatRate(m.defaultRate);
+                                }}
+                                className="p-1 text-slate-400 hover:text-white rounded"
+                              >
+                                <Edit2 className="w-3 h-3" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteMaterial(m.name)}
+                                className="p-1 text-slate-500 hover:text-rose-400 rounded"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Add New Material Form */}
+                    <div className="pt-2 border-t border-[#1E293B] flex gap-1.5">
+                      <input
+                        type="text"
+                        placeholder="Material name"
+                        value={newMatName}
+                        onChange={(e) => setNewMatName(e.target.value)}
+                        className="flex-1 px-2.5 py-1 bg-[#162032] border border-[#1E293B] rounded-lg text-white text-xs"
+                      />
+                      <input
+                        type="number"
+                        placeholder="Rate ₹"
+                        value={newMatRate}
+                        onChange={(e) =>
+                          setNewMatRate(e.target.value === '' ? '' : Number(e.target.value))
+                        }
+                        className="w-20 px-2 py-1 bg-[#162032] border border-[#1E293B] rounded-lg text-white font-mono text-xs text-right"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddNewMaterial}
+                        className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shrink-0"
+                      >
+                        + Add
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <select
+                    value={tripForm.materialName}
+                    onChange={(e) => handleMaterialChange(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-blue-500 font-medium cursor-pointer"
+                  >
+                    {materialsList.map((m) => (
+                      <option key={m.name} value={m.name}>
+                        {m.name} (Preset: ₹{m.defaultRate}/Brass)
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               {/* 4. Material Quantity (in Brass) */}
@@ -439,10 +637,10 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                 />
               </div>
 
-              {/* 5. Rate per Brass (₹) */}
+              {/* 5. Rate per 1 Brass (₹) */}
               <div>
                 <label className="block text-slate-300 font-bold mb-1">
-                  Rate per Brass (₹) <span className="text-blue-400">*</span>
+                  Rate per 1 Brass (₹) <span className="text-blue-400">*</span>
                 </label>
                 <input
                   type="number"
@@ -461,6 +659,21 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                 />
               </div>
 
+              {/* 6. Real-Time Calculation Card */}
+              <div className="p-3.5 bg-[#0D111D] border border-blue-500/30 rounded-2xl flex items-center justify-between">
+                <div>
+                  <div className="text-[11px] text-slate-400 font-semibold">
+                    Rate: ₹{Number(tripForm.ratePerBrass || 0).toLocaleString('en-IN')} / 1 Brass
+                  </div>
+                  <div className="text-xs text-slate-300 font-bold">
+                    Total Amount ({tripForm.brassQty || 0} Brass):
+                  </div>
+                </div>
+                <div className="text-lg font-black font-mono text-amber-400">
+                  ₹{autoCalculatedTotal.toLocaleString('en-IN')}
+                </div>
+              </div>
+
               {/* Footer Actions */}
               <div className="flex justify-end items-center gap-2 pt-3 border-t border-[#1E293B]">
                 <button
@@ -468,6 +681,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                   onClick={() => {
                     setIsLogModalOpen(false);
                     setIsAddingNewVehicle(false);
+                    setIsManagingMaterials(false);
                   }}
                   className="px-4 py-2 rounded-xl text-slate-400 hover:text-white transition-colors cursor-pointer"
                 >

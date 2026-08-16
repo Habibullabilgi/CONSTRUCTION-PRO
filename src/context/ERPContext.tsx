@@ -173,6 +173,7 @@ interface ERPContextType {
 const ERPContext = createContext<ERPContextType | undefined>(undefined);
 
 const LOCAL_STORAGE_KEY = 'INFRABUILD_ERP_STATE_V1';
+const DELETED_SITES_KEY = 'PAVETRACK_DELETED_SITE_IDS';
 
 const getZeroedSiteSheets = (sheets: SiteMatrixSheet[]): SiteMatrixSheet[] => {
   return (sheets || []).map((sheet) => ({
@@ -197,15 +198,17 @@ const getZeroedSiteSheets = (sheets: SiteMatrixSheet[]): SiteMatrixSheet[] => {
 export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const isClearedSlate = typeof window !== 'undefined' && localStorage.getItem('ERP_DATA_CLEARED_SLATE') === 'true';
 
- // 1. Session-only authentication (resets to false on app/browser close)
+  // 1. Session Authentication (Requires login per session)
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     const saved = sessionStorage.getItem(LOCAL_STORAGE_KEY + '_AUTH');
-    return saved ? JSON.parse(saved) : false; // Defaults to false so login is required
+    return saved ? JSON.parse(saved) : false;
   });
 
   const [currentUser, setCurrentUser] = useState<User>(() => {
-    if (typeof window === 'undefined') return { id: 'usr-owner-1', name: 'Admin User', email: 'admin@bilgicrushers.com', role: 'SUPER_ADMIN' };
+    if (typeof window === 'undefined') {
+      return { id: 'usr-owner-1', name: 'Admin User', email: 'admin@bilgicrushers.com', role: 'SUPER_ADMIN' };
+    }
     const saved = sessionStorage.getItem(LOCAL_STORAGE_KEY + '_USER');
     return saved
       ? JSON.parse(saved)
@@ -219,7 +222,7 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const [userRole, setUserRole] = useState<UserRole>(() => currentUser?.role || 'SUPER_ADMIN');
 
-const login = (username: string, _password?: string): boolean => {
+  const login = (username: string, _password?: string): boolean => {
     const cleanUser = username.trim().toLowerCase();
     let name = 'Admin User';
     let role: UserRole = 'SUPER_ADMIN';
@@ -254,7 +257,6 @@ const login = (username: string, _password?: string): boolean => {
     setUserRole(role);
     setIsAuthenticated(true);
 
-    // Save only to sessionStorage
     sessionStorage.setItem(LOCAL_STORAGE_KEY + '_AUTH', JSON.stringify(true));
     sessionStorage.setItem(LOCAL_STORAGE_KEY + '_USER', JSON.stringify(usr));
     return true;
@@ -269,18 +271,54 @@ const login = (username: string, _password?: string): boolean => {
   const [workType, setWorkType] = useState<WorkType | null>('ROAD');
   const [mobileSiteMode, setMobileSiteMode] = useState<boolean>(false);
 
-  // --- 2. Database Entities ---
+  // 2. Persistent Blacklist for Deleted Sites
+  const [deletedSiteIds, setDeletedSiteIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem(DELETED_SITES_KEY);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // 3. Database Entities with Deletion Blacklist Filtering
   const [projects, setProjects] = useState<Project[]>(() => {
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEY + '_PROJECTS');
-    return saved ? JSON.parse(saved) : INITIAL_PROJECTS;
+    try {
+      const savedDeleted = localStorage.getItem(DELETED_SITES_KEY);
+      const purgedIds: string[] = savedDeleted ? JSON.parse(savedDeleted) : [];
+      const saved = localStorage.getItem(LOCAL_STORAGE_KEY + '_PROJECTS');
+      const baseProjects: Project[] = saved ? JSON.parse(saved) : INITIAL_PROJECTS;
+
+      return baseProjects.map((p) => ({
+        ...p,
+        sites: (p.sites || []).filter((s) => !purgedIds.includes(s.id))
+      }));
+    } catch {
+      return INITIAL_PROJECTS;
+    }
+  });
+
+  const [siteSheets, setSiteSheets] = useState<SiteMatrixSheet[]>(() => {
+    try {
+      const savedDeleted = localStorage.getItem(DELETED_SITES_KEY);
+      const purgedIds: string[] = savedDeleted ? JSON.parse(savedDeleted) : [];
+
+      if (isClearedSlate) return getZeroedSiteSheets(INITIAL_SITE_SHEETS).filter((s) => !purgedIds.includes(s.siteId));
+      const saved = localStorage.getItem(LOCAL_STORAGE_KEY + '_SITE_SHEETS');
+      const baseSheets: SiteMatrixSheet[] = saved ? JSON.parse(saved) : INITIAL_SITE_SHEETS;
+      return baseSheets.filter((s) => !purgedIds.includes(s.siteId));
+    } catch {
+      return INITIAL_SITE_SHEETS;
+    }
   });
 
   const [selectedProjectId, setSelectedProjectId] = useState<string>(
     INITIAL_PROJECTS[0]?.id || 'proj-road-1'
   );
-  const [selectedSiteId, setSelectedSiteId] = useState<string>(
-    INITIAL_PROJECTS[0]?.sites?.[0]?.id || 'site-road-1'
-  );
+  const [selectedSiteId, setSelectedSiteId] = useState<string>(() => {
+    if (siteSheets.length > 0) return siteSheets[0].siteId;
+    return INITIAL_PROJECTS[0]?.sites?.[0]?.id || '';
+  });
 
   const [roadSections, setRoadSections] = useState<RoadSection[]>(() => {
     const saved = localStorage.getItem(LOCAL_STORAGE_KEY + '_ROAD_SECTIONS');
@@ -385,12 +423,6 @@ const login = (username: string, _password?: string): boolean => {
     return saved ? JSON.parse(saved) : INITIAL_AUDIT_LOGS;
   });
 
-  const [siteSheets, setSiteSheets] = useState<SiteMatrixSheet[]>(() => {
-    if (isClearedSlate) return getZeroedSiteSheets(INITIAL_SITE_SHEETS);
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEY + '_SITE_SHEETS');
-    return saved ? JSON.parse(saved) : INITIAL_SITE_SHEETS;
-  });
-
   const [siteExpenses, setSiteExpenses] = useState<SiteExpenseRecord[]>(() => {
     if (isClearedSlate) return [];
     const saved = localStorage.getItem(LOCAL_STORAGE_KEY + '_SITE_EXPENSES');
@@ -413,7 +445,7 @@ const login = (username: string, _password?: string): boolean => {
     }
   };
 
-  // --- 3. Synchronize State to LocalStorage ---
+  // Sync state to LocalStorage
   useEffect(() => {
     try {
       localStorage.setItem(LOCAL_STORAGE_KEY + '_PROJECTS', JSON.stringify(projects));
@@ -437,6 +469,7 @@ const login = (username: string, _password?: string): boolean => {
       localStorage.setItem(LOCAL_STORAGE_KEY + '_AUDIT', JSON.stringify(auditLogs));
       localStorage.setItem(LOCAL_STORAGE_KEY + '_SITE_SHEETS', JSON.stringify(siteSheets));
       localStorage.setItem(LOCAL_STORAGE_KEY + '_SITE_EXPENSES', JSON.stringify(siteExpenses));
+      localStorage.setItem(DELETED_SITES_KEY, JSON.stringify(deletedSiteIds));
     } catch (e) {
       console.error('Failed to sync to localStorage', e);
     }
@@ -461,7 +494,8 @@ const login = (username: string, _password?: string): boolean => {
     notifications,
     auditLogs,
     siteSheets,
-    siteExpenses
+    siteExpenses,
+    deletedSiteIds
   ]);
 
   const addAuditLog = (
@@ -589,27 +623,44 @@ const login = (username: string, _password?: string): boolean => {
     );
   };
 
-  // --- 4. Permanent Site Purge Function ---
+  // --- PERMANENT DELETION ENGINE ---
   const deleteSite = (siteId: string) => {
-    setProjects((prev) =>
-      prev.map((p) => ({
+    // 1. Add to permanent blacklist
+    const updatedDeleted = Array.from(new Set([...deletedSiteIds, siteId]));
+    setDeletedSiteIds(updatedDeleted);
+    localStorage.setItem(DELETED_SITES_KEY, JSON.stringify(updatedDeleted));
+
+    // 2. Remove from active state and persist directly
+    const remainingSheets = siteSheets.filter((s) => s.siteId !== siteId);
+    setSiteSheets(remainingSheets);
+    localStorage.setItem(LOCAL_STORAGE_KEY + '_SITE_SHEETS', JSON.stringify(remainingSheets));
+
+    // 3. Remove from project master
+    setProjects((prev) => {
+      const updated = prev.map((p) => ({
         ...p,
         sites: (p.sites || []).filter((s) => s.id !== siteId)
-      }))
-    );
-    setSiteSheets((prev) => (prev || []).filter((s) => s.siteId !== siteId));
-    setRoadSections((prev) => (prev || []).filter((s) => s.siteId !== siteId));
-    setBuildingFloors((prev) => (prev || []).filter((f) => f.siteId !== siteId));
-    setSiteExpenses((prev) => (prev || []).filter((e) => e.siteId !== siteId));
-    setVehicleTrips((prev) => (prev || []).filter((t) => t.siteId !== siteId));
+      }));
+      localStorage.setItem(LOCAL_STORAGE_KEY + '_PROJECTS', JSON.stringify(updated));
+      return updated;
+    });
 
+    // 4. Remove all associated modules
+    setRoadSections((prev) => prev.filter((s) => s.siteId !== siteId));
+    setBuildingFloors((prev) => prev.filter((f) => f.siteId !== siteId));
+    setSiteExpenses((prev) => prev.filter((e) => e.siteId !== siteId));
+    setVehicleTrips((prev) => prev.filter((t) => t.siteId !== siteId));
+
+    // 5. Update active site context
     if (selectedSiteId === siteId) {
-      const remaining = siteSheets.filter((s) => s.siteId !== siteId);
-      if (remaining.length > 0) {
-        setSelectedSiteId(remaining[0].siteId);
+      if (remainingSheets.length > 0) {
+        setSelectedSiteId(remainingSheets[0].siteId);
+      } else {
+        setSelectedSiteId('');
       }
     }
-    addAuditLog('Site Master', siteId, 'DELETE', `Deleted site stretch ${siteId}`);
+
+    addAuditLog('Site Master', siteId, 'DELETE', `Permanently purged site stretch: ${siteId}`);
   };
 
   const addRoadSiteSection = (input: {
@@ -954,7 +1005,7 @@ const login = (username: string, _password?: string): boolean => {
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
   };
 
-  // --- 5. Total Data Purge Engine ---
+  // --- Total Data Purge Engine ---
   const clearAllData = () => {
     setStockLedger([]);
     setConsumptionRecords([]);
@@ -992,6 +1043,8 @@ const login = (username: string, _password?: string): boolean => {
 
   const resetToSampleData = () => {
     localStorage.removeItem('ERP_DATA_CLEARED_SLATE');
+    localStorage.removeItem(DELETED_SITES_KEY);
+    setDeletedSiteIds([]);
     setProjects(INITIAL_PROJECTS);
     setRoadSections(INITIAL_ROAD_SECTIONS);
     setBuildingFloors(INITIAL_BUILDING_FLOORS);
@@ -1027,7 +1080,8 @@ const login = (username: string, _password?: string): boolean => {
         machinery,
         dieselLogs,
         siteSheets,
-        siteExpenses
+        siteExpenses,
+        deletedSiteIds
       },
       null,
       2
@@ -1040,6 +1094,7 @@ const login = (username: string, _password?: string): boolean => {
       if (data.projects) setProjects(data.projects);
       if (data.siteSheets) setSiteSheets(data.siteSheets);
       if (data.materials) setMaterials(data.materials);
+      if (data.deletedSiteIds) setDeletedSiteIds(data.deletedSiteIds);
       return true;
     } catch {
       return false;

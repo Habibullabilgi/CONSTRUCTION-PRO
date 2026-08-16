@@ -33,13 +33,14 @@ export const Sidebar: React.FC<Props> = ({ activeTab, setActiveTab }) => {
   // 1. OPERATIONS
   const operationsItems: NavItem[] = [
     { id: 'dashboard', label: 'Site Overview', icon: LayoutDashboard },
-    {
-      id: 'road-sites',
-      label: 'Road Sites & Stretches',
-      icon: Milestone,
-      badge: 'Sites',
-      badgeStyle: 'bg-blue-900/40 text-blue-300 border border-blue-500/40'
-    },
+   // Inside operationsItems in src/components/Sidebar.tsx:
+{
+  id: 'road-sites',
+  label: 'Ongoing Sites & Stretches',
+  icon: Milestone,
+  badge: 'Sites',
+  badgeStyle: 'bg-blue-900/40 text-blue-300 border border-blue-500/40'
+},
     {
       id: 'haulage-trips',
       label: 'Material Trips & Weighbridge',

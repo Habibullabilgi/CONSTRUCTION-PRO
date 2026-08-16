@@ -1,5 +1,3 @@
-headertext
-
 import React, { useState } from 'react';
 import { useERP } from '../context/ERPContext';
 import { UserRole } from '../types/erp';

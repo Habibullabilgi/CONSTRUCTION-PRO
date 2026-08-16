@@ -15,7 +15,8 @@ export const MaterialHaulageTripsModule: React.FC = () => {
     addVehicleTrip,
     selectedSiteId,
     siteSheets,
-    currentProject
+    currentProject,
+    addSiteSheetVehicle
   } = useERP();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -23,20 +24,26 @@ export const MaterialHaulageTripsModule: React.FC = () => {
   const [filterVehicle, setFilterVehicle] = useState('ALL');
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
 
-  const currentSheet = siteSheets.find((s) => s.siteId === selectedSiteId);
+  // New vehicle inline input mode
+  const [isAddingNewVehicle, setIsAddingNewVehicle] = useState(false);
+  const [newVehicleInput, setNewVehicleInput] = useState('');
+
+  const currentSheet = siteSheets.find((s) => s.siteId === selectedSiteId) || siteSheets[0];
   const vehicles = currentSheet?.vehicles || ['8797', '7352', '7353', '9579', '9580'];
 
-  // Form State (Only Site Name, Vehicle Number, Material Name, Material in Brass)
+  // Form State
   const [tripForm, setTripForm] = useState<{
     siteName: string;
     vehicleNumber: string;
     materialName: string;
     brassQty: number | '';
+    ratePerBrass: number | '';
   }>({
     siteName: currentSheet?.siteName || 'Ongoing Highway Site',
-    vehicleNumber: '8797',
+    vehicleNumber: vehicles[0] || '8797',
     materialName: 'Murum',
-    brassQty: 4.5
+    brassQty: 6,
+    ratePerBrass: 1400
   });
 
   const siteTrips = vehicleTrips.filter(
@@ -58,15 +65,28 @@ export const MaterialHaulageTripsModule: React.FC = () => {
   const totalTrips = filteredTrips.length;
   const totalBrass = filteredTrips.reduce((acc, t) => acc + (t.netWeightTons || 0), 0);
   const totalValuation = filteredTrips.reduce(
-    (acc, t) => acc + (t.netWeightTons || 1) * (t.ratePerUnitOrTrip || 350),
+    (acc, t) => acc + (t.totalAmount || (t.netWeightTons || 1) * (t.ratePerUnitOrTrip || 1400)),
     0
   );
+
+  const handleAddNewVehicle = () => {
+    const cleanNumber = newVehicleInput.trim().toUpperCase();
+    if (!cleanNumber) return;
+
+    if (currentSheet?.siteId) {
+      addSiteSheetVehicle(currentSheet.siteId, cleanNumber);
+    }
+    setTripForm((prev) => ({ ...prev, vehicleNumber: cleanNumber }));
+    setNewVehicleInput('');
+    setIsAddingNewVehicle(false);
+  };
 
   const handleCreateTrip = (e: React.FormEvent) => {
     e.preventDefault();
     const today = new Date().toISOString().substring(0, 10);
     const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const brass = typeof tripForm.brassQty === 'number' ? tripForm.brassQty : Number(tripForm.brassQty) || 1;
+    const rate = typeof tripForm.ratePerBrass === 'number' ? tripForm.ratePerBrass : Number(tripForm.ratePerBrass) || 1400;
 
     addVehicleTrip({
       projectId: currentProject?.id || 'proj-ongoing-1',
@@ -82,9 +102,9 @@ export const MaterialHaulageTripsModule: React.FC = () => {
       grossWeightKg: brass * 1000,
       tareWeightKg: 0,
       netWeightKg: brass * 1000,
-      netWeightTons: brass, // Storing Brass value
-      ratePerUnitOrTrip: 350,
-      totalAmount: brass * 350,
+      netWeightTons: brass,
+      ratePerUnitOrTrip: rate,
+      totalAmount: brass * rate,
       travelDistanceKm: 0,
       approvalStatus: 'APPROVED'
     });
@@ -93,11 +113,11 @@ export const MaterialHaulageTripsModule: React.FC = () => {
   };
 
   const handleExportCSV = () => {
-    const headers = 'Trip Slip,Date,Site Name,Vehicle,Material,Brass Qty,Billing (INR)\n';
+    const headers = 'Trip Slip,Date,Site Name,Vehicle,Material,Brass Qty,Rate/Brass (INR),Total (INR)\n';
     const rows = filteredTrips
       .map(
         (t) =>
-          `"${t.slipNumber}","${t.date}","${t.sourceLocation || currentSheet?.siteName || ''}","${t.vehicleNumber}","${t.materialName}","${t.netWeightTons}","${t.totalAmount}"`
+          `"${t.slipNumber}","${t.date}","${t.sourceLocation || currentSheet?.siteName || ''}","${t.vehicleNumber}","${t.materialName}","${t.netWeightTons}","${t.ratePerUnitOrTrip}","${t.totalAmount}"`
       )
       .join('\n');
 
@@ -125,7 +145,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
               </span>
             </div>
             <p className="text-xs text-[#94A3B8] mt-0.5">
-              Record and track tipper trip slips, brass quantities, and materials.
+              Record and track tipper trip slips, brass quantities, rates, and materials.
             </p>
           </div>
         </div>
@@ -232,13 +252,14 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                 <th className="py-3 px-5">Vehicle Number</th>
                 <th className="py-3 px-5">Material Name</th>
                 <th className="py-3 px-5 text-right">Material (Brass)</th>
+                <th className="py-3 px-5 text-right">Rate / Brass (₹)</th>
                 <th className="py-3 px-5 text-right">Billing (₹)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#1E293B]/60 text-slate-200">
               {filteredTrips.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-xs text-slate-500">
+                  <td colSpan={7} className="py-12 text-center text-xs text-slate-500">
                     No trips recorded yet. Click <strong>+ Log Trip</strong> to create an entry.
                   </td>
                 </tr>
@@ -273,8 +294,12 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                       {t.netWeightTons ? `${t.netWeightTons.toFixed(2)} Brass` : '1.00 Brass'}
                     </td>
 
+                    <td className="py-3.5 px-5 text-right font-mono text-slate-300 whitespace-nowrap">
+                      ₹{(t.ratePerUnitOrTrip || 1400).toLocaleString('en-IN')}
+                    </td>
+
                     <td className="py-3.5 px-5 text-right font-mono font-bold text-amber-400 whitespace-nowrap">
-                      ₹{((t.netWeightTons || 1) * (t.ratePerUnitOrTrip || 350)).toLocaleString('en-IN')}
+                      ₹{(t.totalAmount || ((t.netWeightTons || 1) * (t.ratePerUnitOrTrip || 1400))).toLocaleString('en-IN')}
                     </td>
                   </tr>
                 ))
@@ -296,7 +321,10 @@ export const MaterialHaulageTripsModule: React.FC = () => {
               </div>
               <button
                 type="button"
-                onClick={() => setIsLogModalOpen(false)}
+                onClick={() => {
+                  setIsLogModalOpen(false);
+                  setIsAddingNewVehicle(false);
+                }}
                 className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
               >
                 <X className="w-5 h-5" />
@@ -322,22 +350,51 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                 </select>
               </div>
 
-              {/* 2. Vehicle Number */}
+              {/* 2. Vehicle Number + Inline New Vehicle Creator */}
               <div>
-                <label className="block text-slate-300 font-bold mb-1">
-                  Vehicle Number <span className="text-blue-400">*</span>
-                </label>
-                <select
-                  value={tripForm.vehicleNumber}
-                  onChange={(e) => setTripForm({ ...tripForm, vehicleNumber: e.target.value })}
-                  className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-blue-500 font-mono font-bold cursor-pointer"
-                >
-                  {vehicles.map((v) => (
-                    <option key={v} value={v}>
-                      #{v}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-slate-300 font-bold">
+                    Vehicle Number <span className="text-blue-400">*</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingNewVehicle(!isAddingNewVehicle)}
+                    className="text-blue-400 hover:text-blue-300 text-[11px] font-bold cursor-pointer"
+                  >
+                    {isAddingNewVehicle ? '← Select Existing' : '+ Add New Vehicle'}
+                  </button>
+                </div>
+
+                {isAddingNewVehicle ? (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="e.g. 9988 or MH-12-AB-1234"
+                      value={newVehicleInput}
+                      onChange={(e) => setNewVehicleInput(e.target.value)}
+                      className="flex-1 px-3.5 py-2 bg-[#162032] border border-blue-500 rounded-xl text-white outline-none font-mono font-bold uppercase placeholder-slate-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddNewVehicle}
+                      className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs cursor-pointer shadow-md shadow-blue-600/20 shrink-0"
+                    >
+                      Add & Select
+                    </button>
+                  </div>
+                ) : (
+                  <select
+                    value={tripForm.vehicleNumber}
+                    onChange={(e) => setTripForm({ ...tripForm, vehicleNumber: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-blue-500 font-mono font-bold cursor-pointer"
+                  >
+                    {vehicles.map((v) => (
+                      <option key={v} value={v}>
+                        #{v}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               {/* 3. Material Name */}
@@ -370,7 +427,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                   step="0.01"
                   min="0.1"
                   required
-                  placeholder="e.g. 4.50"
+                  placeholder="e.g. 6.00"
                   value={tripForm.brassQty ?? ''}
                   onChange={(e) =>
                     setTripForm({
@@ -382,11 +439,36 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                 />
               </div>
 
+              {/* 5. Rate per Brass (₹) */}
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">
+                  Rate per Brass (₹) <span className="text-blue-400">*</span>
+                </label>
+                <input
+                  type="number"
+                  step="1"
+                  min="0"
+                  required
+                  placeholder="e.g. 1400"
+                  value={tripForm.ratePerBrass ?? ''}
+                  onChange={(e) =>
+                    setTripForm({
+                      ...tripForm,
+                      ratePerBrass: e.target.value === '' ? '' : Number(e.target.value)
+                    })
+                  }
+                  className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-blue-500 font-mono font-bold placeholder-slate-500"
+                />
+              </div>
+
               {/* Footer Actions */}
               <div className="flex justify-end items-center gap-2 pt-3 border-t border-[#1E293B]">
                 <button
                   type="button"
-                  onClick={() => setIsLogModalOpen(false)}
+                  onClick={() => {
+                    setIsLogModalOpen(false);
+                    setIsAddingNewVehicle(false);
+                  }}
                   className="px-4 py-2 rounded-xl text-slate-400 hover:text-white transition-colors cursor-pointer"
                 >
                   Cancel

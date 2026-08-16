@@ -19,9 +19,9 @@ import {
   Milestone,
   Trash2
 } from 'lucide-react';
-import CreateProjectModal from './modals/CreateProjectModal';
 import CreateRoadSiteModal from './modals/CreateRoadSiteModal';
 import { ClearDataModal } from './modals/ClearDataModal';
+import { DeleteSiteModal } from './modals/DeleteSiteModal';
 
 interface Props {
   activeTab: string;
@@ -45,7 +45,8 @@ export const Header: React.FC<Props> = ({
     siteSheets,
     userRole,
     setUserRole,
-    currentUser
+    currentUser,
+    deleteSite
   } = useERP();
 
   const [isSiteOpen, setIsSiteOpen] = useState(false);
@@ -53,6 +54,7 @@ export const Header: React.FC<Props> = ({
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isAddRoadSiteOpen, setIsAddRoadSiteOpen] = useState(false);
   const [isClearDataOpen, setIsClearDataOpen] = useState(false);
+  const [siteToDelete, setSiteToDelete] = useState<{ id: string; name: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isOnline, setIsOnline] = useState(true);
 
@@ -107,7 +109,7 @@ export const Header: React.FC<Props> = ({
           >
             <Building2 className="w-3.5 h-3.5 text-blue-400" />
             <span className="font-mono text-blue-400 truncate max-w-[220px] sm:max-w-[340px]">
-              {currentSiteSheet ? currentSiteSheet.siteName : 'NH-48 Highway Extension - Package 3'}
+              {currentSiteSheet ? currentSiteSheet.siteName : 'Select Site'}
             </span>
             <ChevronDown className="w-3.5 h-3.5 text-[#94A3B8]" />
           </button>
@@ -118,26 +120,46 @@ export const Header: React.FC<Props> = ({
                 <span>Active Highway Site Stretches</span>
                 <span className="text-blue-400 font-mono">{siteSheets.length} Sites</span>
               </div>
+
               <div className="max-h-60 overflow-y-auto">
                 {siteSheets.map((s) => (
-                  <button
+                  <div
                     key={s.siteId}
-                    onClick={() => {
-                      setSelectedSiteId(s.siteId);
-                      setIsSiteOpen(false);
-                    }}
-                    className={`w-full text-left px-3.5 py-2.5 text-xs flex items-center justify-between hover:bg-[#162032] transition-colors ${
-                      selectedSiteId === s.siteId ? 'text-blue-400 font-bold bg-[#162032]/60' : 'text-slate-300'
+                    className={`w-full px-3.5 py-2.5 text-xs flex items-center justify-between hover:bg-[#162032] transition-colors group ${
+                      selectedSiteId === s.siteId ? 'bg-[#162032]/60' : ''
                     }`}
                   >
-                    <div>
-                      <div className="font-semibold text-white">{s.siteName}</div>
+                    <button
+                      onClick={() => {
+                        setSelectedSiteId(s.siteId);
+                        setIsSiteOpen(false);
+                      }}
+                      className="flex-1 text-left"
+                    >
+                      <div className={`font-semibold ${selectedSiteId === s.siteId ? 'text-blue-400 font-bold' : 'text-white'}`}>
+                        {s.siteName}
+                      </div>
                       <div className="text-[10px] text-[#94A3B8]">
                         {s.vehicles.length} Tippers Configured
                       </div>
+                    </button>
+
+                    <div className="flex items-center gap-2">
+                      {selectedSiteId === s.siteId && <Check className="w-3.5 h-3.5 text-blue-400" />}
+                      
+                      {/* Delete Site Action */}
+                      <button
+                        title={`Delete ${s.siteName} completely`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSiteToDelete({ id: s.siteId, name: s.siteName });
+                        }}
+                        className="p-1 text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 rounded-lg opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
-                    {selectedSiteId === s.siteId && <Check className="w-3.5 h-3.5 text-blue-400" />}
-                  </button>
+                  </div>
                 ))}
               </div>
 
@@ -174,9 +196,8 @@ export const Header: React.FC<Props> = ({
         />
       </form>
 
-      {/* Right: Site Status Indicator + Notifications + Connectivity + Role */}
+      {/* Right Actions */}
       <div className="flex items-center gap-2 sm:gap-3">
-        {/* Site Status Indicator */}
         <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#064E3B] text-[#34D399] border border-[#065F46] text-[11px] font-black">
           <Activity className="w-3 h-3 animate-pulse" />
           <span>Site Active (Shift Day-1)</span>
@@ -214,7 +235,7 @@ export const Header: React.FC<Props> = ({
           )}
         </div>
 
-        {/* Network Connectivity Simulator Button */}
+        {/* Connectivity */}
         <button
           onClick={() => setIsOnline(!isOnline)}
           title="Click to toggle offline mode simulation"
@@ -228,7 +249,7 @@ export const Header: React.FC<Props> = ({
           <span>{isOnline ? 'Online' : 'Offline'}</span>
         </button>
 
-        {/* Clear Data / Reset Database Button */}
+        {/* Clear Data Button */}
         <button
           onClick={() => setIsClearDataOpen(true)}
           title="Clear all transactional data or reset database"
@@ -238,7 +259,7 @@ export const Header: React.FC<Props> = ({
           <span className="hidden md:inline text-[11px] font-semibold">Clear Data</span>
         </button>
 
-        {/* User Role Switcher Dropdown */}
+        {/* Role switcher */}
         <div className="relative">
           <button
             onClick={() => setIsRoleOpen(!isRoleOpen)}
@@ -275,15 +296,21 @@ export const Header: React.FC<Props> = ({
           )}
         </div>
       </div>
-      {/* Add Road Site Modal */}
+
+      {/* Modals */}
       <CreateRoadSiteModal
         isOpen={isAddRoadSiteOpen}
         onClose={() => setIsAddRoadSiteOpen(false)}
       />
-      {/* Clear Data & Reset Database Modal */}
       <ClearDataModal
         isOpen={isClearDataOpen}
         onClose={() => setIsClearDataOpen(false)}
+      />
+      <DeleteSiteModal
+        isOpen={!!siteToDelete}
+        siteId={siteToDelete?.id || ''}
+        siteName={siteToDelete?.name || ''}
+        onClose={() => setSiteToDelete(null)}
       />
     </header>
   );

@@ -53,14 +53,66 @@ import {
   INITIAL_SITE_EXPENSES
 } from '../data/initialData';
 
+export interface ManagedUser extends User {
+  username: string;
+  password?: string;
+  phone?: string;
+  status: 'ACTIVE' | 'INACTIVE';
+}
+
+const DEFAULT_MANAGED_USERS: ManagedUser[] = [
+  {
+    id: 'usr-owner-1',
+    username: 'admin',
+    password: '123',
+    name: 'Habibulla Bilgi (Director)',
+    email: 'habibullabilgiabu@gmail.com',
+    role: 'SUPER_ADMIN',
+    status: 'ACTIVE'
+  },
+  {
+    id: 'usr-mgr-1',
+    username: 'neha',
+    password: '123',
+    name: 'Neha (Accounts & Ops)',
+    email: 'neha.ops@bilgicrushers.com',
+    role: 'STORE_MANAGER',
+    status: 'ACTIVE'
+  },
+  {
+    id: 'usr-sup-1',
+    username: 'ibrahim',
+    password: '123',
+    name: 'Ibrahim (Site Incharge)',
+    email: 'ibrahim@bilgicrushers.com',
+    role: 'SITE_SUPERVISOR',
+    status: 'ACTIVE'
+  },
+  {
+    id: 'usr-eng-1',
+    username: 'billing',
+    password: '123',
+    name: 'Er. Amit Sharma',
+    email: 'amit.billing@bilgicrushers.com',
+    role: 'SITE_ENGINEER',
+    status: 'ACTIVE'
+  }
+];
+
 interface ERPContextType {
   isAuthenticated: boolean;
-  login: (username: string, password?: string) => boolean;
+  login: (username: string, password?: string) => { success: boolean; message?: string };
   logout: () => void;
   currentUser: User;
   setCurrentUser: (user: User) => void;
   userRole: UserRole;
   setUserRole: (role: UserRole) => void;
+
+  // User Management
+  usersList: ManagedUser[];
+  addManagedUser: (user: Omit<ManagedUser, 'id'>) => void;
+  updateManagedUser: (id: string, user: Partial<ManagedUser>) => void;
+  deleteManagedUser: (id: string) => void;
 
   workType: WorkType | null;
   setWorkType: (type: WorkType | null) => void;
@@ -130,7 +182,6 @@ interface ERPContextType {
   workers: Worker[];
   attendanceRecords: AttendanceRecord[];
   addAttendanceRecord: (rec: Omit<AttendanceRecord, 'id'>) => void;
-  markAttendancePaid: (attendanceId: string, ref: string) => void;
   bulkAddAttendance: (records: Omit<AttendanceRecord, 'id'>[]) => void;
   paymentSheets: LabourPaymentSheet[];
 
@@ -170,24 +221,21 @@ const safeGetJSON = <T,>(key: string, fallback: T): T => {
     const item = localStorage.getItem(key);
     return item ? JSON.parse(item) : fallback;
   } catch (err) {
-    console.error(`Error loading localStorage key: ${key}`, err);
     return fallback;
   }
 };
 
 export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const isHydrated = useRef(false);
+  // 1. Persistent User Database
+  const [usersList, setUsersList] = useState<ManagedUser[]>(() =>
+    safeGetJSON(LOCAL_STORAGE_KEY + '_USER_ACCOUNTS', DEFAULT_MANAGED_USERS)
+  );
 
-  // Clean old persistent authentication so closed tabs require login
   useEffect(() => {
-    try {
-      localStorage.removeItem(LOCAL_STORAGE_KEY + '_AUTH');
-    } catch {
-      // ignore
-    }
-  }, []);
+    localStorage.setItem(LOCAL_STORAGE_KEY + '_USER_ACCOUNTS', JSON.stringify(usersList));
+  }, [usersList]);
 
-  // 1. Session-Based Authentication (requires login every time app closes)
+  // Session-based authentication
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     try {
@@ -199,48 +247,48 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   });
 
   const [currentUser, setCurrentUser] = useState<User>(() =>
-    safeGetJSON(LOCAL_STORAGE_KEY + '_USER', {
-      id: 'usr-owner-1',
-      name: 'Admin User',
-      email: 'admin@bilgicrushers.com',
-      role: 'SUPER_ADMIN'
-    })
+    safeGetJSON(LOCAL_STORAGE_KEY + '_USER', DEFAULT_MANAGED_USERS[0])
   );
 
   const [userRole, setUserRole] = useState<UserRole>(() => currentUser?.role || 'SUPER_ADMIN');
 
-  const login = (username: string, _password?: string): boolean => {
+  // Login that verifies username and password against User Management
+  const login = (username: string, password?: string): { success: boolean; message?: string } => {
     const cleanUser = username.trim().toLowerCase();
-    let name = 'Admin User';
-    let role: UserRole = 'SUPER_ADMIN';
-    let email = 'admin@bilgicrushers.com';
+    const cleanPass = (password || '').trim();
 
-    if (cleanUser === 'neha' || cleanUser.includes('neha') || cleanUser.includes('manager')) {
-      name = 'Neha (Accounts & Ops)';
-      role = 'STORE_MANAGER';
-      email = 'neha.ops@bilgicrushers.com';
-    } else if (cleanUser === 'ibrahim' || cleanUser.includes('ibrahim') || cleanUser.includes('operator')) {
-      name = 'Ibrahim (Site Incharge)';
-      role = 'SITE_SUPERVISOR';
-      email = 'ibrahim@bilgicrushers.com';
-    } else if (cleanUser === 'billing' || cleanUser.includes('eng')) {
-      name = 'Er. Amit Sharma';
-      role = 'SITE_ENGINEER';
-      email = 'amit.billing@bilgicrushers.com';
-    } else if (cleanUser === 'owner' || cleanUser.includes('bilgi') || cleanUser === 'admin') {
-      name = 'Habibulla Bilgi (Director)';
-      role = 'SUPER_ADMIN';
-      email = 'habibullabilgiabu@gmail.com';
+    const matchedUser = usersList.find(
+      (u) =>
+        u.username.toLowerCase() === cleanUser ||
+        u.email.toLowerCase() === cleanUser
+    );
+
+    if (!matchedUser) {
+      return { success: false, message: 'User not registered. Please contact administrator.' };
     }
 
-    const usr: User = { id: `usr-${Date.now()}`, name, email, role };
+    if (matchedUser.status === 'INACTIVE') {
+      return { success: false, message: 'Your account is deactivated. Contact administrator.' };
+    }
+
+    if (matchedUser.password && cleanPass !== matchedUser.password) {
+      return { success: false, message: 'Incorrect password. Please try again.' };
+    }
+
+    const usr: User = {
+      id: matchedUser.id,
+      name: matchedUser.name,
+      email: matchedUser.email,
+      role: matchedUser.role
+    };
+
     setCurrentUser(usr);
-    setUserRole(role);
+    setUserRole(matchedUser.role);
     setIsAuthenticated(true);
 
     sessionStorage.setItem(LOCAL_STORAGE_KEY + '_AUTH', JSON.stringify(true));
     localStorage.setItem(LOCAL_STORAGE_KEY + '_USER', JSON.stringify(usr));
-    return true;
+    return { success: true };
   };
 
   const logout = () => {
@@ -248,15 +296,31 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     sessionStorage.removeItem(LOCAL_STORAGE_KEY + '_AUTH');
   };
 
+  const addManagedUser = (userData: Omit<ManagedUser, 'id'>) => {
+    const newUser: ManagedUser = {
+      ...userData,
+      id: `usr-${Date.now()}`
+    };
+    setUsersList((prev) => [newUser, ...prev]);
+  };
+
+  const updateManagedUser = (id: string, updated: Partial<ManagedUser>) => {
+    setUsersList((prev) =>
+      prev.map((u) => (u.id === id ? { ...u, ...updated } : u))
+    );
+  };
+
+  const deleteManagedUser = (id: string) => {
+    setUsersList((prev) => prev.filter((u) => u.id !== id));
+  };
+
   const [workType, setWorkType] = useState<WorkType | null>('ROAD');
   const [mobileSiteMode, setMobileSiteMode] = useState<boolean>(false);
 
-  // 2. Persistent Blacklist for Deleted Sites
   const [deletedSiteIds, setDeletedSiteIds] = useState<string[]>(() =>
     safeGetJSON(DELETED_SITES_KEY, [])
   );
 
-  // 3. Database Entities (Permanently preserved in localStorage)
   const [projects, setProjects] = useState<Project[]>(() => {
     const purged: string[] = safeGetJSON(DELETED_SITES_KEY, []);
     const base: Project[] = safeGetJSON(LOCAL_STORAGE_KEY + '_PROJECTS', INITIAL_PROJECTS);
@@ -376,9 +440,7 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
-  // Sync state to LocalStorage
   useEffect(() => {
-    isHydrated.current = true;
     try {
       localStorage.setItem(LOCAL_STORAGE_KEY + '_PROJECTS', JSON.stringify(projects));
       localStorage.setItem(LOCAL_STORAGE_KEY + '_ROAD_SECTIONS', JSON.stringify(roadSections));
@@ -654,7 +716,6 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setBuildingFloors((prev) => [...prev, newFloor]);
   };
 
-  // Trips CRUD
   const addVehicleTrip = (tripData: Omit<VehicleTrip, 'id'>) => {
     const newId = 'trip-' + Date.now();
     setVehicleTrips((prev) => [{ ...tripData, id: newId }, ...prev]);
@@ -939,7 +1000,8 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         dieselLogs,
         siteSheets,
         siteExpenses,
-        deletedSiteIds
+        deletedSiteIds,
+        usersList
       },
       null,
       2
@@ -953,6 +1015,7 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (data.siteSheets) setSiteSheets(data.siteSheets);
       if (data.materials) setMaterials(data.materials);
       if (data.deletedSiteIds) setDeletedSiteIds(data.deletedSiteIds);
+      if (data.usersList) setUsersList(data.usersList);
       return true;
     } catch {
       return false;
@@ -969,6 +1032,10 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setCurrentUser,
         userRole,
         setUserRole,
+        usersList,
+        addManagedUser,
+        updateManagedUser,
+        deleteManagedUser,
         workType,
         setWorkType,
         selectedProjectId,

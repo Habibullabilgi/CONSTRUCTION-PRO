@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Truck, 
   Plus, 
@@ -8,7 +8,6 @@ import {
   Gauge, 
   X, 
   HardHat,
-  Car,
   CheckCircle2
 } from 'lucide-react';
 
@@ -26,7 +25,7 @@ const VEHICLE_PRESETS = [
   { id: 'TRANSIT_MIXER', name: 'Transit Mixer (RMC)', category: 'Concrete', defaultUnit: 'KM' }
 ];
 
-interface FleetVehicle {
+export interface FleetVehicle {
   id: string;
   vehicleNumber: string;
   vehicleType: string;
@@ -35,57 +34,69 @@ interface FleetVehicle {
   currentReading: number;
 }
 
+const DEFAULT_FLEET: FleetVehicle[] = [
+  {
+    id: 'v-1',
+    vehicleNumber: 'KA-28-EX-8901',
+    vehicleType: 'Hydraulic Excavator (CAT/Hitachi)',
+    category: 'Earthmoving',
+    metricType: 'HMR',
+    currentReading: 4215.5
+  },
+  {
+    id: 'v-2',
+    vehicleNumber: 'KA-28-JC-3342',
+    vehicleType: 'Backhoe Loader (JCB 3DX)',
+    category: 'Earthmoving',
+    metricType: 'HMR',
+    currentReading: 2850.0
+  },
+  {
+    id: 'v-3',
+    vehicleNumber: 'MH-12-DT-5510',
+    vehicleType: 'Tipper / Dump Truck',
+    category: 'Haulage',
+    metricType: 'KM',
+    currentReading: 14200
+  },
+  {
+    id: 'v-4',
+    vehicleNumber: 'KA-28-TR-1092',
+    vehicleType: 'Tractor & Trolley',
+    category: 'Transport',
+    metricType: 'HMR',
+    currentReading: 1120.0
+  },
+  {
+    id: 'v-5',
+    vehicleNumber: 'KA-28-JP-7890',
+    vehicleType: 'Site Jeep / Bolero / Pickup',
+    category: 'Site Inspection',
+    metricType: 'KM',
+    currentReading: 38450
+  },
+  {
+    id: 'v-6',
+    vehicleNumber: 'KA-28-CR-2200',
+    vehicleType: 'Car / SUV',
+    category: 'Staff Transport',
+    metricType: 'KM',
+    currentReading: 24100
+  }
+];
+
+const STORAGE_KEY = 'CONSTRUCTION_PRO_FLEET_VEHICLES_V1';
+
 export const MachineryFleetModule: React.FC = () => {
-  const [fleet, setFleet] = useState<FleetVehicle[]>([
-    {
-      id: '1',
-      vehicleNumber: 'KA-28-EX-8901',
-      vehicleType: 'Hydraulic Excavator (CAT/Hitachi)',
-      category: 'Earthmoving',
-      metricType: 'HMR',
-      currentReading: 4215.5
-    },
-    {
-      id: '2',
-      vehicleNumber: 'KA-28-JC-3342',
-      vehicleType: 'Backhoe Loader (JCB 3DX)',
-      category: 'Earthmoving',
-      metricType: 'HMR',
-      currentReading: 2850.0
-    },
-    {
-      id: '3',
-      vehicleNumber: 'MH-12-DT-5510',
-      vehicleType: 'Tipper / Dump Truck',
-      category: 'Haulage',
-      metricType: 'KM',
-      currentReading: 14200
-    },
-    {
-      id: '4',
-      vehicleNumber: 'KA-28-TR-1092',
-      vehicleType: 'Tractor & Trolley',
-      category: 'Transport',
-      metricType: 'HMR',
-      currentReading: 1120.0
-    },
-    {
-      id: '5',
-      vehicleNumber: 'KA-28-JP-7890',
-      vehicleType: 'Site Jeep / Bolero / Pickup',
-      category: 'Site Inspection',
-      metricType: 'KM',
-      currentReading: 38450
-    },
-    {
-      id: '6',
-      vehicleNumber: 'KA-28-CR-2200',
-      vehicleType: 'Car / SUV',
-      category: 'Staff Transport',
-      metricType: 'KM',
-      currentReading: 24100
+  // Persistent state: load from localStorage if present
+  const [fleet, setFleet] = useState<FleetVehicle[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      return saved !== null ? JSON.parse(saved) : DEFAULT_FLEET;
+    } catch {
+      return DEFAULT_FLEET;
     }
-  ]);
+  });
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -95,6 +106,11 @@ export const MachineryFleetModule: React.FC = () => {
   const [selectedType, setSelectedType] = useState(VEHICLE_PRESETS[0].id);
   const [metricType, setMetricType] = useState<'KM' | 'HMR'>('KM');
   const [currentReading, setCurrentReading] = useState<number | ''>('');
+
+  // Auto-sync every change to localStorage
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(fleet));
+  }, [fleet]);
 
   const handleTypeChange = (typeId: string) => {
     const preset = VEHICLE_PRESETS.find(p => p.id === typeId);
@@ -110,7 +126,7 @@ export const MachineryFleetModule: React.FC = () => {
 
     const matched = VEHICLE_PRESETS.find(p => p.id === selectedType);
     const newVehicle: FleetVehicle = {
-      id: Date.now().toString(),
+      id: `v-${Date.now()}`,
       vehicleNumber: vehicleNumber.trim().toUpperCase(),
       vehicleType: matched ? matched.name : selectedType,
       category: matched ? matched.category : 'General',
@@ -118,15 +134,20 @@ export const MachineryFleetModule: React.FC = () => {
       currentReading: Number(currentReading)
     };
 
-    setFleet([newVehicle, ...fleet]);
+    const updated = [newVehicle, ...fleet];
+    setFleet(updated);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+
     setIsModalOpen(false);
     setVehicleNumber('');
     setCurrentReading('');
   };
 
   const handleDeleteVehicle = (id: string, number: string, type: string) => {
-    if (window.confirm(`Delete ${type} (${number}) from fleet registry?`)) {
-      setFleet(fleet.filter(v => v.id !== id));
+    if (window.confirm(`Are you sure you want to permanently delete ${type} [${number}]?`)) {
+      const updated = fleet.filter(v => v.id !== id);
+      setFleet(updated);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
     }
   };
 
@@ -187,8 +208,8 @@ export const MachineryFleetModule: React.FC = () => {
       {filteredFleet.length === 0 ? (
         <div className="bg-[#0B1220] border border-[#1E293B] rounded-3xl p-12 text-center text-slate-500 space-y-2">
           <Truck className="w-10 h-10 mx-auto text-slate-600 mb-2" />
-          <div className="text-sm font-bold text-slate-300">No matching vehicles or machinery found.</div>
-          <div className="text-xs">Click <strong>+ Add Construction Vehicle</strong> to register fleet units.</div>
+          <div className="text-sm font-bold text-slate-300">No matching vehicles or machinery in registry.</div>
+          <div className="text-xs">Click <strong>+ Add Construction Vehicle</strong> to register new units.</div>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -233,7 +254,7 @@ export const MachineryFleetModule: React.FC = () => {
                 </span>
               </div>
 
-              {/* Card Footer with Status and Delete Button */}
+              {/* Card Footer with Permanent Delete Button */}
               <div className="pt-2 border-t border-[#182643] flex items-center justify-between">
                 <span className="text-[11px] text-emerald-400 font-semibold flex items-center gap-1.5">
                   <CheckCircle2 className="w-3.5 h-3.5" />
@@ -274,7 +295,6 @@ export const MachineryFleetModule: React.FC = () => {
             </div>
 
             <form onSubmit={handleAddVehicle} className="space-y-4 text-xs">
-              {/* Vehicle Number */}
               <div>
                 <label className="block text-slate-300 font-bold mb-1.5">
                   Vehicle Number / Registration Plate <span className="text-amber-400">*</span>
@@ -289,7 +309,6 @@ export const MachineryFleetModule: React.FC = () => {
                 />
               </div>
 
-              {/* Vehicle Type */}
               <div>
                 <label className="block text-slate-300 font-bold mb-1.5">
                   Type of Construction Vehicle / Machinery <span className="text-amber-400">*</span>
@@ -307,7 +326,6 @@ export const MachineryFleetModule: React.FC = () => {
                 </select>
               </div>
 
-              {/* Running Meter / Running Hours Selection */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-300 font-bold mb-1.5">
@@ -358,7 +376,6 @@ export const MachineryFleetModule: React.FC = () => {
                 </div>
               </div>
 
-              {/* Action Buttons */}
               <div className="flex justify-end items-center gap-2 pt-3 border-t border-[#1E293B]">
                 <button
                   type="button"

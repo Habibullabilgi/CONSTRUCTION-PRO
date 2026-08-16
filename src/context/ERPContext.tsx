@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import {
   WorkType,
   UserRole,
@@ -54,7 +54,6 @@ import {
 } from '../data/initialData';
 
 interface ERPContextType {
-  // Authentication & RBAC
   isAuthenticated: boolean;
   login: (username: string, password?: string) => boolean;
   logout: () => void;
@@ -63,11 +62,9 @@ interface ERPContextType {
   userRole: UserRole;
   setUserRole: (role: UserRole) => void;
 
-  // Navigation & Mode
   workType: WorkType | null;
   setWorkType: (type: WorkType | null) => void;
 
-  // Selected Context
   selectedProjectId: string;
   setSelectedProjectId: (id: string) => void;
   selectedSiteId: string;
@@ -75,7 +72,6 @@ interface ERPContextType {
   currentProject: Project | undefined;
   currentSite: Site | undefined;
 
-  // Projects & Sites Master
   projects: Project[];
   addProject: (proj: Partial<Project>) => Project;
   updateProject: (id: string, proj: Partial<Project>) => void;
@@ -95,27 +91,23 @@ interface ERPContextType {
     vehicles?: string[];
   }) => string;
 
-  // Engineering & Layer Stretches
   roadSections: RoadSection[];
   updateRoadLayerProgress: (sectionId: string, layerId: string, completedMeters: number, actualQty: number) => void;
   buildingFloors: BuildingFloor[];
   updateBuildingFloor: (floorId: string, data: Partial<BuildingFloor>) => void;
   addBuildingFloor: (floor: Partial<BuildingFloor>) => void;
 
-  // Materials & Ledger
   materials: MaterialItem[];
   stockLedger: StockLedgerEntry[];
   addStockTransaction: (entry: Omit<StockLedgerEntry, 'id'>) => void;
   consumptionRecords: MaterialConsumptionRecord[];
   addConsumptionRecord: (rec: Omit<MaterialConsumptionRecord, 'id'>) => void;
 
-  // Trips & Weighbridge
   vehicleTrips: VehicleTrip[];
   addVehicleTrip: (trip: Omit<VehicleTrip, 'id'>) => void;
   deleteVehicleTrip: (tripId: string) => void;
   updateVehicleTripStatus: (tripId: string, status: ApprovalStatus) => void;
 
-  // Site Matrix Sheets
   siteSheets: SiteMatrixSheet[];
   updateSiteCellValue: (siteId: string, tabKey: string, rowId: string, vehicle: string, value: number) => void;
   updateSiteRowRate: (siteId: string, tabKey: string, rowId: string, rate: number) => void;
@@ -124,20 +116,17 @@ interface ERPContextType {
   deleteSiteSheetVehicle: (siteId: string, vehicleNumber: string) => void;
   addSiteSheetTab: (siteId: string, tabKey: string, label: string, defaultRate: number, unit: string) => void;
 
-  // Expenses & Accounts
   siteExpenses: SiteExpenseRecord[];
   addSiteExpense: (exp: Omit<SiteExpenseRecord, 'id' | 'createdAt'>) => void;
   deleteSiteExpense: (id: string) => void;
   updateSiteExpenseStatus: (id: string, status: 'PAID' | 'PENDING' | 'APPROVED') => void;
 
-  // Machinery & Telematics
   machinery: MachineryRecord[];
   machineryLogs: MachineryLog[];
   addMachineryLog: (log: Omit<MachineryLog, 'id'>) => void;
   dieselLogs: DieselLog[];
   addDieselLog: (log: Omit<DieselLog, 'id'>) => void;
 
-  // Labor & Wages
   workers: Worker[];
   attendanceRecords: AttendanceRecord[];
   addAttendanceRecord: (rec: Omit<AttendanceRecord, 'id'>) => void;
@@ -145,7 +134,6 @@ interface ERPContextType {
   bulkAddAttendance: (records: Omit<AttendanceRecord, 'id'>[]) => void;
   paymentSheets: LabourPaymentSheet[];
 
-  // Production & Billing
   roadProductions: DailyRoadProduction[];
   addRoadProduction: (prod: Omit<DailyRoadProduction, 'id'>) => void;
   buildingProductions: DailyBuildingProduction[];
@@ -159,7 +147,6 @@ interface ERPContextType {
   addBBSItem: (item: Omit<BBSItem, 'id'>) => void;
   deleteBBSItem: (id: string) => void;
 
-  // System & Logs
   notifications: ERPNotification[];
   markNotificationRead: (id: string) => void;
   auditLogs: AuditLogEntry[];
@@ -174,68 +161,36 @@ interface ERPContextType {
 
 const ERPContext = createContext<ERPContextType | undefined>(undefined);
 
-// V4 forces automatic invalidation of stale data in localStorage
-const LOCAL_STORAGE_KEY = 'INFRABUILD_ERP_STATE_V4';
-const DELETED_SITES_KEY = 'PAVETRACK_DELETED_SITE_IDS';
+const LOCAL_STORAGE_KEY = 'PAVETRACK_ERP_STORAGE_V5';
+const DELETED_SITES_KEY = 'PAVETRACK_DELETED_SITE_IDS_V5';
 
-const getZeroedSiteSheets = (sheets: SiteMatrixSheet[]): SiteMatrixSheet[] => {
-  return (sheets || []).map((sheet) => ({
-    ...sheet,
-    tabs: (sheet.tabs || []).map((tab) => ({
-      ...tab,
-      rows: (tab.rows || []).map((row) => {
-        const zeroVV: Record<string, number> = {};
-        (sheet.vehicles || []).forEach((v) => {
-          zeroVV[v] = 0;
-        });
-        return {
-          ...row,
-          vehicleValues: zeroVV,
-          total: 0
-        };
-      })
-    }))
-  }));
+const safeGetJSON = <T,>(key: string, fallback: T): T => {
+  if (typeof window === 'undefined') return fallback;
+  try {
+    const item = localStorage.getItem(key);
+    return item ? JSON.parse(item) : fallback;
+  } catch (err) {
+    console.error(`Error loading localStorage key: ${key}`, err);
+    return fallback;
+  }
 };
 
 export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  useEffect(() => {
-    try {
-      localStorage.removeItem('INFRABUILD_ERP_STATE_V1_PROJECTS');
-      localStorage.removeItem('INFRABUILD_ERP_STATE_V1_ROAD_SECTIONS');
-      localStorage.removeItem('INFRABUILD_ERP_STATE_V1_SITE_SHEETS');
-      localStorage.removeItem('INFRABUILD_ERP_STATE_V2_PROJECTS');
-      localStorage.removeItem('INFRABUILD_ERP_STATE_V2_ROAD_SECTIONS');
-      localStorage.removeItem('road_erp_sections');
-      localStorage.removeItem('road_erp_sites');
-    } catch {
-      // ignore
-    }
-  }, []);
+  const isHydrated = useRef(false);
 
-  const isClearedSlate = typeof window !== 'undefined' && localStorage.getItem('ERP_DATA_CLEARED_SLATE') === 'true';
+  // 1. Persistent Authentication (Saved in localStorage instead of sessionStorage)
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() =>
+    safeGetJSON(LOCAL_STORAGE_KEY + '_AUTH', true)
+  );
 
-  // 1. Session Authentication
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    const saved = sessionStorage.getItem(LOCAL_STORAGE_KEY + '_AUTH');
-    return saved ? JSON.parse(saved) : false;
-  });
-
-  const [currentUser, setCurrentUser] = useState<User>(() => {
-    if (typeof window === 'undefined') {
-      return { id: 'usr-owner-1', name: 'Admin User', email: 'admin@bilgicrushers.com', role: 'SUPER_ADMIN' };
-    }
-    const saved = sessionStorage.getItem(LOCAL_STORAGE_KEY + '_USER');
-    return saved
-      ? JSON.parse(saved)
-      : {
-          id: 'usr-owner-1',
-          name: 'Admin User',
-          email: 'admin@bilgicrushers.com',
-          role: 'SUPER_ADMIN'
-        };
-  });
+  const [currentUser, setCurrentUser] = useState<User>(() =>
+    safeGetJSON(LOCAL_STORAGE_KEY + '_USER', {
+      id: 'usr-owner-1',
+      name: 'Admin User',
+      email: 'admin@bilgicrushers.com',
+      role: 'SUPER_ADMIN'
+    })
+  );
 
   const [userRole, setUserRole] = useState<UserRole>(() => currentUser?.role || 'SUPER_ADMIN');
 
@@ -263,188 +218,132 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       email = 'habibullabilgiabu@gmail.com';
     }
 
-    const usr: User = {
-      id: `usr-${Date.now()}`,
-      name,
-      email,
-      role
-    };
-
+    const usr: User = { id: `usr-${Date.now()}`, name, email, role };
     setCurrentUser(usr);
     setUserRole(role);
     setIsAuthenticated(true);
 
-    sessionStorage.setItem(LOCAL_STORAGE_KEY + '_AUTH', JSON.stringify(true));
-    sessionStorage.setItem(LOCAL_STORAGE_KEY + '_USER', JSON.stringify(usr));
+    localStorage.setItem(LOCAL_STORAGE_KEY + '_AUTH', JSON.stringify(true));
+    localStorage.setItem(LOCAL_STORAGE_KEY + '_USER', JSON.stringify(usr));
     return true;
   };
 
   const logout = () => {
     setIsAuthenticated(false);
-    sessionStorage.removeItem(LOCAL_STORAGE_KEY + '_AUTH');
-    sessionStorage.removeItem(LOCAL_STORAGE_KEY + '_USER');
+    localStorage.setItem(LOCAL_STORAGE_KEY + '_AUTH', JSON.stringify(false));
   };
 
   const [workType, setWorkType] = useState<WorkType | null>('ROAD');
   const [mobileSiteMode, setMobileSiteMode] = useState<boolean>(false);
 
   // 2. Persistent Blacklist for Deleted Sites
-  const [deletedSiteIds, setDeletedSiteIds] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem(DELETED_SITES_KEY);
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [deletedSiteIds, setDeletedSiteIds] = useState<string[]>(() =>
+    safeGetJSON(DELETED_SITES_KEY, [])
+  );
 
-  // 3. Database Entities
+  // 3. Database Entities with Robust Hydration
   const [projects, setProjects] = useState<Project[]>(() => {
-    try {
-      const savedDeleted = localStorage.getItem(DELETED_SITES_KEY);
-      const purgedIds: string[] = savedDeleted ? JSON.parse(savedDeleted) : [];
-      const saved = localStorage.getItem(LOCAL_STORAGE_KEY + '_PROJECTS');
-      const baseProjects: Project[] = saved ? JSON.parse(saved) : INITIAL_PROJECTS;
-
-      return baseProjects.map((p) => ({
-        ...p,
-        sites: (p.sites || []).filter((s) => !purgedIds.includes(s.id))
-      }));
-    } catch {
-      return INITIAL_PROJECTS;
-    }
+    const purged: string[] = safeGetJSON(DELETED_SITES_KEY, []);
+    const base: Project[] = safeGetJSON(LOCAL_STORAGE_KEY + '_PROJECTS', INITIAL_PROJECTS);
+    return base.map((p) => ({
+      ...p,
+      sites: (p.sites || []).filter((s) => !purged.includes(s.id))
+    }));
   });
 
   const [siteSheets, setSiteSheets] = useState<SiteMatrixSheet[]>(() => {
-    try {
-      const savedDeleted = localStorage.getItem(DELETED_SITES_KEY);
-      const purgedIds: string[] = savedDeleted ? JSON.parse(savedDeleted) : [];
-
-      if (isClearedSlate) return getZeroedSiteSheets(INITIAL_SITE_SHEETS).filter((s) => !purgedIds.includes(s.siteId));
-      const saved = localStorage.getItem(LOCAL_STORAGE_KEY + '_SITE_SHEETS');
-      const baseSheets: SiteMatrixSheet[] = saved ? JSON.parse(saved) : INITIAL_SITE_SHEETS;
-      return baseSheets.filter((s) => !purgedIds.includes(s.siteId));
-    } catch {
-      return INITIAL_SITE_SHEETS;
-    }
+    const purged: string[] = safeGetJSON(DELETED_SITES_KEY, []);
+    const base: SiteMatrixSheet[] = safeGetJSON(LOCAL_STORAGE_KEY + '_SITE_SHEETS', INITIAL_SITE_SHEETS);
+    return base.filter((s) => !purged.includes(s.siteId));
   });
 
-  const [selectedProjectId, setSelectedProjectId] = useState<string>(
-    INITIAL_PROJECTS[0]?.id || 'proj-ongoing-1'
+  const [selectedProjectId, setSelectedProjectId] = useState<string>(() =>
+    safeGetJSON(LOCAL_STORAGE_KEY + '_SELECTED_PROJ', projects[0]?.id || 'proj-ongoing-1')
   );
+
   const [selectedSiteId, setSelectedSiteId] = useState<string>(() => {
-    if (siteSheets.length > 0) return siteSheets[0].siteId;
-    return INITIAL_PROJECTS[0]?.sites?.[0]?.id || 'site-ongoing-1';
+    const saved = safeGetJSON(LOCAL_STORAGE_KEY + '_SELECTED_SITE', '');
+    if (saved && siteSheets.some((s) => s.siteId === saved)) return saved;
+    return siteSheets[0]?.siteId || 'site-ongoing-1';
   });
 
-  const [roadSections, setRoadSections] = useState<RoadSection[]>(() => {
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEY + '_ROAD_SECTIONS');
-    return saved ? JSON.parse(saved) : INITIAL_ROAD_SECTIONS;
-  });
+  const [roadSections, setRoadSections] = useState<RoadSection[]>(() =>
+    safeGetJSON(LOCAL_STORAGE_KEY + '_ROAD_SECTIONS', INITIAL_ROAD_SECTIONS)
+  );
 
-  const [buildingFloors, setBuildingFloors] = useState<BuildingFloor[]>(() => {
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEY + '_BUILDING_FLOORS');
-    return saved ? JSON.parse(saved) : INITIAL_BUILDING_FLOORS;
-  });
+  const [buildingFloors, setBuildingFloors] = useState<BuildingFloor[]>(() =>
+    safeGetJSON(LOCAL_STORAGE_KEY + '_BUILDING_FLOORS', INITIAL_BUILDING_FLOORS)
+  );
 
-  const [materials, setMaterials] = useState<MaterialItem[]>(() => {
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEY + '_MATERIALS');
-    return saved ? JSON.parse(saved) : INITIAL_MATERIALS;
-  });
+  const [materials, setMaterials] = useState<MaterialItem[]>(() =>
+    safeGetJSON(LOCAL_STORAGE_KEY + '_MATERIALS', INITIAL_MATERIALS)
+  );
 
-  const [stockLedger, setStockLedger] = useState<StockLedgerEntry[]>(() => {
-    if (isClearedSlate) return [];
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEY + '_STOCK_LEDGER');
-    return saved ? JSON.parse(saved) : INITIAL_STOCK_LEDGER;
-  });
+  const [stockLedger, setStockLedger] = useState<StockLedgerEntry[]>(() =>
+    safeGetJSON(LOCAL_STORAGE_KEY + '_STOCK_LEDGER', INITIAL_STOCK_LEDGER)
+  );
 
-  const [consumptionRecords, setConsumptionRecords] = useState<MaterialConsumptionRecord[]>(() => {
-    if (isClearedSlate) return [];
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEY + '_CONSUMPTION');
-    return saved ? JSON.parse(saved) : INITIAL_CONSUMPTION_RECORDS;
-  });
+  const [consumptionRecords, setConsumptionRecords] = useState<MaterialConsumptionRecord[]>(() =>
+    safeGetJSON(LOCAL_STORAGE_KEY + '_CONSUMPTION', INITIAL_CONSUMPTION_RECORDS)
+  );
 
-  const [vehicleTrips, setVehicleTrips] = useState<VehicleTrip[]>(() => {
-    if (isClearedSlate) return [];
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEY + '_TRIPS');
-    return saved ? JSON.parse(saved) : INITIAL_VEHICLE_TRIPS;
-  });
+  const [vehicleTrips, setVehicleTrips] = useState<VehicleTrip[]>(() =>
+    safeGetJSON(LOCAL_STORAGE_KEY + '_TRIPS', INITIAL_VEHICLE_TRIPS)
+  );
 
-  const [machinery, setMachinery] = useState<MachineryRecord[]>(() => {
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEY + '_MACHINERY');
-    return saved ? JSON.parse(saved) : INITIAL_MACHINERY;
-  });
+  const [machinery, setMachinery] = useState<MachineryRecord[]>(() =>
+    safeGetJSON(LOCAL_STORAGE_KEY + '_MACHINERY', INITIAL_MACHINERY)
+  );
 
-  const [machineryLogs, setMachineryLogs] = useState<MachineryLog[]>(() => {
-    if (isClearedSlate) return [];
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEY + '_MACHINERY_LOGS');
-    return saved ? JSON.parse(saved) : INITIAL_MACHINERY_LOGS;
-  });
+  const [machineryLogs, setMachineryLogs] = useState<MachineryLog[]>(() =>
+    safeGetJSON(LOCAL_STORAGE_KEY + '_MACHINERY_LOGS', INITIAL_MACHINERY_LOGS)
+  );
 
-  const [dieselLogs, setDieselLogs] = useState<DieselLog[]>(() => {
-    if (isClearedSlate) return [];
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEY + '_DIESEL_LOGS');
-    return saved ? JSON.parse(saved) : INITIAL_DIESEL_LOGS;
-  });
+  const [dieselLogs, setDieselLogs] = useState<DieselLog[]>(() =>
+    safeGetJSON(LOCAL_STORAGE_KEY + '_DIESEL_LOGS', INITIAL_DIESEL_LOGS)
+  );
 
-  const [workers, setWorkers] = useState<Worker[]>(() => {
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEY + '_WORKERS');
-    return saved ? JSON.parse(saved) : INITIAL_WORKERS;
-  });
+  const [workers, setWorkers] = useState<Worker[]>(() =>
+    safeGetJSON(LOCAL_STORAGE_KEY + '_WORKERS', INITIAL_WORKERS)
+  );
 
-  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>(() => {
-    if (isClearedSlate) return [];
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEY + '_ATTENDANCE');
-    return saved ? JSON.parse(saved) : INITIAL_ATTENDANCE;
-  });
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>(() =>
+    safeGetJSON(LOCAL_STORAGE_KEY + '_ATTENDANCE', INITIAL_ATTENDANCE)
+  );
 
   const [paymentSheets, setPaymentSheets] = useState<LabourPaymentSheet[]>([]);
 
-  const [roadProductions, setRoadProductions] = useState<DailyRoadProduction[]>(() => {
-    if (isClearedSlate) return [];
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEY + '_ROAD_PROD');
-    return saved ? JSON.parse(saved) : INITIAL_ROAD_PRODUCTION;
-  });
+  const [roadProductions, setRoadProductions] = useState<DailyRoadProduction[]>(() =>
+    safeGetJSON(LOCAL_STORAGE_KEY + '_ROAD_PROD', INITIAL_ROAD_PRODUCTION)
+  );
 
-  const [buildingProductions, setBuildingProductions] = useState<DailyBuildingProduction[]>(() => {
-    if (isClearedSlate) return [];
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEY + '_BLDG_PROD');
-    return saved ? JSON.parse(saved) : INITIAL_BUILDING_PRODUCTION;
-  });
+  const [buildingProductions, setBuildingProductions] = useState<DailyBuildingProduction[]>(() =>
+    safeGetJSON(LOCAL_STORAGE_KEY + '_BLDG_PROD', INITIAL_BUILDING_PRODUCTION)
+  );
 
-  const [boqItems, setBOQItems] = useState<BOQItem[]>(() => {
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEY + '_BOQ');
-    return saved ? JSON.parse(saved) : INITIAL_BOQ;
-  });
+  const [boqItems, setBOQItems] = useState<BOQItem[]>(() =>
+    safeGetJSON(LOCAL_STORAGE_KEY + '_BOQ', INITIAL_BOQ)
+  );
 
-  const [measurements, setMeasurements] = useState<MeasurementBookEntry[]>(() => {
-    if (isClearedSlate) return [];
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEY + '_MEASUREMENTS');
-    return saved ? JSON.parse(saved) : INITIAL_MEASUREMENTS;
-  });
+  const [measurements, setMeasurements] = useState<MeasurementBookEntry[]>(() =>
+    safeGetJSON(LOCAL_STORAGE_KEY + '_MEASUREMENTS', INITIAL_MEASUREMENTS)
+  );
 
-  const [bbsItems, setBBSItems] = useState<BBSItem[]>(() => {
-    if (isClearedSlate) return [];
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEY + '_BBS');
-    return saved ? JSON.parse(saved) : INITIAL_BBS;
-  });
+  const [bbsItems, setBBSItems] = useState<BBSItem[]>(() =>
+    safeGetJSON(LOCAL_STORAGE_KEY + '_BBS', INITIAL_BBS)
+  );
 
-  const [notifications, setNotifications] = useState<ERPNotification[]>(() => {
-    if (isClearedSlate) return [];
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEY + '_NOTIFS');
-    return saved ? JSON.parse(saved) : INITIAL_NOTIFICATIONS;
-  });
+  const [notifications, setNotifications] = useState<ERPNotification[]>(() =>
+    safeGetJSON(LOCAL_STORAGE_KEY + '_NOTIFS', INITIAL_NOTIFICATIONS)
+  );
 
-  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>(() => {
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEY + '_AUDIT');
-    return saved ? JSON.parse(saved) : INITIAL_AUDIT_LOGS;
-  });
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>(() =>
+    safeGetJSON(LOCAL_STORAGE_KEY + '_AUDIT', INITIAL_AUDIT_LOGS)
+  );
 
-  const [siteExpenses, setSiteExpenses] = useState<SiteExpenseRecord[]>(() => {
-    if (isClearedSlate) return [];
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEY + '_SITE_EXPENSES');
-    return saved ? JSON.parse(saved) : INITIAL_SITE_EXPENSES;
-  });
+  const [siteExpenses, setSiteExpenses] = useState<SiteExpenseRecord[]>(() =>
+    safeGetJSON(LOCAL_STORAGE_KEY + '_SITE_EXPENSES', INITIAL_SITE_EXPENSES)
+  );
 
   const currentProject = projects.find((p) => p.id === selectedProjectId) || projects[0];
   const currentSite = currentProject?.sites?.find((s) => s.id === selectedSiteId) || currentProject?.sites?.[0];
@@ -464,6 +363,7 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // Sync state to LocalStorage
   useEffect(() => {
+    isHydrated.current = true;
     try {
       localStorage.setItem(LOCAL_STORAGE_KEY + '_PROJECTS', JSON.stringify(projects));
       localStorage.setItem(LOCAL_STORAGE_KEY + '_ROAD_SECTIONS', JSON.stringify(roadSections));
@@ -486,6 +386,8 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       localStorage.setItem(LOCAL_STORAGE_KEY + '_AUDIT', JSON.stringify(auditLogs));
       localStorage.setItem(LOCAL_STORAGE_KEY + '_SITE_SHEETS', JSON.stringify(siteSheets));
       localStorage.setItem(LOCAL_STORAGE_KEY + '_SITE_EXPENSES', JSON.stringify(siteExpenses));
+      localStorage.setItem(LOCAL_STORAGE_KEY + '_SELECTED_PROJ', JSON.stringify(selectedProjectId));
+      localStorage.setItem(LOCAL_STORAGE_KEY + '_SELECTED_SITE', JSON.stringify(selectedSiteId));
       localStorage.setItem(DELETED_SITES_KEY, JSON.stringify(deletedSiteIds));
     } catch (e) {
       console.error('Failed to sync to localStorage', e);
@@ -512,6 +414,8 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     auditLogs,
     siteSheets,
     siteExpenses,
+    selectedProjectId,
+    selectedSiteId,
     deletedSiteIds
   ]);
 
@@ -554,7 +458,6 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         return mat;
       })
     );
-
     addAuditLog('Inventory Ledger', newId, 'CREATE', `Stock ${entryData.type}: ${entryData.materialName}`);
   };
 
@@ -562,20 +465,6 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const newId = 'con-' + Date.now();
     const newRec: MaterialConsumptionRecord = { ...rec, id: newId };
     setConsumptionRecords((prev) => [newRec, ...prev]);
-
-    if (rec.status === 'OVER_CONSUMPTION_ALERT') {
-      const notif: ERPNotification = {
-        id: 'notif-' + Date.now(),
-        date: new Date().toISOString().substring(0, 16).replace('T', ' '),
-        type: 'EXCESS_CONSUMPTION',
-        title: `Over-consumption in ${rec.activityName}`,
-        message: `${rec.materialName} consumed exceeds theoretical requirement.`,
-        severity: 'warning',
-        isRead: false,
-        linkModule: 'consumption'
-      };
-      setNotifications((prev) => [notif, ...prev]);
-    }
   };
 
   const addProject = (projData: Partial<Project>): Project => {
@@ -616,9 +505,7 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const updateProject = (id: string, data: Partial<Project>) => {
-    setProjects((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, ...data } : p))
-    );
+    setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, ...data } : p)));
   };
 
   const deleteProject = (id: string) => {
@@ -635,12 +522,9 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       location,
       supervisor
     };
-    setProjects((prev) =>
-      prev.map((p) => (p.id === projectId ? { ...p, sites: [...p.sites, newSite] } : p))
-    );
+    setProjects((prev) => prev.map((p) => (p.id === projectId ? { ...p, sites: [...p.sites, newSite] } : p)));
   };
 
-  // --- PERMANENT DELETION ENGINE ---
   const deleteSite = (siteId: string) => {
     const updatedDeleted = Array.from(new Set([...deletedSiteIds, siteId]));
     setDeletedSiteIds(updatedDeleted);
@@ -648,16 +532,13 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     const remainingSheets = siteSheets.filter((s) => s.siteId !== siteId);
     setSiteSheets(remainingSheets);
-    localStorage.setItem(LOCAL_STORAGE_KEY + '_SITE_SHEETS', JSON.stringify(remainingSheets));
 
-    setProjects((prev) => {
-      const updated = prev.map((p) => ({
+    setProjects((prev) =>
+      prev.map((p) => ({
         ...p,
         sites: (p.sites || []).filter((s) => s.id !== siteId)
-      }));
-      localStorage.setItem(LOCAL_STORAGE_KEY + '_PROJECTS', JSON.stringify(updated));
-      return updated;
-    });
+      }))
+    );
 
     setRoadSections((prev) => prev.filter((s) => s.siteId !== siteId));
     setBuildingFloors((prev) => prev.filter((f) => f.siteId !== siteId));
@@ -665,14 +546,8 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setVehicleTrips((prev) => prev.filter((t) => t.siteId !== siteId));
 
     if (selectedSiteId === siteId) {
-      if (remainingSheets.length > 0) {
-        setSelectedSiteId(remainingSheets[0].siteId);
-      } else {
-        setSelectedSiteId('');
-      }
+      setSelectedSiteId(remainingSheets[0]?.siteId || '');
     }
-
-    addAuditLog('Site Master', siteId, 'DELETE', `Permanently purged site stretch: ${siteId}`);
   };
 
   const addRoadSiteSection = (input: {
@@ -704,61 +579,13 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       prev.map((p) => (p.id === targetProjId ? { ...p, sites: [...p.sites, newSite] } : p))
     );
 
-    const makeDayRow = (d: number, item: string) => {
-      const vVals: Record<string, number> = {};
-      vehicleList.forEach((v) => {
-        vVals[v] = 0;
-      });
-      return {
-        id: `r-${newSiteId}-${item.toLowerCase().replace(/\s+/g, '')}-${d}`,
-        dayNumber: d,
-        date: `${d}-8-2026`,
-        item,
-        vehicleValues: vVals,
-        total: 0
-      };
-    };
-
     const newSheet: SiteMatrixSheet = {
       siteId: newSiteId,
       siteName: input.siteName,
       monthTitle: 'AUGUST',
       year: 2026,
       vehicles: vehicleList,
-      tabs: [
-        {
-          id: `tab-${newSiteId}-murum`,
-          tabKey: 'MURUM',
-          label: 'Murum / Borrow Soil',
-          unit: 'Trips',
-          defaultRate: 350,
-          rows: Array.from({ length: 15 }, (_, i) => makeDayRow(i + 1, 'Murum'))
-        },
-        {
-          id: `tab-${newSiteId}-gsb`,
-          tabKey: 'GSB',
-          label: 'GSB (Granular Sub-Base)',
-          unit: 'Tonnes',
-          defaultRate: 390,
-          rows: Array.from({ length: 15 }, (_, i) => makeDayRow(i + 1, 'GSB'))
-        },
-        {
-          id: `tab-${newSiteId}-wmm`,
-          tabKey: 'WMM',
-          label: 'WMM (Wet Mix Macadam)',
-          unit: 'Tonnes',
-          defaultRate: 420,
-          rows: Array.from({ length: 15 }, (_, i) => makeDayRow(i + 1, 'WMM'))
-        },
-        {
-          id: `tab-${newSiteId}-diesel`,
-          tabKey: 'DIESEL',
-          label: 'Diesel Dispensed (L)',
-          unit: 'Litres',
-          defaultRate: 92.5,
-          rows: Array.from({ length: 15 }, (_, i) => makeDayRow(i + 1, 'Diesel'))
-        }
-      ]
+      tabs: []
     };
 
     setSiteSheets((prev) => [...prev, newSheet]);
@@ -790,9 +617,7 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const updateBuildingFloor = (floorId: string, data: Partial<BuildingFloor>) => {
-    setBuildingFloors((prev) =>
-      prev.map((f) => (f.id === floorId ? { ...f, ...data } : f))
-    );
+    setBuildingFloors((prev) => prev.map((f) => (f.id === floorId ? { ...f, ...data } : f)));
   };
 
   const addBuildingFloor = (floorData: Partial<BuildingFloor>) => {
@@ -814,7 +639,7 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setBuildingFloors((prev) => [...prev, newFloor]);
   };
 
-  // Trips Functions
+  // Trips CRUD
   const addVehicleTrip = (tripData: Omit<VehicleTrip, 'id'>) => {
     const newId = 'trip-' + Date.now();
     setVehicleTrips((prev) => [{ ...tripData, id: newId }, ...prev]);
@@ -825,9 +650,7 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const updateVehicleTripStatus = (tripId: string, status: ApprovalStatus) => {
-    setVehicleTrips((prev) =>
-      prev.map((t) => (t.id === tripId ? { ...t, approvalStatus: status } : t))
-    );
+    setVehicleTrips((prev) => prev.map((t) => (t.id === tripId ? { ...t, approvalStatus: status } : t)));
   };
 
   const addMachineryLog = (logData: Omit<MachineryLog, 'id'>) => {
@@ -1003,26 +826,9 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setSiteSheets((prevSheets) =>
       (prevSheets || []).map((sheet) => {
         if (sheet.siteId !== siteId || sheet.tabs.some((t) => t.tabKey === tabKey)) return sheet;
-        const initialRows: SiteMatrixRow[] = Array.from({ length: 15 }, (_, i) => {
-          const vv: Record<string, number> = {};
-          sheet.vehicles.forEach((v) => {
-            vv[v] = 0;
-          });
-          return {
-            id: `row-${siteId}-${tabKey}-${i + 1}`,
-            dayNumber: i + 1,
-            date: `${i + 1}-8-2026`,
-            item: label,
-            vehicleValues: vv,
-            total: 0,
-            ratePerUnitOrTrip: defaultRate,
-            unit
-          };
-        });
-
         return {
           ...sheet,
-          tabs: [...sheet.tabs, { id: `tab-${Date.now()}`, tabKey, label, unit, defaultRate, rows: initialRows }]
+          tabs: [...sheet.tabs, { id: `tab-${Date.now()}`, tabKey, label, unit, defaultRate, rows: [] }]
         };
       })
     );
@@ -1046,7 +852,6 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
   };
 
-  // Total Data Purge Engine
   const clearAllData = () => {
     setStockLedger([]);
     setConsumptionRecords([]);
@@ -1061,7 +866,6 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setBBSItems([]);
     setSiteExpenses([]);
     setNotifications([]);
-    setSiteSheets((prev) => getZeroedSiteSheets(prev));
 
     try {
       localStorage.removeItem(LOCAL_STORAGE_KEY + '_TRIPS');
@@ -1076,14 +880,12 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       localStorage.removeItem(LOCAL_STORAGE_KEY + '_BBS');
       localStorage.removeItem(LOCAL_STORAGE_KEY + '_NOTIFS');
       localStorage.removeItem(LOCAL_STORAGE_KEY + '_MACHINERY_LOGS');
-      localStorage.setItem('ERP_DATA_CLEARED_SLATE', 'true');
     } catch {
       // ignore
     }
   };
 
   const resetToSampleData = () => {
-    localStorage.removeItem('ERP_DATA_CLEARED_SLATE');
     localStorage.removeItem(DELETED_SITES_KEY);
     setDeletedSiteIds([]);
     setProjects(INITIAL_PROJECTS);

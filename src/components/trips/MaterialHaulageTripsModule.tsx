@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useERP } from '../../context/ERPContext';
 import {
   Truck,
@@ -6,12 +6,12 @@ import {
   Trash2,
   Calendar,
   Layers,
-  DollarSign,
   Search,
-  CheckCircle2,
   X,
   Hash,
-  ArrowRight
+  ArrowRight,
+  Building2,
+  Check
 } from 'lucide-react';
 
 export interface DayTripLog {
@@ -28,39 +28,55 @@ export interface DayTripLog {
   totalAmount: number;
 }
 
-const MATERIAL_PRESETS = [
-  { name: 'Murum', defaultRate: 1400, defaultBrassPerTrip: 6 },
-  { name: 'Granular Sub-Base (GSB)', defaultRate: 1650, defaultBrassPerTrip: 5.5 },
-  { name: 'Wet Mix Macadam (WMM)', defaultRate: 1850, defaultBrassPerTrip: 5.5 },
-  { name: 'M-Sand / Crushed Sand', defaultRate: 2200, defaultBrassPerTrip: 5 },
-  { name: '20mm Aggregate', defaultRate: 2100, defaultBrassPerTrip: 5 },
-  { name: '40mm Ballast / Base', defaultRate: 1950, defaultBrassPerTrip: 6 }
+const DEFAULT_MATERIALS = [
+  { name: 'Murum', defaultRate: 1400, defaultBrass: 6 },
+  { name: 'Granular Sub-Base (GSB)', defaultRate: 1650, defaultBrass: 5.5 },
+  { name: 'Wet Mix Macadam (WMM)', defaultRate: 1850, defaultBrass: 5.5 },
+  { name: 'M-Sand / Crushed Sand', defaultRate: 2200, defaultBrass: 5 },
+  { name: '20mm Aggregate', defaultRate: 2100, defaultBrass: 5 },
+  { name: '40mm Ballast / Base', defaultRate: 1950, defaultBrass: 6 }
 ];
 
-const LOCAL_STORAGE_TRIPS_KEY = 'CONSTRUCTION_PRO_DAY_TRIPS_V1';
+const DEFAULT_VEHICLES = [
+  'KA-28-EX-8901',
+  'KA-28-JC-3342',
+  'MH-12-DT-5510',
+  'KA-28-TR-1092',
+  'KA-28-JP-7890'
+];
+
+const STORAGE_TRIPS_KEY = 'CONSTRUCTION_PRO_DAY_TRIPS_V2';
+const STORAGE_VEHICLES_KEY = 'CONSTRUCTION_PRO_TRIP_VEHICLES_V1';
 
 export const MaterialHaulageTripsModule: React.FC = () => {
   const { siteSheets, selectedSiteId } = useERP();
 
   const currentSite = siteSheets.find((s) => s.siteId === selectedSiteId) || siteSheets[0];
-  const activeVehicles = currentSite?.vehicles?.length
-    ? currentSite.vehicles
-    : ['KA-28-EX-8901', 'KA-28-JC-3342', 'MH-12-DT-5510', 'KA-28-TR-1092'];
+  const siteList = siteSheets.length > 0 
+    ? siteSheets.map((s) => s.siteName) 
+    : ['NH-50 Ongoing Site Stretch', 'Mulwad Murum Quarry Pit', 'Main Express Highway Package-3'];
+
+  // Persistent Vehicles List
+  const [vehiclesList, setVehiclesList] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_VEHICLES_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return DEFAULT_VEHICLES;
+  });
 
   // Persistent Day Trips State
   const [tripLogs, setTripLogs] = useState<DayTripLog[]>(() => {
     try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_TRIPS_KEY);
+      const saved = localStorage.getItem(STORAGE_TRIPS_KEY);
       if (saved) return JSON.parse(saved);
     } catch {}
-
-    // Default sample entries showing whole-day totals
     return [
       {
         id: 'trip-1',
         date: '2026-08-16',
         dayNumber: 1,
-        siteName: currentSite?.siteName || 'NH-50 Ongoing Site Stretch',
+        siteName: siteList[0] || 'NH-50 Ongoing Site Stretch',
         vehicleNumber: 'MH-12-DT-5510',
         materialName: 'Murum',
         totalTrips: 10,
@@ -68,45 +84,57 @@ export const MaterialHaulageTripsModule: React.FC = () => {
         totalBrass: 60,
         ratePerBrass: 1400,
         totalAmount: 84000
-      },
-      {
-        id: 'trip-2',
-        date: '2026-08-16',
-        dayNumber: 1,
-        siteName: currentSite?.siteName || 'NH-50 Ongoing Site Stretch',
-        vehicleNumber: 'KA-28-TR-1092',
-        materialName: 'Granular Sub-Base (GSB)',
-        totalTrips: 8,
-        brassPerTrip: 5.5,
-        totalBrass: 44,
-        ratePerBrass: 1650,
-        totalAmount: 72600
       }
     ];
   });
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isAddingNewVehicle, setIsAddingNewVehicle] = useState(false);
+  const [newVehicleInput, setNewVehicleInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
   // Form State
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
-    siteName: currentSite?.siteName || 'NH-50 Ongoing Site Stretch',
-    vehicleNumber: activeVehicles[0] || 'MH-12-DT-5510',
-    materialName: MATERIAL_PRESETS[0].name,
+    siteName: siteList[0] || 'NH-50 Ongoing Site Stretch',
+    vehicleNumber: vehiclesList[0] || 'MH-12-DT-5510',
+    materialName: DEFAULT_MATERIALS[0].name,
     totalTrips: 10,
-    brassPerTrip: MATERIAL_PRESETS[0].defaultBrassPerTrip,
-    ratePerBrass: MATERIAL_PRESETS[0].defaultRate
+    brassPerTrip: DEFAULT_MATERIALS[0].defaultBrass,
+    ratePerBrass: DEFAULT_MATERIALS[0].defaultRate
   });
 
-  const handleMaterialSelect = (matName: string) => {
-    const matched = MATERIAL_PRESETS.find((m) => m.name === matName);
+  // Sync to localStorage
+  useEffect(() => {
+    localStorage.setItem(STORAGE_TRIPS_KEY, JSON.stringify(tripLogs));
+  }, [tripLogs]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_VEHICLES_KEY, JSON.stringify(vehiclesList));
+  }, [vehiclesList]);
+
+  const handleMaterialChange = (matName: string) => {
+    const matched = DEFAULT_MATERIALS.find((m) => m.name === matName);
     setFormData((prev) => ({
       ...prev,
       materialName: matName,
       ratePerBrass: matched ? matched.defaultRate : prev.ratePerBrass,
-      brassPerTrip: matched ? matched.defaultBrassPerTrip : prev.brassPerTrip
+      brassPerTrip: matched ? matched.defaultBrass : prev.brassPerTrip
     }));
+  };
+
+  const handleAddNewVehicle = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanPlate = newVehicleInput.trim().toUpperCase();
+    if (!cleanPlate) return;
+
+    if (!vehiclesList.includes(cleanPlate)) {
+      const updated = [cleanPlate, ...vehiclesList];
+      setVehiclesList(updated);
+      setFormData((prev) => ({ ...prev, vehicleNumber: cleanPlate }));
+    }
+    setNewVehicleInput('');
+    setIsAddingNewVehicle(false);
   };
 
   const handleSaveDayTrip = (e: React.FormEvent) => {
@@ -130,17 +158,13 @@ export const MaterialHaulageTripsModule: React.FC = () => {
       totalAmount
     };
 
-    const updated = [newLog, ...tripLogs];
-    setTripLogs(updated);
-    localStorage.setItem(LOCAL_STORAGE_TRIPS_KEY, JSON.stringify(updated));
+    setTripLogs([newLog, ...tripLogs]);
     setIsModalOpen(false);
   };
 
   const handleDeleteTrip = (id: string) => {
-    if (window.confirm('Delete this day trip record?')) {
-      const updated = tripLogs.filter((t) => t.id !== id);
-      setTripLogs(updated);
-      localStorage.setItem(LOCAL_STORAGE_TRIPS_KEY, JSON.stringify(updated));
+    if (window.confirm('Delete this day trip entry?')) {
+      setTripLogs(tripLogs.filter((t) => t.id !== id));
     }
   };
 
@@ -173,7 +197,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                 Haulage Matrix
               </span>
               <span className="text-xs text-slate-400 font-semibold">
-                Active Site: {currentSite?.siteName || 'Main Stretch'}
+                Active Site: {formData.siteName}
               </span>
             </div>
             <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight mt-0.5">
@@ -202,16 +226,16 @@ export const MaterialHaulageTripsModule: React.FC = () => {
         </div>
 
         <div className="bg-[#0c1427] border border-[#182643] p-4 rounded-2xl">
-          <div className="text-slate-400 text-xs font-semibold">Total Material Quantity</div>
+          <div className="text-slate-400 text-xs font-semibold">Total Material Volume</div>
           <div className="text-2xl font-extrabold text-blue-400 mt-1">
             {grandTotalBrass.toFixed(1)}{' '}
-            <span className="text-xs font-normal text-slate-400">Brass (Murum / GSB / WMM)</span>
+            <span className="text-xs font-normal text-slate-400">Brass Quantity</span>
           </div>
         </div>
 
         <div className="bg-[#0c1427] border border-[#182643] p-4 rounded-2xl">
-          <div className="text-slate-400 text-xs font-semibold">Total Day Valuation</div>
-          <div className="text-2xl font-extrabold text-emerald-400 mt-1">
+          <div className="text-slate-400 text-xs font-semibold">Total Ledger Valuation</div>
+          <div className="text-2xl font-extrabold text-amber-400 mt-1">
             ₹{grandTotalValuation.toLocaleString('en-IN')}
           </div>
         </div>
@@ -222,7 +246,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
         <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
         <input
           type="text"
-          placeholder="Filter by date (YYYY-MM-DD), vehicle plate, or material (Murum, GSB)..."
+          placeholder="Filter by date (YYYY-MM-DD), vehicle plate, site name, or material..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="w-full pl-10 pr-4 py-2.5 bg-[#0D111D] border border-[#1E293B] rounded-2xl text-xs text-white outline-none focus:border-blue-500 placeholder-slate-500"
@@ -241,9 +265,10 @@ export const MaterialHaulageTripsModule: React.FC = () => {
             <thead>
               <tr className="border-b border-[#1E293B] text-[10px] font-extrabold uppercase tracking-wider text-slate-400 bg-[#080d19]/80">
                 <th className="py-3 px-4">Date</th>
+                <th className="py-3 px-4">Site Name</th>
                 <th className="py-3 px-4">Vehicle Number</th>
                 <th className="py-3 px-4">Material Name</th>
-                <th className="py-3 px-4 text-center">Day Trips (Total)</th>
+                <th className="py-3 px-4 text-center">Day Trips</th>
                 <th className="py-3 px-4 text-center">Brass / Trip</th>
                 <th className="py-3 px-4 text-right">Total Brass</th>
                 <th className="py-3 px-4 text-right">Rate / Brass</th>
@@ -254,8 +279,8 @@ export const MaterialHaulageTripsModule: React.FC = () => {
             <tbody className="divide-y divide-[#1E293B]/60 text-slate-200">
               {filteredLogs.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-8 text-center text-slate-500 text-xs">
-                    No haulage trips logged for this selection. Click "+ Log Day Trips" to record.
+                  <td colSpan={10} className="py-8 text-center text-slate-500 text-xs">
+                    No haulage trips logged. Click "+ Log Day Trips" above to record daily entries.
                   </td>
                 </tr>
               ) : (
@@ -263,6 +288,9 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                   <tr key={log.id} className="hover:bg-[#121c33]/50 transition-colors">
                     <td className="py-3.5 px-4 font-mono text-slate-300 font-semibold">
                       {log.date}
+                    </td>
+                    <td className="py-3.5 px-4 text-white font-medium">
+                      {log.siteName}
                     </td>
                     <td className="py-3.5 px-4">
                       <span className="px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-400 font-mono font-black text-[11px] border border-amber-500/30">
@@ -292,7 +320,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                         type="button"
                         onClick={() => handleDeleteTrip(log.id)}
                         className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 transition-colors cursor-pointer"
-                        title="Delete Trip"
+                        title="Delete Entry"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -305,7 +333,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
         </div>
       </div>
 
-      {/* 5. Modal: Whole Day Trips Entry */}
+      {/* 5. Log Total Day Haulage Trips Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150 font-sans">
           <div className="bg-[#121927] border border-[#1E293B] rounded-3xl w-full max-w-lg p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-150 text-slate-100 max-h-[92vh] overflow-y-auto">
@@ -327,7 +355,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
             </div>
 
             <form onSubmit={handleSaveDayTrip} className="space-y-4 text-xs">
-              {/* Row 1: Date & Site */}
+              {/* Row 1: Trip Date & Site Name */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-300 font-bold mb-1.5 flex items-center gap-1">
@@ -344,56 +372,99 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-slate-300 font-bold mb-1.5">
-                    Site Location
+                  <label className="block text-slate-300 font-bold mb-1.5 flex items-center gap-1">
+                    <Building2 className="w-3.5 h-3.5 text-blue-400" />
+                    <span>Site Name *</span>
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={formData.siteName}
                     onChange={(e) => setFormData({ ...formData, siteName: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-blue-500 font-medium"
-                  />
+                    className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-blue-500 cursor-pointer font-medium"
+                  >
+                    {siteList.map((site) => (
+                      <option key={site} value={site}>
+                        {site}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
-              {/* Row 2: Vehicle & Material */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-300 font-bold mb-1.5">
+              {/* Row 2: Vehicle Number with Inline Add Button */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-slate-300 font-bold">
                     Vehicle Number / Tipper *
                   </label>
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingNewVehicle(!isAddingNewVehicle)}
+                    className="text-[11px] font-bold text-blue-400 hover:text-blue-300 flex items-center gap-1 cursor-pointer transition-colors"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>+ Add Vehicle</span>
+                  </button>
+                </div>
+
+                {isAddingNewVehicle ? (
+                  <div className="flex items-center gap-2 mb-2 p-2 bg-[#162032] border border-blue-500/40 rounded-xl animate-in fade-in">
+                    <input
+                      type="text"
+                      placeholder="e.g. KA-28-AB-9999"
+                      value={newVehicleInput}
+                      onChange={(e) => setNewVehicleInput(e.target.value.toUpperCase())}
+                      className="flex-1 px-3 py-1.5 bg-[#0D111D] border border-[#1E293B] rounded-lg text-white font-mono font-bold text-xs uppercase outline-none focus:border-blue-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddNewVehicle}
+                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold text-xs flex items-center gap-1 cursor-pointer"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Save</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsAddingNewVehicle(false)}
+                      className="p-1.5 text-slate-400 hover:text-white rounded-lg"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : (
                   <select
                     value={formData.vehicleNumber}
                     onChange={(e) => setFormData({ ...formData, vehicleNumber: e.target.value })}
                     className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono font-bold outline-none focus:border-blue-500 cursor-pointer"
                   >
-                    {activeVehicles.map((v) => (
+                    {vehiclesList.map((v) => (
                       <option key={v} value={v}>
                         {v}
                       </option>
                     ))}
                   </select>
-                </div>
-
-                <div>
-                  <label className="block text-slate-300 font-bold mb-1.5">
-                    Material Name *
-                  </label>
-                  <select
-                    value={formData.materialName}
-                    onChange={(e) => handleMaterialSelect(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-blue-500 cursor-pointer font-medium"
-                  >
-                    {MATERIAL_PRESETS.map((m) => (
-                      <option key={m.name} value={m.name}>
-                        {m.name} (Preset: ₹{m.defaultRate}/Brass)
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                )}
               </div>
 
-              {/* Row 3: Total Day Trips Count + Brass Per Trip + Rate Per Brass */}
+              {/* Row 3: Material Name */}
+              <div>
+                <label className="block text-slate-300 font-bold mb-1.5">
+                  Material Name *
+                </label>
+                <select
+                  value={formData.materialName}
+                  onChange={(e) => handleMaterialChange(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-blue-500 cursor-pointer font-medium"
+                >
+                  {DEFAULT_MATERIALS.map((m) => (
+                    <option key={m.name} value={m.name}>
+                      {m.name} (Preset: ₹{m.defaultRate}/Brass)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Row 4: Total Day Trips + Brass Per Trip + Rate Per 1 Brass (Directly Editable) */}
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-slate-300 font-bold mb-1.5 flex items-center gap-1">
@@ -429,8 +500,9 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-slate-300 font-bold mb-1.5">
-                    Rate / 1 Brass (₹)
+                  <label className="block text-slate-300 font-bold mb-1.5 flex items-center justify-between">
+                    <span>Rate / 1 Brass (₹)</span>
+                    <span className="text-[10px] text-amber-400 font-normal">Editable</span>
                   </label>
                   <input
                     type="number"
@@ -438,7 +510,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                     required
                     value={formData.ratePerBrass || ''}
                     onChange={(e) => setFormData({ ...formData, ratePerBrass: Number(e.target.value) })}
-                    className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono font-bold outline-none focus:border-blue-500"
+                    className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-amber-400 font-mono font-bold outline-none focus:border-blue-500"
                   />
                 </div>
               </div>
@@ -446,7 +518,9 @@ export const MaterialHaulageTripsModule: React.FC = () => {
               {/* Day Computation Summary Box */}
               <div className="p-4 bg-[#080d19] border border-[#1E293B] rounded-2xl space-y-2">
                 <div className="flex items-center justify-between text-slate-400 text-xs">
-                  <span>Total Quantity Delivered ({formData.totalTrips || 0} Trips × {formData.brassPerTrip || 0} Brass):</span>
+                  <span>
+                    Total Quantity Delivered ({formData.totalTrips || 0} Trips × {formData.brassPerTrip || 0} Brass):
+                  </span>
                   <span className="text-white font-bold font-mono text-sm">
                     {(Number(formData.totalTrips || 0) * Number(formData.brassPerTrip || 0)).toFixed(1)} Brass
                   </span>
@@ -462,7 +536,11 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                     </div>
                   </div>
                   <div className="text-xl font-black text-amber-400 font-mono">
-                    ₹{(Number(formData.totalTrips || 0) * Number(formData.brassPerTrip || 0) * Number(formData.ratePerBrass || 0)).toLocaleString('en-IN')}
+                    ₹{(
+                      Number(formData.totalTrips || 0) *
+                      Number(formData.brassPerTrip || 0) *
+                      Number(formData.ratePerBrass || 0)
+                    ).toLocaleString('en-IN')}
                   </div>
                 </div>
               </div>

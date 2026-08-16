@@ -9,7 +9,8 @@ import {
   Calculator,
   HardHat,
   LogOut,
-  Milestone
+  Milestone,
+  Users
 } from 'lucide-react';
 
 interface Props {
@@ -32,6 +33,13 @@ export const Sidebar: React.FC<Props> = ({ activeTab, setActiveTab }) => {
   // 1. OPERATIONS
   const operationsItems: NavItem[] = [
     { id: 'dashboard', label: 'Site Overview', icon: LayoutDashboard },
+    {
+      id: 'users',
+      label: 'User Management',
+      icon: Users,
+      badge: 'RBAC',
+      badgeStyle: 'bg-indigo-900/40 text-indigo-300 border border-indigo-500/40'
+    },
     {
       id: 'road-sites',
       label: 'Road Sites & Stretches',

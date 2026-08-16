@@ -38,7 +38,7 @@ interface Props {
 }
 
 export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab }) => {
-  const { selectedSiteId, siteSheets, projects, selectedProjectId } = useERP();
+  const { selectedSiteId, siteSheets, projects, selectedProjectId, siteExpenses, vehicleTrips, dieselLogs, machinery } = useERP();
   const {
     machines,
     trips,
@@ -59,6 +59,45 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
       siteCode: 'NH48-PKG3-MUL'
     };
   }, [siteSheets, selectedSiteId]);
+
+  // Dynamic KPI Calculations from Live State
+  const currentSheet = siteSheets.find((s) => s.siteId === selectedSiteId) || siteSheets[0];
+  
+  const totalMaterialLaid = useMemo(() => {
+    if (!currentSheet) return 0;
+    return currentSheet.tabs.reduce((sum, tab) => {
+      return sum + tab.rows.reduce((rSum, row) => rSum + (Number(row.total) || 0), 0);
+    }, 0);
+  }, [currentSheet]);
+
+  const totalExpensesAmount = useMemo(() => {
+    const contextTotal = (siteExpenses || [])
+      .filter((e) => !selectedSiteId || e.siteId === selectedSiteId)
+      .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+    
+    const roadTotal = (expenses || []).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+    return contextTotal + roadTotal;
+  }, [siteExpenses, expenses, selectedSiteId]);
+
+  const activeTripsCount = useMemo(() => {
+    const vTrips = (vehicleTrips || []).filter((t) => !selectedSiteId || t.siteId === selectedSiteId).length;
+    const rTrips = (trips || []).length;
+    return vTrips + rTrips;
+  }, [vehicleTrips, trips, selectedSiteId]);
+
+  const lowFuelMachines = useMemo(() => {
+    const list = machines || [];
+    return list.filter((m: any) => m.fuelLevel !== undefined && m.fuelLevel < 15);
+  }, [machines]);
+
+  const totalMachinesCount = (machines && machines.length > 0) ? machines.length : (machinery?.length || 0);
+  const activeMachinesCount = (machines && machines.length > 0)
+    ? machines.filter((m: any) => m.status === 'Active').length
+    : (machinery || []).filter((m: any) => m.status === 'Active').length;
+
+  const breakdownMachinesCount = (machines && machines.length > 0)
+    ? machines.filter((m: any) => m.status === 'Breakdown' || m.status === 'Idle').length
+    : (machinery || []).filter((m: any) => m.status === 'Breakdown' || m.status === 'Maintenance').length;
 
   // Activity Feed Filter
   const [feedFilter, setFeedFilter] = useState<'ALL' | 'DIESEL' | 'MATERIAL' | 'EXPENSE'>('ALL');
@@ -103,147 +142,71 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
   const [calcTipperCap, setCalcTipperCap] = useState<number>(30);
   const [calcActualDelivered, setCalcActualDelivered] = useState<number>(2800);
 
-  // Machine Roster Statuses (matching exact prompt specs)
+  // Machine Roster Statuses
   const machineRoster = useMemo(() => {
-    return [
-      {
-        id: 'CAT-GRD-01',
-        name: 'CAT 140K Motor Grader',
-        operator: 'Mahesh Patil',
-        status: 'Active' as const,
-        workingHours: 8.5,
-        targetHours: 10,
-        fuelLevel: 68,
-        section: 'Ch. 14+200 GSB Sub-Base Leveling'
-      },
-      {
-        id: 'JCB-3DX-04',
-        name: 'JCB 3DX Super Backhoe',
-        operator: 'Irfan Mulla',
-        status: 'Active' as const,
-        workingHours: 7.2,
-        targetHours: 9,
-        fuelLevel: 54,
-        section: 'Ch. 13+800 Side Drain Trenching'
-      },
-      {
-        id: 'EX-HITACHI-210',
-        name: 'Hitachi ZX210 Excavator',
-        operator: 'Prakash Patil',
-        status: 'Active' as const,
-        workingHours: 9.0,
-        targetHours: 10,
-        fuelLevel: 12, // Critical Low Fuel Alert
-        isLowFuel: true,
-        section: 'Mulwad Quarry Borrow Pit #1'
-      },
-      {
-        id: 'VIB-ROLLER-01',
-        name: 'HAMM 311D Soil Compactor',
-        operator: 'Raju Rathod',
-        status: 'Active' as const,
-        workingHours: 6.8,
-        targetHours: 8,
-        fuelLevel: 48,
-        section: 'Ch. 14+100 WMM Compaction'
-      },
-      {
-        id: 'PAVER-VOGELE-1800',
-        name: 'Vögele 1800-3 Sensor Paver',
-        operator: 'Anand Biradar',
-        status: 'Idle' as const,
-        workingHours: 2.5,
-        targetHours: 8,
-        fuelLevel: 80,
-        section: 'Standby for DBM Shift (Ch. 12+500)'
-      },
-      {
-        id: 'TIP-9580',
-        name: 'BharatBenz 2828C Tipper (9580)',
-        operator: 'Ramesh Lamani',
-        status: 'Breakdown' as const,
-        workingHours: 0.0,
-        targetHours: 10,
-        fuelLevel: 25,
-        section: 'Camp Garage (Hydraulic Hose Leak)'
-      }
-    ];
-  }, []);
+    if (machines && machines.length > 0) return machines;
+    return (machinery || []).map((m) => ({
+      id: m.registrationNo || m.id,
+      name: m.name,
+      operator: m.operatorName || 'Assigned Operator',
+      status: m.status as any,
+      workingHours: 0,
+      targetHours: 10,
+      fuelLevel: 100,
+      isLowFuel: false,
+      section: 'Main Site Stretch'
+    }));
+  }, [machines, machinery]);
 
-  // Combined Real-Time Activity Feed
+  // Combined Real-Time Activity Feed Dynamic Generator
   const activityLedger = useMemo(() => {
-    const list = [
-      {
-        id: 'act-1',
-        type: 'DIESEL' as const,
+    const list: any[] = [];
+
+    (fuelLogs || []).forEach((f: any) => {
+      list.push({
+        id: `fuel-${f.id}`,
+        type: 'DIESEL',
         title: 'Diesel Dispensed',
-        direction: 'OUT' as const,
-        value: '[-] 180.00 L',
-        subtext: 'To CAT-GRD-01 (CAT 140K Grader)',
-        detail: 'Bowser: Site Mobile Bowser #1 • Challan: BWS-884',
-        timestamp: '10:45 AM Today',
+        direction: 'OUT',
+        value: `[-] ${f.litresDispensed} L`,
+        subtext: `To ${f.machineName || f.machineCode}`,
+        detail: `Challan: ${f.voucherChallanNo || 'N/A'} • Source: ${f.fuelSource}`,
+        timestamp: f.date || 'Today',
         tagColor: 'crimson'
-      },
-      {
-        id: 'act-2',
-        type: 'MATERIAL' as const,
+      });
+    });
+
+    (trips || []).forEach((t: any) => {
+      list.push({
+        id: `trip-${t.id}`,
+        type: 'MATERIAL',
         title: 'Material Haul Delivery',
-        direction: 'IN' as const,
-        value: '[+] 32.50 Tons WMM',
-        subtext: 'Tipper: KA-28-C-8797 • Challan #WB-49102',
-        detail: 'From Bilgi Crusher Pit -> Ch. 14+200 LHS',
-        timestamp: '10:30 AM Today',
+        direction: 'IN',
+        value: `[+] ${t.netWeightTons?.toFixed(2) || '0.00'} Tons ${t.materialName}`,
+        subtext: `Tipper: ${t.vehicleNumberPlate} • Challan #${t.challanNumber}`,
+        detail: `From ${t.sourceQuarryOrPlant} -> ${t.formattedChainage || 'Site'}`,
+        timestamp: t.date || 'Today',
         tagColor: 'emerald'
-      },
-      {
-        id: 'act-3',
-        type: 'EXPENSE' as const,
-        title: 'Petty Cash Expense',
-        direction: 'OUT' as const,
-        value: '[-] ₹4,500.00',
-        subtext: 'Hydraulic Hose Replacement on EX-210',
-        detail: 'Payee: Mahaveer Hydraulics • Mode: Petty Cash Float',
-        timestamp: '10:15 AM Today',
+      });
+    });
+
+    (expenses || []).forEach((e: any) => {
+      list.push({
+        id: `exp-${e.id}`,
+        type: 'EXPENSE',
+        title: 'Site Expense Voucher',
+        direction: 'OUT',
+        value: `[-] ₹${Number(e.amount).toLocaleString('en-IN')}`,
+        subtext: e.description || e.category,
+        detail: `Payee: ${e.payeeVendorName || 'Vendor'} • Center: ${e.costCenterChainage || 'Site'}`,
+        timestamp: e.date || 'Today',
         tagColor: 'crimson'
-      },
-      {
-        id: 'act-4',
-        type: 'MATERIAL' as const,
-        title: 'Material Haul Delivery',
-        direction: 'IN' as const,
-        value: '[+] 28.40 Tons GSB',
-        subtext: 'Tipper: KA-28-D-7352 • Challan #WB-49098',
-        detail: 'From Mulwad Quarry Pit #1 -> Ch. 14+150',
-        timestamp: '09:50 AM Today',
-        tagColor: 'emerald'
-      },
-      {
-        id: 'act-5',
-        type: 'DIESEL' as const,
-        title: 'Diesel Dispensed',
-        direction: 'OUT' as const,
-        value: '[-] 210.00 L',
-        subtext: 'To EX-HITACHI-210 (ZX210 Excavator)',
-        detail: 'Source: Base Camp Static Tank (20KL) • Challan: BWS-883',
-        timestamp: '09:15 AM Today',
-        tagColor: 'crimson'
-      },
-      {
-        id: 'act-6',
-        type: 'EXPENSE' as const,
-        title: 'Equipment Spares Expense',
-        direction: 'OUT' as const,
-        value: '[-] ₹14,800.00',
-        subtext: 'Tipper 9580 Leaf Spring Bushings & U-Bolts',
-        detail: 'Payee: Mahalaxmi Auto Garage • Voucher: EXP-NH48-014',
-        timestamp: '08:30 AM Today',
-        tagColor: 'crimson'
-      }
-    ];
+      });
+    });
 
     if (feedFilter === 'ALL') return list;
     return list.filter((item) => item.type === feedFilter);
-  }, [feedFilter]);
+  }, [fuelLogs, trips, expenses, feedFilter]);
 
   // Handlers for quick entries
   const handleSaveDiesel = (e: React.FormEvent) => {
@@ -393,7 +356,7 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
         </div>
       </div>
 
-      {/* 2. Top KPI Metric Cards (4-Column Grid) */}
+      {/* 2. Top KPI Metric Cards (Dynamic Values) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Total Material Laid (Today) */}
         <div className="p-5 rounded-2xl bg-[#121927] border border-[#1E293B] shadow-xl hover:border-slate-700 transition-all space-y-2 group">
@@ -406,11 +369,11 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
             </div>
           </div>
           <div className="text-3xl font-black text-white tracking-tight">
-            1,240 <span className="text-lg font-bold text-slate-400">Tons</span>
+            {totalMaterialLaid.toLocaleString()} <span className="text-lg font-bold text-slate-400">Tons</span>
           </div>
           <div className="flex items-center gap-1.5 text-xs text-[#94A3B8]">
             <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400" />
-            <span>GSB & WMM on Ch. 14+200</span>
+            <span>{totalMaterialLaid > 0 ? 'Active layer haulage' : 'No material logged'}</span>
           </div>
         </div>
 
@@ -425,11 +388,11 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
             </div>
           </div>
           <div className="text-3xl font-black text-emerald-400 font-mono tracking-tight">
-            ₹3,42,850.00
+            ₹{totalExpensesAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
           <div className="flex items-center gap-1.5 text-xs text-[#94A3B8]">
             <TrendingDown className="w-3.5 h-3.5 text-rose-400" />
-            <span>Fuel, vendor spares & petty cash</span>
+            <span>{totalExpensesAmount > 0 ? 'Fuel, vendor spares & petty cash' : 'No expenses recorded'}</span>
           </div>
         </div>
 
@@ -444,11 +407,11 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
             </div>
           </div>
           <div className="text-3xl font-black text-white tracking-tight">
-            48 <span className="text-lg font-bold text-slate-400">Trips</span>
+            {activeTripsCount} <span className="text-lg font-bold text-slate-400">Trips</span>
           </div>
           <div className="flex items-center gap-1.5 text-xs text-[#94A3B8]">
             <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-400 animate-ping" />
-            <span>6 Tippers in active transit</span>
+            <span>{activeTripsCount > 0 ? `${activeTripsCount} Tippers recorded` : '0 tippers active'}</span>
           </div>
         </div>
 
@@ -464,10 +427,10 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
             </div>
           </div>
           <div className="text-3xl font-black text-rose-400 tracking-tight">
-            2 Machines <span className="text-lg font-bold text-rose-300/80">Low</span>
+            {lowFuelMachines.length} Machines <span className="text-lg font-bold text-rose-300/80">Low</span>
           </div>
           <div className="flex items-center gap-1.5 text-xs text-rose-300">
-            <span>Hitachi 210 & Cat Grader &lt; 15%</span>
+            <span>{lowFuelMachines.length > 0 ? `${lowFuelMachines.length} machine(s) < 15% fuel` : 'All equipment fuel levels normal'}</span>
           </div>
         </div>
       </div>
@@ -479,12 +442,12 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
           <div className="space-y-0.5">
             <div className="text-xs text-[#94A3B8] font-bold">Active Machines</div>
             <div className="text-xl font-black text-white">
-              18 <span className="text-xs text-[#94A3B8] font-normal">of 22 deployed</span>
+              {activeMachinesCount} <span className="text-xs text-[#94A3B8] font-normal">of {totalMachinesCount} deployed</span>
             </div>
           </div>
           <div className="px-3 py-1.5 rounded-xl bg-[#064E3B] text-[#34D399] border border-[#065F46] text-xs font-black flex items-center gap-1.5 shadow-sm">
             <CheckCircle2 className="w-3.5 h-3.5" />
-            <span>82% Online</span>
+            <span>{totalMachinesCount > 0 ? `${Math.round((activeMachinesCount / totalMachinesCount) * 100)}% Online` : '0% Online'}</span>
           </div>
         </div>
 
@@ -493,12 +456,12 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
           <div className="space-y-0.5">
             <div className="text-xs text-[#94A3B8] font-bold">Breakdown / Idle</div>
             <div className="text-xl font-black text-white">
-              3 <span className="text-xs text-[#94A3B8] font-normal">machines stopped</span>
+              {breakdownMachinesCount} <span className="text-xs text-[#94A3B8] font-normal">machines stopped</span>
             </div>
           </div>
           <div className="px-3 py-1.5 rounded-xl bg-[#450A0A] text-[#F87171] border border-[#7F1D1D] text-xs font-black flex items-center gap-1.5 shadow-sm">
             <AlertTriangle className="w-3.5 h-3.5" />
-            <span>Action Req.</span>
+            <span>{breakdownMachinesCount > 0 ? 'Action Req.' : 'Optimal'}</span>
           </div>
         </div>
 
@@ -507,19 +470,19 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
           <div className="space-y-0.5">
             <div className="text-xs text-[#94A3B8] font-bold">Maintenance Scheduled</div>
             <div className="text-xl font-black text-white">
-              1 <span className="text-xs text-[#94A3B8] font-normal">machine due</span>
+              0 <span className="text-xs text-[#94A3B8] font-normal">machines due</span>
             </div>
           </div>
           <div className="px-3 py-1.5 rounded-xl bg-[#451A03] text-[#FBBF24] border border-[#78350F] text-xs font-black flex items-center gap-1.5 shadow-sm">
             <Clock className="w-3.5 h-3.5" />
-            <span>Due in 15h</span>
+            <span>Up to date</span>
           </div>
         </div>
       </div>
 
-      {/* 4. Main Analytics & Activity Feeds (Split Layout: 35% Left / 65% Right) */}
+      {/* 4. Main Analytics & Activity Feeds */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* LEFT PANEL (35% - 4.2 cols -> 4 or 5 cols) — Machine & Operator Status */}
+        {/* LEFT PANEL: Machine & Operator Status */}
         <div className="lg:col-span-5 rounded-2xl bg-[#121927] border border-[#1E293B] p-5 shadow-xl space-y-4">
           <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
             <div className="flex items-center gap-2">
@@ -538,80 +501,83 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
 
           {/* Roster List */}
           <div className="space-y-3">
-            {machineRoster.map((m) => {
-              const isActive = m.status === 'Active';
-              const isIdle = m.status === 'Idle';
-              const isBreakdown = m.status === 'Breakdown';
+            {machineRoster.length === 0 ? (
+              <div className="p-4 text-center text-xs text-slate-500">No machinery logged.</div>
+            ) : (
+              machineRoster.map((m: any) => {
+                const isActive = m.status === 'Active';
+                const isIdle = m.status === 'Idle';
+                const isBreakdown = m.status === 'Breakdown';
 
-              return (
-                <div
-                  key={m.id}
-                  className="p-3 rounded-xl bg-[#162032] border border-[#1E293B] hover:border-slate-700 transition-all space-y-2"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs font-bold text-white">
-                        {m.id}
-                      </span>
-                      {m.isLowFuel && (
-                        <span className="px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-400 border border-rose-500/30 text-[9px] font-black animate-pulse">
-                          LOW FUEL ({m.fuelLevel}%)
+                return (
+                  <div
+                    key={m.id}
+                    className="p-3 rounded-xl bg-[#162032] border border-[#1E293B] hover:border-slate-700 transition-all space-y-2"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs font-bold text-white">
+                          {m.id}
                         </span>
-                      )}
-                    </div>
+                        {m.isLowFuel && (
+                          <span className="px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-400 border border-rose-500/30 text-[9px] font-black animate-pulse">
+                            LOW FUEL ({m.fuelLevel}%)
+                          </span>
+                        )}
+                      </div>
 
-                    <span
-                      className={`text-[10px] font-black px-2 py-0.5 rounded-md uppercase ${
-                        isActive
-                          ? 'bg-[#064E3B] text-[#34D399] border border-[#065F46]'
-                          : isIdle
-                          ? 'bg-[#451A03] text-[#FBBF24] border border-[#78350F]'
-                          : 'bg-[#450A0A] text-[#F87171] border border-[#7F1D1D]'
-                      }`}
-                    >
-                      {m.status}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-300 font-semibold truncate max-w-[180px]">
-                      {m.name}
-                    </span>
-                    <span className="text-[#94A3B8] font-mono text-[11px]">
-                      Op: <strong className="text-slate-200">{m.operator}</strong>
-                    </span>
-                  </div>
-
-                  <div className="text-[10px] text-[#94A3B8] truncate">
-                    {m.section}
-                  </div>
-
-                  {/* Progress bar of working hours */}
-                  <div className="space-y-1 pt-1 border-t border-[#1E293B]/60">
-                    <div className="flex justify-between text-[10px] text-[#94A3B8] font-mono">
-                      <span>Working: {m.workingHours} hrs</span>
-                      <span>Target: {m.targetHours} hrs</span>
-                    </div>
-                    <div className="w-full h-1.5 rounded-full bg-[#0D111D] overflow-hidden">
-                      <div
-                        className={`h-full rounded-full ${
-                          isBreakdown
-                            ? 'bg-rose-500'
+                      <span
+                        className={`text-[10px] font-black px-2 py-0.5 rounded-md uppercase ${
+                          isActive
+                            ? 'bg-[#064E3B] text-[#34D399] border border-[#065F46]'
                             : isIdle
-                            ? 'bg-amber-500'
-                            : 'bg-blue-500'
+                            ? 'bg-[#451A03] text-[#FBBF24] border border-[#78350F]'
+                            : 'bg-[#450A0A] text-[#F87171] border border-[#7F1D1D]'
                         }`}
-                        style={{ width: `${Math.min(100, (m.workingHours / m.targetHours) * 100)}%` }}
-                      />
+                      >
+                        {m.status || 'Active'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-300 font-semibold truncate max-w-[180px]">
+                        {m.name}
+                      </span>
+                      <span className="text-[#94A3B8] font-mono text-[11px]">
+                        Op: <strong className="text-slate-200">{m.operator}</strong>
+                      </span>
+                    </div>
+
+                    <div className="text-[10px] text-[#94A3B8] truncate">
+                      {m.section || 'Main Road Project Section'}
+                    </div>
+
+                    <div className="space-y-1 pt-1 border-t border-[#1E293B]/60">
+                      <div className="flex justify-between text-[10px] text-[#94A3B8] font-mono">
+                        <span>Working: {m.workingHours || 0} hrs</span>
+                        <span>Target: {m.targetHours || 10} hrs</span>
+                      </div>
+                      <div className="w-full h-1.5 rounded-full bg-[#0D111D] overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${
+                            isBreakdown
+                              ? 'bg-rose-500'
+                              : isIdle
+                              ? 'bg-amber-500'
+                              : 'bg-blue-500'
+                          }`}
+                          style={{ width: `${Math.min(100, ((m.workingHours || 0) / (m.targetHours || 10)) * 100)}%` }}
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </div>
 
-        {/* RIGHT PANEL (65% - 7 cols) — Recent Transactions & Material/Fuel Logs */}
+        {/* RIGHT PANEL: Recent Transactions & Material/Fuel Logs */}
         <div className="lg:col-span-7 rounded-2xl bg-[#121927] border border-[#1E293B] p-5 shadow-xl space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#1E293B] pb-3">
             <div>
@@ -643,67 +609,69 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
 
           {/* Activity Ledger Feed */}
           <div className="space-y-2.5">
-            {activityLedger.map((item) => {
-              const isOut = item.direction === 'OUT';
+            {activityLedger.length === 0 ? (
+              <div className="p-8 text-center text-xs text-slate-500 bg-[#162032]/40 rounded-xl border border-[#1E293B]">
+                No recent transactions or logs recorded. Use the action buttons above to log trips, diesel, or expenses.
+              </div>
+            ) : (
+              activityLedger.map((item) => {
+                const isOut = item.direction === 'OUT';
 
-              return (
-                <div
-                  key={item.id}
-                  className="p-3.5 rounded-xl bg-[#162032] border border-[#1E293B] hover:border-slate-700 transition-all flex items-start justify-between gap-3"
-                >
-                  <div className="flex items-start gap-3">
-                    {/* Icon Bubble */}
-                    <div
-                      className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
-                        isOut
-                          ? 'bg-[#450A0A] text-[#F87171] border border-[#7F1D1D]'
-                          : 'bg-[#064E3B] text-[#34D399] border border-[#065F46]'
-                      }`}
-                    >
-                      {isOut ? (
-                        <ArrowDownRight className="w-4 h-4" />
-                      ) : (
-                        <ArrowUpRight className="w-4 h-4" />
-                      )}
+                return (
+                  <div
+                    key={item.id}
+                    className="p-3.5 rounded-xl bg-[#162032] border border-[#1E293B] hover:border-slate-700 transition-all flex items-start justify-between gap-3"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div
+                        className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
+                          isOut
+                            ? 'bg-[#450A0A] text-[#F87171] border border-[#7F1D1D]'
+                            : 'bg-[#064E3B] text-[#34D399] border border-[#065F46]'
+                        }`}
+                      >
+                        {isOut ? (
+                          <ArrowDownRight className="w-4 h-4" />
+                        ) : (
+                          <ArrowUpRight className="w-4 h-4" />
+                        )}
+                      </div>
+
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-white">
+                            {item.title}
+                          </span>
+                          <span className="text-[10px] text-[#94A3B8] font-mono">
+                            • {item.timestamp}
+                          </span>
+                        </div>
+                        <div className="text-xs text-slate-300 font-medium">
+                          {item.subtext}
+                        </div>
+                        <div className="text-[11px] text-[#94A3B8]">
+                          {item.detail}
+                        </div>
+                      </div>
                     </div>
 
-                    {/* Main Content */}
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-white">
-                          {item.title}
-                        </span>
-                        <span className="text-[10px] text-[#94A3B8] font-mono">
-                          • {item.timestamp}
-                        </span>
-                      </div>
-                      <div className="text-xs text-slate-300 font-medium">
-                        {item.subtext}
-                      </div>
-                      <div className="text-[11px] text-[#94A3B8]">
-                        {item.detail}
-                      </div>
+                    <div className="text-right shrink-0">
+                      <span
+                        className={`text-sm font-black font-mono px-2.5 py-1 rounded-lg ${
+                          isOut
+                            ? 'bg-[#450A0A]/70 text-[#F87171] border border-[#7F1D1D]'
+                            : 'bg-[#064E3B]/70 text-[#34D399] border border-[#065F46]'
+                        }`}
+                      >
+                        {item.value}
+                      </span>
                     </div>
                   </div>
-
-                  {/* Highlight Metric Value */}
-                  <div className="text-right shrink-0">
-                    <span
-                      className={`text-sm font-black font-mono px-2.5 py-1 rounded-lg ${
-                        isOut
-                          ? 'bg-[#450A0A]/70 text-[#F87171] border border-[#7F1D1D]'
-                          : 'bg-[#064E3B]/70 text-[#34D399] border border-[#065F46]'
-                      }`}
-                    >
-                      {item.value}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
 
-          {/* Bottom Footnote & Navigation */}
           <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-[#1E293B] text-xs">
             <span className="text-[#94A3B8] text-[11px]">
               Showing real-time site events (Auto-refreshed via local ledger)
@@ -727,11 +695,7 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
         </div>
       </div>
 
-      {/* ============================================================ */}
-      {/* 5. MODALS FOR ENTRIES & YIELD CALCULATIONS */}
-      {/* ============================================================ */}
-
-      {/* MODAL 1: MATERIAL QUANTITY & YIELD CALCULATOR */}
+      {/* MODAL 1: YIELD CALCULATOR */}
       {isYieldModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
           <div className="bg-[#121927] border border-[#1E293B] rounded-3xl w-full max-w-2xl p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
@@ -757,7 +721,6 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
               </button>
             </div>
 
-            {/* Inputs Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
               <div>
                 <label className="block text-[#94A3B8] font-bold mb-1">Stretch Length (m)</label>
@@ -822,7 +785,6 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
               </div>
             </div>
 
-            {/* Live Calculation Output Card */}
             <div className="p-4 rounded-2xl bg-[#0D111D] border border-[#1E293B] space-y-3">
               <div className="text-xs font-black uppercase text-blue-400 tracking-wider">
                 Theoretical Requirements Output
@@ -851,7 +813,6 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
                 </div>
               </div>
 
-              {/* Planned vs Actual Reconciliation */}
               <div className="pt-3 border-t border-[#1E293B] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="text-xs">
                   <label className="text-[#94A3B8] font-semibold block">
@@ -886,7 +847,7 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
         </div>
       )}
 
-      {/* MODAL 2: DIESEL REFUELING ENTRY */}
+      {/* MODAL 2: DIESEL ENTRY */}
       {isDieselModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
           <div className="bg-[#121927] border border-[#1E293B] rounded-3xl w-full max-w-lg p-6 shadow-2xl space-y-4">
@@ -995,7 +956,7 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
         </div>
       )}
 
-      {/* MODAL 3: TRIP CHALLAN LOGGING */}
+      {/* MODAL 3: TRIP CHALLAN */}
       {isTripModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
           <div className="bg-[#121927] border border-[#1E293B] rounded-3xl w-full max-w-lg p-6 shadow-2xl space-y-4">
@@ -1121,7 +1082,7 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
         </div>
       )}
 
-      {/* MODAL 4: SITE EXPENSE VOUCHER */}
+      {/* MODAL 4: SITE EXPENSE */}
       {isExpenseModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
           <div className="bg-[#121927] border border-[#1E293B] rounded-3xl w-full max-w-lg p-6 shadow-2xl space-y-4">
@@ -1216,6 +1177,7 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
           </div>
         </div>
       )}
+
       {/* Add Road Site Modal */}
       <CreateRoadSiteModal
         isOpen={isAddRoadSiteOpen}

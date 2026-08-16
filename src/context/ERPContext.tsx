@@ -172,7 +172,8 @@ interface ERPContextType {
 
 const ERPContext = createContext<ERPContextType | undefined>(undefined);
 
-const LOCAL_STORAGE_KEY = 'INFRABUILD_ERP_STATE_V1';
+// V4 forces automatic invalidation of stale 9-site data in localStorage
+const LOCAL_STORAGE_KEY = 'INFRABUILD_ERP_STATE_V4';
 const DELETED_SITES_KEY = 'PAVETRACK_DELETED_SITE_IDS';
 
 const getZeroedSiteSheets = (sheets: SiteMatrixSheet[]): SiteMatrixSheet[] => {
@@ -196,9 +197,24 @@ const getZeroedSiteSheets = (sheets: SiteMatrixSheet[]): SiteMatrixSheet[] => {
 };
 
 export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  // One-time cleanup of legacy keys from prior versions
+  useEffect(() => {
+    try {
+      localStorage.removeItem('INFRABUILD_ERP_STATE_V1_PROJECTS');
+      localStorage.removeItem('INFRABUILD_ERP_STATE_V1_ROAD_SECTIONS');
+      localStorage.removeItem('INFRABUILD_ERP_STATE_V1_SITE_SHEETS');
+      localStorage.removeItem('INFRABUILD_ERP_STATE_V2_PROJECTS');
+      localStorage.removeItem('INFRABUILD_ERP_STATE_V2_ROAD_SECTIONS');
+      localStorage.removeItem('road_erp_sections');
+      localStorage.removeItem('road_erp_sites');
+    } catch {
+      // ignore
+    }
+  }, []);
+
   const isClearedSlate = typeof window !== 'undefined' && localStorage.getItem('ERP_DATA_CLEARED_SLATE') === 'true';
 
-  // 1. Session Authentication (Requires login per session)
+  // 1. Session Authentication
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     const saved = sessionStorage.getItem(LOCAL_STORAGE_KEY + '_AUTH');
@@ -281,7 +297,7 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   });
 
-  // 3. Database Entities with Deletion Blacklist Filtering
+  // 3. Database Entities (Fresh ongoing data)
   const [projects, setProjects] = useState<Project[]>(() => {
     try {
       const savedDeleted = localStorage.getItem(DELETED_SITES_KEY);
@@ -313,11 +329,11 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   });
 
   const [selectedProjectId, setSelectedProjectId] = useState<string>(
-    INITIAL_PROJECTS[0]?.id || 'proj-road-1'
+    INITIAL_PROJECTS[0]?.id || 'proj-ongoing-1'
   );
   const [selectedSiteId, setSelectedSiteId] = useState<string>(() => {
     if (siteSheets.length > 0) return siteSheets[0].siteId;
-    return INITIAL_PROJECTS[0]?.sites?.[0]?.id || '';
+    return INITIAL_PROJECTS[0]?.sites?.[0]?.id || 'site-ongoing-1';
   });
 
   const [roadSections, setRoadSections] = useState<RoadSection[]>(() => {
@@ -572,20 +588,20 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       location: projData.location || 'Site Location, India',
       startDate: projData.startDate || new Date().toISOString().substring(0, 10),
       expectedCompletion: projData.expectedCompletion || '2027-12-31',
-      contractValue: projData.contractValue || 50000000,
-      estimatedCost: projData.estimatedCost || 42000000,
+      contractValue: projData.contractValue || 85000000,
+      estimatedCost: projData.estimatedCost || 72000000,
       actualCost: 0,
-      forecastFinalCost: projData.estimatedCost || 42000000,
-      profitOrLoss: (projData.contractValue || 50000000) - (projData.estimatedCost || 42000000),
+      forecastFinalCost: projData.estimatedCost || 72000000,
+      profitOrLoss: (projData.contractValue || 85000000) - (projData.estimatedCost || 72000000),
       progressPercent: 0,
-      projectManager: projData.projectManager || 'Er. Site Manager',
-      siteEngineer: projData.siteEngineer || 'Er. Field Engineer',
-      supervisor: projData.supervisor || 'Site Supervisor',
+      projectManager: projData.projectManager || 'Er. Anand Patil',
+      siteEngineer: projData.siteEngineer || 'Er. Habibulla Bilgi',
+      supervisor: projData.supervisor || 'Ibrahim',
       status: 'Active',
       sites: projData.sites && projData.sites.length > 0 ? projData.sites : [
-        { id: 'site-' + Date.now(), projectId: newId, name: 'Package Section 1', code: 'S1', location: 'Main Stretch', supervisor: 'Supervisor' }
+        { id: 'site-' + Date.now(), projectId: newId, name: 'Ongoing Highway Site', code: 'S1', location: 'Main Stretch', supervisor: 'Supervisor' }
       ],
-      totalRoadKm: projData.type === 'ROAD' ? (projData.totalRoadKm || 10) : undefined,
+      totalRoadKm: projData.type === 'ROAD' ? (projData.totalRoadKm || 15) : undefined,
       totalBuiltUpSqFt: projData.type === 'BUILDING' ? (projData.totalBuiltUpSqFt || 50000) : undefined,
       description: projData.description || 'Project created in ERP.'
     };
@@ -625,17 +641,14 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // --- PERMANENT DELETION ENGINE ---
   const deleteSite = (siteId: string) => {
-    // 1. Add to permanent blacklist
     const updatedDeleted = Array.from(new Set([...deletedSiteIds, siteId]));
     setDeletedSiteIds(updatedDeleted);
     localStorage.setItem(DELETED_SITES_KEY, JSON.stringify(updatedDeleted));
 
-    // 2. Remove from active state and persist directly
     const remainingSheets = siteSheets.filter((s) => s.siteId !== siteId);
     setSiteSheets(remainingSheets);
     localStorage.setItem(LOCAL_STORAGE_KEY + '_SITE_SHEETS', JSON.stringify(remainingSheets));
 
-    // 3. Remove from project master
     setProjects((prev) => {
       const updated = prev.map((p) => ({
         ...p,
@@ -645,13 +658,11 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       return updated;
     });
 
-    // 4. Remove all associated modules
     setRoadSections((prev) => prev.filter((s) => s.siteId !== siteId));
     setBuildingFloors((prev) => prev.filter((f) => f.siteId !== siteId));
     setSiteExpenses((prev) => prev.filter((e) => e.siteId !== siteId));
     setVehicleTrips((prev) => prev.filter((t) => t.siteId !== siteId));
 
-    // 5. Update active site context
     if (selectedSiteId === siteId) {
       if (remainingSheets.length > 0) {
         setSelectedSiteId(remainingSheets[0].siteId);
@@ -675,7 +686,7 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     carriagewayType?: string;
     vehicles?: string[];
   }): string => {
-    const targetProjId = input.projectId || selectedProjectId || (projects[0]?.id || 'prj-1');
+    const targetProjId = input.projectId || selectedProjectId || (projects[0]?.id || 'proj-ongoing-1');
     const newSiteId = 'site-' + Date.now();
     const vehicleList = input.vehicles?.length ? input.vehicles : ['8797', '7352', '7353', '9579', '9580'];
 
@@ -700,7 +711,7 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       return {
         id: `r-${newSiteId}-${item.toLowerCase().replace(/\s+/g, '')}-${d}`,
         dayNumber: d,
-        date: `${d}-6-2026`,
+        date: `${d}-8-2026`,
         item,
         vehicleValues: vVals,
         total: 0
@@ -710,7 +721,7 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const newSheet: SiteMatrixSheet = {
       siteId: newSiteId,
       siteName: input.siteName,
-      monthTitle: 'JUNE/JULY',
+      monthTitle: 'AUGUST',
       year: 2026,
       vehicles: vehicleList,
       tabs: [
@@ -970,7 +981,7 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           return {
             id: `row-${siteId}-${tabKey}-${i + 1}`,
             dayNumber: i + 1,
-            date: `${i + 1}-6-2026`,
+            date: `${i + 1}-8-2026`,
             item: label,
             vehicleValues: vv,
             total: 0,

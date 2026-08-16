@@ -12,13 +12,11 @@ import { RoadSitesManagerModule } from './components/sites/RoadSitesManagerModul
 import { MachineFleetManagementModule } from './components/fleet/MachineFleetManagementModule';
 import { RoadYieldCalculatorModule } from './components/calculator/RoadYieldCalculatorModule';
 import { RoadAnalyticsDPRModule } from './components/analytics/RoadAnalyticsDPRModule';
-import { TechnicalArchitectureModal } from './components/architecture/TechnicalArchitectureModal';
 
 export const AppContent: React.FC = () => {
   const { isAuthenticated } = useERP();
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
-  const [isArchitectureOpen, setIsArchitectureOpen] = useState<boolean>(false);
 
   // If not authenticated, render the LoginPage
   if (!isAuthenticated) {
@@ -32,7 +30,6 @@ export const AppContent: React.FC = () => {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
-        onOpenArchitecture={() => setIsArchitectureOpen(true)}
       />
 
       {/* Main ERP Layout: Sidebar + Viewport */}
@@ -42,7 +39,6 @@ export const AppContent: React.FC = () => {
           <Sidebar
             activeTab={activeTab}
             setActiveTab={setActiveTab}
-            onOpenArchitecture={() => setIsArchitectureOpen(true)}
           />
         )}
 
@@ -91,12 +87,6 @@ export const AppContent: React.FC = () => {
           </div>
         </main>
       </div>
-
-      {/* Interactive System Architecture & ERD Specification Modal */}
-      <TechnicalArchitectureModal
-        isOpen={isArchitectureOpen}
-        onClose={() => setIsArchitectureOpen(false)}
-      />
     </div>
   );
 };

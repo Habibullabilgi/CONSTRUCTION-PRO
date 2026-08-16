@@ -1,437 +1,486 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useERP } from '../../context/ERPContext';
-import { MachineryLog } from '../../types/erp';
+import { MachineryRecord } from '../../types/erp';
 import {
-  Tractor,
+  Truck,
   Plus,
+  Trash2,
   Search,
-  Clock,
-  Activity,
-  DollarSign,
-  Fuel,
   CheckCircle2,
-  Wrench,
-  AlertCircle
+  AlertCircle,
+  X,
+  Gauge
 } from 'lucide-react';
 
 export const MachineryFleetModule: React.FC = () => {
-  const { machineryLogs, addMachineryLog, currentProject, currentSite } = useERP();
+  const { machinery, addMachinery, deleteMachinery } = useERP();
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
+  const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [isRegisterModalOpen, setIsRegisterModalOpen] = useState<boolean>(false);
 
-  // Form State
-  const [date, setDate] = useState(new Date().toISOString().substring(0, 10));
-  const [machineryName, setMachineryName] = useState('CAT 320D Hydraulic Excavator');
-  const [machineryType, setMachineryType] = useState<MachineryLog['machineryType']>('Excavator');
-  const [registrationOrAssetCode, setRegistrationOrAssetCode] = useState('EXC-CAT-01');
-  const [operatorName, setOperatorName] = useState('Dharmendra Yadav');
-  const [ownership, setOwnership] = useState<MachineryLog['ownership']>('Company Owned');
-  const [vendorName, setVendorName] = useState('');
-  const [startHourMeter, setStartHourMeter] = useState<number>(3482.0);
-  const [endHourMeter, setEndHourMeter] = useState<number>(3490.5);
-  const [idleHours, setIdleHours] = useState<number>(0.5);
-  const [breakdownHours, setBreakdownHours] = useState<number>(0.0);
-  const [ratePerHour, setRatePerHour] = useState<number>(2400);
-  const [dieselConsumedLitres, setDieselConsumedLitres] = useState<number>(140);
-  const [activityOrLocation, setActivityOrLocation] = useState('Embankment Earth Cutting Km 124+000');
+  // Form State for registering a new machine
+  const [formData, setFormData] = useState({
+    code: '',
+    registrationNumber: '',
+    name: '',
+    category: 'EARTHMOVING_EXCAVATION' as MachineryRecord['category'],
+    ownershipType: 'COMPANY_OWNED' as 'COMPANY_OWNED' | 'RENTED',
+    rentalHourlyRateINR: 0,
+    currentHMR: 0,
+    currentKMR: 0,
+    averageConsumptionBenchmark: 15,
+    benchmarkUnit: 'L/hr' as 'L/hr' | 'km/L',
+    currentLocation: '',
+    assignedOperator: '',
+    status: 'ACTIVE' as MachineryRecord['status']
+  });
 
-  // Automatic calculations
-  const rawOperatingHours = Math.max(0, endHourMeter - startHourMeter);
-  const netEffectiveHours = Math.max(0, rawOperatingHours - idleHours - breakdownHours);
-  const totalCost = Number((rawOperatingHours * ratePerHour).toFixed(2));
+  const filteredFleet = useMemo(() => {
+    return (machinery || []).filter((m) => {
+      const matchesCategory = categoryFilter === 'ALL' || m.category === categoryFilter;
+      const matchesStatus = statusFilter === 'ALL' || m.status === statusFilter;
+      const q = searchQuery.toLowerCase();
+      const matchesSearch =
+        !searchQuery ||
+        m.name.toLowerCase().includes(q) ||
+        m.code.toLowerCase().includes(q) ||
+        m.registrationNumber.toLowerCase().includes(q) ||
+        m.assignedOperator.toLowerCase().includes(q);
+      return matchesCategory && matchesStatus && matchesSearch;
+    });
+  }, [machinery, categoryFilter, statusFilter, searchQuery]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleCreateMachine = (e: React.FormEvent) => {
     e.preventDefault();
-    addMachineryLog({
-      date,
-      projectId: currentProject?.id || 'proj-road-1',
-      siteId: currentSite?.id || 'site-road-1',
-      machineryName,
-      machineryType,
-      registrationOrAssetCode,
-      operatorName,
-      ownership,
-      vendorName: ownership === 'Rental' ? vendorName : undefined,
-      startHourMeter: Number(startHourMeter),
-      endHourMeter: Number(endHourMeter),
-      operatingHours: Number(rawOperatingHours),
-      idleHours: Number(idleHours),
-      breakdownHours: Number(breakdownHours),
-      ratePerHour: Number(ratePerHour),
-      totalCost,
-      dieselConsumedLitres: Number(dieselConsumedLitres),
-      activityOrLocation
+    if (!formData.name || !formData.code) return;
+
+    addMachinery({
+      ...formData,
+      code: formData.code.toUpperCase(),
+      registrationNumber: formData.registrationNumber.toUpperCase()
     });
 
-    setIsModalOpen(false);
+    setIsRegisterModalOpen(false);
+    setFormData({
+      code: '',
+      registrationNumber: '',
+      name: '',
+      category: 'EARTHMOVING_EXCAVATION',
+      ownershipType: 'COMPANY_OWNED',
+      rentalHourlyRateINR: 0,
+      currentHMR: 0,
+      currentKMR: 0,
+      averageConsumptionBenchmark: 15,
+      benchmarkUnit: 'L/hr',
+      currentLocation: '',
+      assignedOperator: '',
+      status: 'ACTIVE'
+    });
   };
 
-  const filteredLogs = machineryLogs.filter(
-    (m) =>
-      m.machineryName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      m.registrationOrAssetCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      m.operatorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      m.machineryType.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const totalOperatingHours = filteredLogs.reduce((sum, m) => sum + m.operatingHours, 0);
-  const totalMachineryCost = filteredLogs.reduce((sum, m) => sum + m.totalCost, 0);
-  const totalDieselConsumed = filteredLogs.reduce((sum, m) => sum + m.dieselConsumedLitres, 0);
+  const handleDelete = (id: string, name: string, code: string) => {
+    if (window.confirm(`Are you sure you want to delete [${code}] ${name}?`)) {
+      deleteMachinery(id);
+    }
+  };
 
   return (
-    <div className="space-y-6 pb-12">
-      {/* Header */}
-      <div className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
-              FLEET & ASSET TELEMETRY
-            </span>
-            <span className="text-xs text-slate-400">Hour Meter & Utilization Logging</span>
+    <div className="space-y-6 font-sans text-slate-100 selection:bg-amber-500 selection:text-slate-950">
+      {/* 1. Header Banner */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#121927] border border-[#1E293B] p-5 rounded-3xl shadow-lg">
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 rounded-2xl bg-amber-600/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 shadow-md shadow-amber-600/20">
+            <Truck className="w-6 h-6" />
           </div>
-          <h2 className="text-2xl font-extrabold text-white">
-            Machinery & Heavy Equipment Management
-          </h2>
-          <p className="text-xs text-slate-400 mt-1">
-            Formula: Operating Hours = End Meter - Start Meter • Direct allocation of hourly rates, operator wages, and fuel burn.
-          </p>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 rounded-full bg-amber-950/60 text-amber-400 border border-amber-800 text-[10px] font-black uppercase">
+                Heavy Asset Registry
+              </span>
+              <span className="text-xs text-slate-400 font-semibold">
+                Total Fleet: {machinery.length} Units
+              </span>
+            </div>
+            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight mt-0.5">
+              Machine & Heavy Fleet Equipment Management
+            </h1>
+          </div>
         </div>
 
         <button
-          onClick={() => setIsModalOpen(true)}
-          className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-2 shadow-lg shadow-amber-500/20 cursor-pointer"
+          onClick={() => setIsRegisterModalOpen(true)}
+          className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-2 transition-all shadow-lg shadow-amber-500/30 cursor-pointer shrink-0"
         >
-          <Plus className="h-4 w-4" />
-          Log Equipment Shift
+          <Plus className="w-4 h-4" />
+          <span>+ Register Machine / Tipper</span>
         </button>
       </div>
 
-      {/* KPI METRICS */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800">
-          <span className="text-[10px] uppercase font-bold text-slate-500 block">Total Shift Hours</span>
-          <div className="text-2xl font-extrabold text-white font-mono my-1">
-            {totalOperatingHours.toFixed(1)} <span className="text-xs font-normal text-slate-400">Hrs</span>
-          </div>
-          <span className="text-xs text-slate-400">
-            Across {filteredLogs.length} fleet sessions
+      {/* 2. Category Filters */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-2">
+        <button
+          onClick={() => setCategoryFilter('ALL')}
+          className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer shrink-0 flex items-center gap-2 ${
+            categoryFilter === 'ALL'
+              ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+              : 'bg-[#121927] text-slate-400 hover:text-white border border-[#1E293B]'
+          }`}
+        >
+          <span>All Fleet Units</span>
+          <span className="px-1.5 py-0.5 rounded-md bg-black/20 text-[10px]">
+            {machinery.length}
           </span>
-        </div>
+        </button>
 
-        <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800">
-          <span className="text-[10px] uppercase font-bold text-slate-500 block">Machinery Equipment Cost</span>
-          <div className="text-2xl font-extrabold text-amber-400 font-mono my-1">
-            ₹{totalMachineryCost.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-          </div>
-          <span className="text-xs text-slate-400">
-            Avg: ₹{(totalMachineryCost / (totalOperatingHours || 1)).toFixed(0)} / Operating Hr
-          </span>
-        </div>
+        <button
+          onClick={() => setCategoryFilter('EARTHMOVING_EXCAVATION')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
+            categoryFilter === 'EARTHMOVING_EXCAVATION'
+              ? 'bg-amber-500 text-slate-950 font-black shadow-md shadow-amber-500/20'
+              : 'bg-[#121927] text-slate-400 hover:text-white border border-[#1E293B]'
+          }`}
+        >
+          Earthmoving & Excavation
+        </button>
 
-        <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800">
-          <span className="text-[10px] uppercase font-bold text-slate-500 block">Diesel Consumed</span>
-          <div className="text-2xl font-extrabold text-cyan-300 font-mono my-1">
-            {totalDieselConsumed} <span className="text-xs font-normal text-slate-400">Litres</span>
-          </div>
-          <span className="text-xs text-cyan-400 font-mono">
-            Avg: {(totalDieselConsumed / (totalOperatingHours || 1)).toFixed(1)} L/hr
-          </span>
-        </div>
+        <button
+          onClick={() => setCategoryFilter('COMPACTION_PAVING')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
+            categoryFilter === 'COMPACTION_PAVING'
+              ? 'bg-amber-500 text-slate-950 font-black shadow-md shadow-amber-500/20'
+              : 'bg-[#121927] text-slate-400 hover:text-white border border-[#1E293B]'
+          }`}
+        >
+          Compaction & Paving
+        </button>
 
-        <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800">
-          <span className="text-[10px] uppercase font-bold text-slate-500 block">Fleet Uptime</span>
-          <div className="text-2xl font-extrabold text-emerald-400 font-mono my-1">
-            96.4%
-          </div>
-          <span className="text-xs text-slate-400">
-            Low breakdown & idle percentage
-          </span>
+        <button
+          onClick={() => setCategoryFilter('HAULAGE_TRANSPORT')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
+            categoryFilter === 'HAULAGE_TRANSPORT'
+              ? 'bg-amber-500 text-slate-950 font-black shadow-md shadow-amber-500/20'
+              : 'bg-[#121927] text-slate-400 hover:text-white border border-[#1E293B]'
+          }`}
+        >
+          Haulage & Transport (Tippers/Tankers)
+        </button>
+      </div>
+
+      {/* 3. Search & Status Filter */}
+      <div className="p-3 rounded-2xl bg-[#0D111D] border border-[#1E293B] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="w-full sm:w-56 px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white text-xs outline-none focus:border-amber-500 font-semibold cursor-pointer"
+        >
+          <option value="ALL">All Operational Statuses</option>
+          <option value="ACTIVE">Active / Operational</option>
+          <option value="MAINTENANCE">In Maintenance / Breakdown</option>
+          <option value="IDLE">Idle / Standby</option>
+        </select>
+
+        <div className="relative flex-1 w-full">
+          <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3.5 top-3" />
+          <input
+            type="text"
+            placeholder="Search code, plate, operator, model..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-3.5 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-xs text-white outline-none focus:border-amber-500 placeholder-slate-500"
+          />
         </div>
       </div>
 
-      {/* MACHINERY LOGS TABLE */}
-      <div className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800 shadow-xl space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
-          <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-            <Tractor className="h-4 w-4 text-amber-400" />
-            Heavy Fleet Daily Shift Logs
-          </h3>
-
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
-            <input
-              type="text"
-              placeholder="Search machinery, asset code, operator..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 pr-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none"
-            />
-          </div>
+      {/* 4. Fleet Units Grid */}
+      {filteredFleet.length === 0 ? (
+        <div className="bg-[#0B1220] border border-[#1E293B] rounded-3xl p-12 text-center text-slate-500 space-y-2">
+          <Truck className="w-10 h-10 mx-auto text-slate-600 mb-2" />
+          <div className="text-sm font-bold text-slate-300">No machinery or equipment found.</div>
+          <div className="text-xs">Click <strong>+ Register Machine / Tipper</strong> above to add units.</div>
         </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr className="border-b border-slate-800 text-slate-400 uppercase text-[10px] tracking-wider">
-                <th className="py-3 px-3">Date & Asset Code</th>
-                <th className="py-3 px-3">Machinery / Model</th>
-                <th className="py-3 px-3">Operator & Type</th>
-                <th className="py-3 px-3">Hour Meter (Start → End)</th>
-                <th className="py-3 px-3">Run Hours</th>
-                <th className="py-3 px-3">Rate & Daily Cost</th>
-                <th className="py-3 px-3">Diesel (L)</th>
-                <th className="py-3 px-3 text-right">Location / Activity</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/60 text-slate-200">
-              {filteredLogs.map((log) => (
-                <tr key={log.id} className="hover:bg-slate-950/40 transition-colors">
-                  <td className="py-3.5 px-3">
-                    <span className="font-mono font-bold text-amber-300 block">{log.registrationOrAssetCode}</span>
-                    <span className="text-[10px] text-slate-400">{log.date}</span>
-                  </td>
-
-                  <td className="py-3.5 px-3">
-                    <span className="font-semibold text-white block">{log.machineryName}</span>
-                    <span className="text-[10px] text-slate-400">
-                      {log.ownership} {log.vendorName ? `(${log.vendorName})` : ''}
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredFleet.map((machine) => (
+            <div
+              key={machine.id}
+              className="p-5 rounded-3xl bg-[#121927] border border-[#1E293B] hover:border-[#334155] transition-all space-y-4 shadow-lg flex flex-col justify-between"
+            >
+              {/* Top Row */}
+              <div>
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded-lg bg-amber-500/20 text-amber-400 font-mono font-bold text-xs border border-amber-500/30">
+                      {machine.code}
                     </span>
-                  </td>
+                    <span className="font-mono text-xs text-slate-400">
+                      {machine.registrationNumber}
+                    </span>
+                  </div>
 
-                  <td className="py-3.5 px-3">
-                    <span className="font-semibold text-slate-200 block">{log.operatorName}</span>
-                    <span className="text-[10px] text-cyan-400">{log.machineryType}</span>
-                  </td>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase flex items-center gap-1 ${
+                        machine.status === 'ACTIVE'
+                          ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800'
+                          : machine.status === 'MAINTENANCE'
+                          ? 'bg-rose-950/60 text-rose-400 border border-rose-800'
+                          : 'bg-slate-800 text-slate-400 border border-slate-700'
+                      }`}
+                    >
+                      {machine.status === 'ACTIVE' ? <CheckCircle2 className="w-2.5 h-2.5" /> : <AlertCircle className="w-2.5 h-2.5" />}
+                      {machine.status}
+                    </span>
 
-                  <td className="py-3.5 px-3 font-mono text-slate-300">
-                    {log.startHourMeter.toFixed(1)} → {log.endHourMeter.toFixed(1)}
-                  </td>
-
-                  <td className="py-3.5 px-3 font-mono">
-                    <span className="font-bold text-white block">{log.operatingHours.toFixed(1)} Hrs</span>
-                    {(log.idleHours > 0 || log.breakdownHours > 0) && (
-                      <span className="text-[10px] text-rose-400">
-                        Idle: {log.idleHours}h • BD: {log.breakdownHours}h
-                      </span>
-                    )}
-                  </td>
-
-                  <td className="py-3.5 px-3 font-mono">
-                    <span className="font-bold text-emerald-400 block">₹{log.totalCost.toLocaleString()}</span>
-                    <span className="text-[10px] text-slate-400">@ ₹{log.ratePerHour}/hr</span>
-                  </td>
-
-                  <td className="py-3.5 px-3 font-mono text-cyan-300">
-                    {log.dieselConsumedLitres} L
-                  </td>
-
-                  <td className="py-3.5 px-3 text-right text-slate-300 text-[11px] line-clamp-1 max-w-[200px]">
-                    {log.activityOrLocation}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* CREATE LOG MODAL */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-xl p-6 shadow-2xl space-y-4">
-            <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <Tractor className="h-4 w-4 text-amber-400" />
-              Log Machinery Shift & Hour Meter
-            </h3>
-
-            <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Date</label>
-                  <input
-                    type="date"
-                    required
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white"
-                  />
+                    {/* Delete Machine Button */}
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(machine.id, machine.name, machine.code)}
+                      className="p-1 text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 rounded-lg transition-colors cursor-pointer"
+                      title="Delete Machine"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Machinery Category</label>
-                  <select
-                    value={machineryType}
-                    onChange={(e) => setMachineryType(e.target.value as MachineryLog['machineryType'])}
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white"
-                  >
-                    <option value="JCB Backhoe Loader">JCB Backhoe Loader</option>
-                    <option value="Excavator">Hydraulic Excavator</option>
-                    <option value="Tandem Roller">Tandem Roller</option>
-                    <option value="Soil Compactor">Soil Compactor</option>
-                    <option value="Motor Grader">Motor Grader</option>
-                    <option value="Asphalt Paver">Asphalt Paver</option>
-                    <option value="Concrete Boom Pump">Concrete Boom Pump</option>
-                    <option value="Tower Crane">Tower Crane</option>
-                    <option value="Water Tanker">Water Tanker</option>
-                  </select>
+                <h3 className="text-base font-black text-white leading-snug">
+                  {machine.name}
+                </h3>
+                <div className="text-xs text-slate-400 mt-1">
+                  {machine.ownershipType === 'COMPANY_OWNED' ? (
+                    <span className="text-amber-400 font-semibold">• Company Owned</span>
+                  ) : (
+                    <span className="text-cyan-400 font-semibold">
+                      • Rented (₹{machine.rentalHourlyRateINR}/hr)
+                    </span>
+                  )}
+                  {machine.assignedOperator && ` • ${machine.assignedOperator}`}
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Equipment Name *</label>
-                  <input
-                    type="text"
-                    required
-                    value={machineryName}
-                    onChange={(e) => setMachineryName(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Asset Code / Reg # *</label>
-                  <input
-                    type="text"
-                    required
-                    value={registrationOrAssetCode}
-                    onChange={(e) => setRegistrationOrAssetCode(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Operator Name *</label>
-                  <input
-                    type="text"
-                    required
-                    value={operatorName}
-                    onChange={(e) => setOperatorName(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Ownership</label>
-                  <select
-                    value={ownership}
-                    onChange={(e) => setOwnership(e.target.value as MachineryLog['ownership'])}
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white"
-                  >
-                    <option value="Company Owned">Company Owned</option>
-                    <option value="Rental">Rental / Vendor</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Meter Readings */}
-              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
-                <div className="text-xs font-bold text-amber-400 uppercase tracking-wider">
-                  Hour Meter Readings
-                </div>
-
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-slate-400 mb-1">Start Hour Meter</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={startHourMeter}
-                      onChange={(e) => setStartHourMeter(Number(e.target.value))}
-                      className="w-full px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-white font-mono"
-                    />
+              {/* Metrics */}
+              <div className="p-3 bg-[#0D111D] border border-[#1E293B] rounded-2xl space-y-2 text-xs">
+                {machine.currentHMR !== undefined && machine.currentHMR > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400 flex items-center gap-1">
+                      <Gauge className="w-3.5 h-3.5 text-slate-500" />
+                      Hour-meter (HMR):
+                    </span>
+                    <span className="font-mono font-bold text-white">
+                      {machine.currentHMR.toLocaleString()} hrs
+                    </span>
                   </div>
+                )}
 
-                  <div>
-                    <label className="block text-slate-400 mb-1">End Hour Meter</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={endHourMeter}
-                      onChange={(e) => setEndHourMeter(Number(e.target.value))}
-                      className="w-full px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-white font-mono text-amber-400 font-bold"
-                    />
+                {machine.currentKMR !== undefined && machine.currentKMR > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400 flex items-center gap-1">
+                      <Gauge className="w-3.5 h-3.5 text-slate-500" />
+                      Odometer (KMR):
+                    </span>
+                    <span className="font-mono font-bold text-white">
+                      {machine.currentKMR.toLocaleString()} km
+                    </span>
                   </div>
+                )}
 
-                  <div>
-                    <label className="block text-slate-400 mb-1">Hourly Rate (₹)</label>
-                    <input
-                      type="number"
-                      value={ratePerHour}
-                      onChange={(e) => setRatePerHour(Number(e.target.value))}
-                      className="w-full px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-white font-mono"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-3 pt-2 border-t border-slate-800/80">
-                  <div>
-                    <label className="block text-slate-400 mb-1">Idle Hours</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={idleHours}
-                      onChange={(e) => setIdleHours(Number(e.target.value))}
-                      className="w-full px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-white font-mono"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-400 mb-1">Breakdown (Hrs)</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={breakdownHours}
-                      onChange={(e) => setBreakdownHours(Number(e.target.value))}
-                      className="w-full px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-white font-mono"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-400 mb-1">Diesel Consumed (L)</label>
-                    <input
-                      type="number"
-                      value={dieselConsumedLitres}
-                      onChange={(e) => setDieselConsumedLitres(Number(e.target.value))}
-                      className="w-full px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-cyan-400 font-mono"
-                    />
-                  </div>
-                </div>
-
-                <div className="pt-2 flex items-center justify-between font-mono text-xs">
-                  <span className="text-slate-400">Total Shift Cost:</span>
-                  <span className="font-bold text-amber-400">
-                    ₹{totalCost.toLocaleString()} ({rawOperatingHours.toFixed(1)} Hrs run)
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">Avg Benchmark:</span>
+                  <span className="font-mono font-bold text-amber-400">
+                    {machine.averageConsumptionBenchmark} {machine.benchmarkUnit}
                   </span>
+                </div>
+
+                {machine.currentLocation && (
+                  <div className="text-[11px] text-slate-400 pt-1 border-t border-[#1E293B] truncate">
+                    📍 {machine.currentLocation}
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 5. Register Machine Modal */}
+      {isRegisterModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150 font-sans">
+          <div className="bg-[#121927] border border-[#1E293B] rounded-3xl w-full max-w-lg p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-150 text-slate-100 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
+              <div className="flex items-center gap-2 text-white font-bold text-base">
+                <Truck className="w-5 h-5 text-amber-400" />
+                <span>Register Machine / Fleet Equipment</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsRegisterModalOpen(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateMachine} className="space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">
+                    Machine Code <span className="text-amber-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. EX-01 or TP-05"
+                    value={formData.code}
+                    onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                    className="w-full px-3.5 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono font-bold uppercase outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">
+                    Registration / Plate No
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. KA-28-EX-8901"
+                    value={formData.registrationNumber}
+                    onChange={(e) => setFormData({ ...formData, registrationNumber: e.target.value })}
+                    className="w-full px-3.5 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono font-bold uppercase outline-none focus:border-amber-500"
+                  />
                 </div>
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Location & Task Activity</label>
+                <label className="block text-slate-300 font-bold mb-1">
+                  Machine Model / Name <span className="text-amber-400">*</span>
+                </label>
                 <input
                   type="text"
-                  value={activityOrLocation}
-                  onChange={(e) => setActivityOrLocation(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white"
+                  required
+                  placeholder="e.g. CAT 320D Heavy Crawler Excavator"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-3.5 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-amber-500 font-medium"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">
+                    Category <span className="text-amber-400">*</span>
+                  </label>
+                  <select
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value as any })}
+                    className="w-full px-3.5 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-amber-500 cursor-pointer"
+                  >
+                    <option value="EARTHMOVING_EXCAVATION">Earthmoving & Excavation</option>
+                    <option value="COMPACTION_PAVING">Compaction & Paving</option>
+                    <option value="HAULAGE_TRANSPORT">Haulage & Transport</option>
+                    <option value="CRUSHING_CONCRETE">Crushing & Concrete</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">
+                    Ownership Type
+                  </label>
+                  <select
+                    value={formData.ownershipType}
+                    onChange={(e) => setFormData({ ...formData, ownershipType: e.target.value as any })}
+                    className="w-full px-3.5 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-amber-500 cursor-pointer"
+                  >
+                    <option value="COMPANY_OWNED">Company Owned</option>
+                    <option value="RENTED">Rented / Hired</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">
+                    Current HMR (Hrs)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={formData.currentHMR}
+                    onChange={(e) => setFormData({ ...formData, currentHMR: Number(e.target.value) })}
+                    className="w-full px-3.5 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">
+                    Benchmark Rate
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={formData.averageConsumptionBenchmark}
+                    onChange={(e) => setFormData({ ...formData, averageConsumptionBenchmark: Number(e.target.value) })}
+                    className="w-full px-3.5 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-amber-400 font-mono font-bold outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">
+                    Unit
+                  </label>
+                  <select
+                    value={formData.benchmarkUnit}
+                    onChange={(e) => setFormData({ ...formData, benchmarkUnit: e.target.value as any })}
+                    className="w-full px-3.5 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-amber-500 cursor-pointer"
+                  >
+                    <option value="L/hr">L/hr</option>
+                    <option value="km/L">km/L</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">
+                    Assigned Operator
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Ramesh Patil"
+                    value={formData.assignedOperator}
+                    onChange={(e) => setFormData({ ...formData, assignedOperator: e.target.value })}
+                    className="w-full px-3.5 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">
+                    Location / Section
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Quarry Site / Ch. 12+400"
+                    value={formData.currentLocation}
+                    onChange={(e) => setFormData({ ...formData, currentLocation: e.target.value })}
+                    className="w-full px-3.5 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end items-center gap-2 pt-3 border-t border-[#1E293B]">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white"
+                  onClick={() => setIsRegisterModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold"
+                  className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black shadow-lg shadow-amber-500/20 cursor-pointer transition-all"
                 >
-                  Save Shift Log
+                  Save Equipment
                 </button>
               </div>
             </form>
@@ -441,3 +490,5 @@ export const MachineryFleetModule: React.FC = () => {
     </div>
   );
 };
+
+export default MachineryFleetModule;

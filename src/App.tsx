@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { ERPProvider } from './context/ERPContext';
+import { ERPProvider, useERP } from './context/ERPContext';
 import { RoadERPProvider } from './context/RoadERPContext';
+import { LoginPage } from './components/auth/LoginPage';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { SiteCentricMidnightDashboard } from './components/dashboard/SiteCentricMidnightDashboard';
@@ -14,13 +15,19 @@ import { RoadAnalyticsDPRModule } from './components/analytics/RoadAnalyticsDPRM
 import { TechnicalArchitectureModal } from './components/architecture/TechnicalArchitectureModal';
 
 export const AppContent: React.FC = () => {
+  const { isAuthenticated } = useERP();
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
   const [isArchitectureOpen, setIsArchitectureOpen] = useState<boolean>(false);
 
+  // If not authenticated, render the LoginPage
+  if (!isAuthenticated) {
+    return <LoginPage />;
+  }
+
   return (
     <div className="min-h-screen bg-[#080C14] text-slate-100 flex flex-col selection:bg-blue-600 selection:text-white font-sans">
-      {/* Top Application Header with Project/Site selector & Quick Actions */}
+      {/* Top Application Header */}
       <Header
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -57,27 +64,27 @@ export const AppContent: React.FC = () => {
               <MaterialHaulageTripsModule />
             )}
 
-            {/* 3. Dedicated Section: Diesel & Fuel Management */}
+            {/* 4. Dedicated Section: Diesel & Fuel Management */}
             {activeTab === 'diesel' && (
               <DieselFuelManagementModule />
             )}
 
-            {/* 4. Dedicated Section: Site Cost & Expenses */}
+            {/* 5. Dedicated Section: Site Cost & Expenses */}
             {activeTab === 'site-expenses' && (
               <SiteCostExpensesModule />
             )}
 
-            {/* 5. Engineering: Road Yield Calculator */}
+            {/* 6. Engineering: Road Yield Calculator */}
             {activeTab === 'road-yield' && (
               <RoadYieldCalculatorModule />
             )}
 
-            {/* 6. Fleet: Machinery & Equipment */}
+            {/* 7. Fleet: Machinery & Equipment */}
             {activeTab === 'machinery' && (
               <MachineFleetManagementModule />
             )}
 
-            {/* 7. Reporting: Daily Progress Report */}
+            {/* 8. Reporting: Daily Progress Report */}
             {activeTab === 'reports' && (
               <RoadAnalyticsDPRModule />
             )}

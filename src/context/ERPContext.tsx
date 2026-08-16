@@ -210,11 +210,11 @@ const getZeroedSiteSheets = (sheets: SiteMatrixSheet[]): SiteMatrixSheet[] => {
 export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const isClearedSlate = typeof window !== 'undefined' && localStorage.getItem('ERP_DATA_CLEARED_SLATE') === 'true';
 
-  // Authentication State
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEY + '_AUTH');
-    return saved ? JSON.parse(saved) : true;
-  });
+ // Inside ERPProvider in src/context/ERPContext.tsx:
+const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+  const saved = localStorage.getItem(LOCAL_STORAGE_KEY + '_AUTH');
+  return saved !== null ? JSON.parse(saved) : true; // Default to true so it stays logged in
+});
 
   const [currentUser, setCurrentUser] = useState<User>(() => {
     const saved = localStorage.getItem(LOCAL_STORAGE_KEY + '_USER');

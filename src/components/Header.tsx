@@ -54,7 +54,6 @@ export const Header: React.FC<Props> = ({
   const [isAddRoadSiteOpen, setIsAddRoadSiteOpen] = useState(false);
   const [isClearDataOpen, setIsClearDataOpen] = useState(false);
   const [siteToDelete, setSiteToDelete] = useState<{ id: string; name: string } | null>(null);
-  const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [isOnline, setIsOnline] = useState(true);
 
@@ -70,10 +69,9 @@ export const Header: React.FC<Props> = ({
 
   const currentSiteSheet = siteSheets.find((s) => s.siteId === selectedSiteId) || siteSheets[0];
 
-  // Permanent Site Deletion Logic
+  // Direct 1-Click Permanent Site Deletion Logic
   const handleExecuteDeleteSite = () => {
     if (!siteToDelete) return;
-    if (deleteConfirmText.trim().toUpperCase() !== 'DELETE') return;
 
     const targetId = siteToDelete.id;
 
@@ -81,6 +79,13 @@ export const Header: React.FC<Props> = ({
       (erpContext as any).deleteSite(targetId);
     } else {
       try {
+        const savedDeleted = localStorage.getItem('PAVETRACK_DELETED_SITE_IDS');
+        const list = savedDeleted ? JSON.parse(savedDeleted) : [];
+        if (!list.includes(targetId)) {
+          list.push(targetId);
+          localStorage.setItem('PAVETRACK_DELETED_SITE_IDS', JSON.stringify(list));
+        }
+
         const savedSheets = localStorage.getItem('INFRABUILD_ERP_STATE_V1_SITE_SHEETS');
         if (savedSheets) {
           const parsed = JSON.parse(savedSheets);
@@ -94,12 +99,11 @@ export const Header: React.FC<Props> = ({
     }
 
     setSiteToDelete(null);
-    setDeleteConfirmText('');
     setIsSiteOpen(false);
   };
 
   const handleLogout = () => {
-    if (window.confirm('Are you sure you want to log out of PaveTrack Pro?')) {
+    if (window.confirm('Are you sure you want to log out?')) {
       if (typeof logout === 'function') {
         logout();
       } else {
@@ -162,7 +166,7 @@ export const Header: React.FC<Props> = ({
                 <span>Active Highway Site Stretches</span>
                 <span className="text-blue-400 font-mono">{siteSheets.length} Sites</span>
               </div>
-              
+
               <div className="max-h-60 overflow-y-auto">
                 {siteSheets.map((s) => (
                   <div
@@ -178,7 +182,11 @@ export const Header: React.FC<Props> = ({
                       }}
                       className="flex-1 text-left"
                     >
-                      <div className={`font-semibold ${selectedSiteId === s.siteId ? 'text-blue-400 font-bold' : 'text-white'}`}>
+                      <div
+                        className={`font-semibold ${
+                          selectedSiteId === s.siteId ? 'text-blue-400 font-bold' : 'text-white'
+                        }`}
+                      >
                         {s.siteName}
                       </div>
                       <div className="text-[10px] text-[#94A3B8]">
@@ -189,7 +197,7 @@ export const Header: React.FC<Props> = ({
                     <div className="flex items-center gap-2">
                       {selectedSiteId === s.siteId && <Check className="w-3.5 h-3.5 text-blue-400" />}
 
-                      {/* Delete Site Button (Super Admin Only) */}
+                      {/* Delete Site Button */}
                       {isSuperAdmin && siteSheets.length > 1 && (
                         <button
                           type="button"
@@ -283,7 +291,7 @@ export const Header: React.FC<Props> = ({
           )}
         </div>
 
-        {/* Network Connectivity Simulator Button */}
+        {/* Connectivity Mode */}
         <button
           onClick={() => setIsOnline(!isOnline)}
           title="Click to toggle offline mode simulation"
@@ -297,7 +305,7 @@ export const Header: React.FC<Props> = ({
           <span>{isOnline ? 'Online' : 'Offline'}</span>
         </button>
 
-        {/* Clear Data / Reset Database Button (Super Admin Only) */}
+        {/* Clear Data (Super Admin Only) */}
         {isSuperAdmin && (
           <button
             onClick={() => setIsClearDataOpen(true)}
@@ -319,7 +327,7 @@ export const Header: React.FC<Props> = ({
             <span className="truncate max-w-[110px]">
               {roles.find((r) => r.role === userRole)?.label.split(' ')[0] || 'Admin'}
             </span>
-            <ChevronDown className="w-3.5 h-3.5 text-[#94A3B8]" />
+            <ChevronDown className="w-3 h-3 text-[#94A3B8]" />
           </button>
 
           {isRoleOpen && (
@@ -350,7 +358,7 @@ export const Header: React.FC<Props> = ({
         <button
           type="button"
           onClick={handleLogout}
-          title="Sign out of PaveTrack Pro"
+          title="Sign out"
           className="p-1.5 rounded-xl bg-[#121927] hover:bg-rose-950/40 border border-[#1E293B] hover:border-rose-700/50 text-slate-400 hover:text-rose-400 transition-colors cursor-pointer flex items-center gap-1"
         >
           <LogOut className="w-3.5 h-3.5" />
@@ -358,70 +366,51 @@ export const Header: React.FC<Props> = ({
         </button>
       </div>
 
-      {/* Embedded Danger Zone Modal: Delete Whole Site */}
+      {/* Direct Confirmation Modal (No typing required) */}
       {siteToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-150">
           <div className="bg-[#121927] border border-rose-900/60 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
             <div className="px-5 py-4 border-b border-[#1E293B] flex items-center justify-between bg-rose-950/30">
               <div className="flex items-center gap-2 text-rose-400 font-bold text-sm">
                 <AlertTriangle className="w-4 h-4 text-rose-500" />
-                <span>Delete Site: {siteToDelete.name}</span>
+                <span>Delete Site</span>
               </div>
               <button
                 type="button"
-                onClick={() => {
-                  setSiteToDelete(null);
-                  setDeleteConfirmText('');
-                }}
+                onClick={() => setSiteToDelete(null)}
                 className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="p-5 space-y-4 text-xs text-slate-300">
+            <div className="p-5 space-y-3 text-xs text-slate-300">
               <p>
-                Are you sure you want to completely delete <strong className="text-white">{siteToDelete.name}</strong>?
+                Are you sure you want to permanently delete{' '}
+                <strong className="text-white font-bold">{siteToDelete.name}</strong>?
               </p>
               <div className="p-3 bg-rose-950/40 border border-rose-800/40 rounded-xl text-rose-300 text-[11px] space-y-1">
-                <p className="font-bold">This will permanently delete:</p>
+                <p className="font-bold">This will permanently remove:</p>
                 <ul className="list-disc list-inside space-y-0.5 text-slate-300 pl-1">
-                  <li>All matrix tabs (Murum, GSB, WMM, Diesel, etc.)</li>
-                  <li>All road section chainages, layers, and trip records</li>
+                  <li>All material matrix sheets (Murum, GSB, WMM, Diesel)</li>
+                  <li>All road chainage sections, layer logs, and trips</li>
                 </ul>
-              </div>
-
-              <div>
-                <label className="block text-slate-400 font-semibold mb-1">
-                  Type <span className="text-rose-400 font-mono font-black">DELETE</span> to confirm:
-                </label>
-                <input
-                  type="text"
-                  value={deleteConfirmText}
-                  onChange={(e) => setDeleteConfirmText(e.target.value)}
-                  placeholder="DELETE"
-                  className="w-full px-3 py-2 bg-[#0D111D] border border-rose-800/50 rounded-xl text-white font-mono uppercase tracking-widest focus:outline-none focus:border-rose-500"
-                />
               </div>
             </div>
 
             <div className="px-5 py-3 border-t border-[#1E293B] bg-[#0D111D] flex items-center justify-end gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  setSiteToDelete(null);
-                  setDeleteConfirmText('');
-                }}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800"
+                onClick={() => setSiteToDelete(null)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 cursor-pointer"
               >
                 Cancel
               </button>
 
               <button
                 type="button"
-                disabled={deleteConfirmText.trim().toUpperCase() !== 'DELETE'}
                 onClick={handleExecuteDeleteSite}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-lg shadow-rose-950/50 cursor-pointer"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 transition-colors shadow-lg shadow-rose-950/50 cursor-pointer"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>Delete Site Permanently</span>
@@ -437,7 +426,7 @@ export const Header: React.FC<Props> = ({
         onClose={() => setIsAddRoadSiteOpen(false)}
       />
 
-      {/* Clear Data & Reset Database Modal */}
+      {/* Clear Data Modal */}
       <ClearDataModal
         isOpen={isClearDataOpen}
         onClose={() => setIsClearDataOpen(false)}

@@ -41,13 +41,14 @@ export const Sidebar: React.FC<Props> = ({ activeTab, setActiveTab }) => {
   badge: 'Sites',
   badgeStyle: 'bg-blue-900/40 text-blue-300 border border-blue-500/40'
 },
-    {
-      id: 'haulage-trips',
-      label: 'Material Trips & Weighbridge',
-      icon: Truck,
-      badge: 'Trips Log',
-      badgeStyle: 'bg-[#064E3B] text-[#34D399] border border-[#065F46]'
-    },
+   // Inside operationsItems in src/components/Sidebar.tsx:
+{
+  id: 'haulage-trips',
+  label: 'Trips',
+  icon: Truck,
+  badge: 'Trips',
+  badgeStyle: 'bg-[#064E3B] text-[#34D399] border border-[#065F46]'
+},
     {
       id: 'diesel',
       label: 'Diesel & Fuel Management',

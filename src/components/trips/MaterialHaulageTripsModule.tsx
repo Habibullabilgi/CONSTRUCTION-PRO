@@ -12,7 +12,7 @@ import {
   ArrowRight,
   Building2,
   Check,
-  Settings,
+  Edit2,
   DollarSign
 } from 'lucide-react';
 
@@ -69,10 +69,10 @@ export const MaterialHaulageTripsModule: React.FC = () => {
         }
       }
     } catch {}
-    return ['KA-28-EX-8901', 'KA-28-JC-3342', 'MH-12-DT-5510', 'KA-28-TR-1092', 'KA-28-JP-7890'];
+    return ['KA-28-EX-8901', 'KA-28-JC-3342', 'MH-12-DT-5510', 'KA-28-TR-1092', 'KA28B8797'];
   });
 
-  // 2. Materials List with Master Fixed Rates
+  // 2. Materials List with Editable Rates
   const [materialsList, setMaterialsList] = useState<MaterialRateItem[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_MATERIALS_KEY);
@@ -105,30 +105,31 @@ export const MaterialHaulageTripsModule: React.FC = () => {
   });
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isMaterialsModalOpen, setIsMaterialsModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Vehicle inline add state
   const [isAddingNewVehicle, setIsAddingNewVehicle] = useState(false);
   const [newVehicleInput, setNewVehicleInput] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
+
+  // Material inline add / edit states
+  const [isAddingMaterial, setIsAddingMaterial] = useState(false);
+  const [isEditingMaterial, setIsEditingMaterial] = useState(false);
+  const [customMaterialName, setCustomMaterialName] = useState('');
+  const [customMaterialRate, setCustomMaterialRate] = useState<number | ''>(1500);
+  const [customMaterialBrass, setCustomMaterialBrass] = useState<number | ''>(6);
 
   // Form State
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     siteName: siteList[0] || 'NH-50 Ongoing Site Stretch',
-    vehicleNumber: fleetVehicles[0] || 'MH-12-DT-5510',
+    vehicleNumber: fleetVehicles[0] || 'KA28B8797',
     materialName: materialsList[0]?.name || 'Murum Base Material',
     totalTrips: 10,
     brassPerTrip: materialsList[0]?.defaultBrass || 6,
     ratePerBrass: materialsList[0]?.fixedRate || 1400
   });
 
-  // Material Creation Form
-  const [newMaterialForm, setNewMaterialForm] = useState({
-    name: '',
-    fixedRate: 1500,
-    defaultBrass: 6
-  });
-
-  // Auto-sync storage
+  // Sync to localStorage
   useEffect(() => {
     localStorage.setItem(STORAGE_TRIPS_KEY, JSON.stringify(tripLogs));
   }, [tripLogs]);
@@ -137,7 +138,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
     localStorage.setItem(STORAGE_MATERIALS_KEY, JSON.stringify(materialsList));
   }, [materialsList]);
 
-  // When selected material changes, prefill its fixed base rate
+  // When selected material changes, prefill rate and brass
   const handleMaterialChange = (matName: string) => {
     const matched = materialsList.find((m) => m.name === matName);
     setFormData((prev) => ({
@@ -148,7 +149,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
     }));
   };
 
-  // Add vehicle to both local state and Machinery Fleet storage
+  // Add Vehicle Handler
   const handleAddNewVehicle = (e: React.FormEvent) => {
     e.preventDefault();
     const cleanPlate = newVehicleInput.trim().toUpperCase();
@@ -159,7 +160,6 @@ export const MaterialHaulageTripsModule: React.FC = () => {
       setFleetVehicles(updated);
       setFormData((prev) => ({ ...prev, vehicleNumber: cleanPlate }));
 
-      // Update Machinery Fleet storage as well
       try {
         const savedFleet = localStorage.getItem(STORAGE_FLEET_KEY);
         const fleetArray = savedFleet ? JSON.parse(savedFleet) : [];
@@ -178,33 +178,83 @@ export const MaterialHaulageTripsModule: React.FC = () => {
     setIsAddingNewVehicle(false);
   };
 
-  // Add / Edit Material Master
-  const handleAddMaterial = (e: React.FormEvent) => {
+  // Add New Material Inline Handler
+  const handleSaveNewMaterial = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMaterialForm.name.trim()) return;
+    if (!customMaterialName.trim() || customMaterialRate === '') return;
 
     const newMat: MaterialRateItem = {
       id: `mat-${Date.now()}`,
-      name: newMaterialForm.name.trim(),
-      fixedRate: Number(newMaterialForm.fixedRate),
-      defaultBrass: Number(newMaterialForm.defaultBrass)
+      name: customMaterialName.trim(),
+      fixedRate: Number(customMaterialRate),
+      defaultBrass: Number(customMaterialBrass) || 6
     };
 
-    setMaterialsList([...materialsList, newMat]);
-    setNewMaterialForm({ name: '', fixedRate: 1500, defaultBrass: 6 });
+    const updated = [newMat, ...materialsList];
+    setMaterialsList(updated);
+    setFormData((prev) => ({
+      ...prev,
+      materialName: newMat.name,
+      ratePerBrass: newMat.fixedRate,
+      brassPerTrip: newMat.defaultBrass
+    }));
+
+    setCustomMaterialName('');
+    setIsAddingMaterial(false);
   };
 
-  const handleDeleteMaterial = (id: string) => {
-    if (materialsList.length <= 1) return alert('At least one material preset must remain.');
-    setMaterialsList(materialsList.filter((m) => m.id !== id));
+  // Edit Existing Material Preset Rate
+  const handleUpdateCurrentMaterial = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (customMaterialRate === '') return;
+
+    const updated = materialsList.map((m) => {
+      if (m.name === formData.materialName) {
+        return {
+          ...m,
+          name: customMaterialName.trim() || m.name,
+          fixedRate: Number(customMaterialRate),
+          defaultBrass: Number(customMaterialBrass) || m.defaultBrass
+        };
+      }
+      return m;
+    });
+
+    const newName = customMaterialName.trim() || formData.materialName;
+    setMaterialsList(updated);
+    setFormData((prev) => ({
+      ...prev,
+      materialName: newName,
+      ratePerBrass: Number(customMaterialRate),
+      brassPerTrip: Number(customMaterialBrass) || prev.brassPerTrip
+    }));
+
+    setIsEditingMaterial(false);
+  };
+
+  const handleOpenEditMaterial = () => {
+    const current = materialsList.find((m) => m.name === formData.materialName);
+    setCustomMaterialName(current?.name || formData.materialName);
+    setCustomMaterialRate(formData.ratePerBrass);
+    setCustomMaterialBrass(formData.brassPerTrip);
+    setIsEditingMaterial(true);
+    setIsAddingMaterial(false);
+  };
+
+  const handleOpenAddMaterial = () => {
+    setCustomMaterialName('');
+    setCustomMaterialRate(1500);
+    setCustomMaterialBrass(6);
+    setIsAddingMaterial(true);
+    setIsEditingMaterial(false);
   };
 
   const handleSaveDayTrip = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.totalTrips || formData.totalTrips <= 0) return;
 
-    const totalBrass = Number(formData.totalTrips) * Number(formData.brassPerTrip);
-    const totalAmount = totalBrass * Number(formData.ratePerBrass);
+    const totalBrass = Number(formData.totalTrips) * Number(formData.brassPerTrip || 0);
+    const totalAmount = totalBrass * Number(formData.ratePerBrass || 0);
 
     const newLog: DayTripLog = {
       id: `trip-${Date.now()}`,
@@ -214,9 +264,9 @@ export const MaterialHaulageTripsModule: React.FC = () => {
       vehicleNumber: formData.vehicleNumber,
       materialName: formData.materialName,
       totalTrips: Number(formData.totalTrips),
-      brassPerTrip: Number(formData.brassPerTrip),
+      brassPerTrip: Number(formData.brassPerTrip || 0),
       totalBrass,
-      ratePerBrass: Number(formData.ratePerBrass),
+      ratePerBrass: Number(formData.ratePerBrass || 0),
       totalAmount
     };
 
@@ -230,7 +280,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
     }
   };
 
-  // KPI Calculations
+  // KPI Totals
   const grandTotalTrips = tripLogs.reduce((acc, t) => acc + t.totalTrips, 0);
   const grandTotalBrass = tripLogs.reduce((acc, t) => acc + t.totalBrass, 0);
   const grandTotalValuation = tripLogs.reduce((acc, t) => acc + t.totalAmount, 0);
@@ -247,7 +297,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
 
   return (
     <div className="space-y-6 font-sans text-slate-100 selection:bg-blue-600 selection:text-white">
-      {/* 1. Header Banner */}
+      {/* Header Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#121927] border border-[#1E293B] p-5 rounded-3xl shadow-lg">
         <div className="flex items-center gap-3.5">
           <div className="w-12 h-12 rounded-2xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0">
@@ -268,27 +318,16 @@ export const MaterialHaulageTripsModule: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setIsMaterialsModalOpen(true)}
-            className="px-3.5 py-2.5 rounded-xl bg-[#162032] hover:bg-[#1f2c44] border border-[#1E293B] text-slate-300 hover:text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
-            title="Manage Materials & Fixed Base Rates"
-          >
-            <Settings className="w-4 h-4 text-amber-400" />
-            <span>Manage Material Rates</span>
-          </button>
-
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs flex items-center gap-2 transition-all shadow-lg shadow-blue-600/30 cursor-pointer shrink-0"
-          >
-            <Plus className="w-4 h-4" />
-            <span>+ Log Day Trips</span>
-          </button>
-        </div>
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs flex items-center gap-2 transition-all shadow-lg shadow-blue-600/30 cursor-pointer shrink-0"
+        >
+          <Plus className="w-4 h-4" />
+          <span>+ Log Day Trips</span>
+        </button>
       </div>
 
-      {/* 2. Top Summary KPI Cards */}
+      {/* Top Summary KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-[#0c1427] border border-[#182643] p-4 rounded-2xl">
           <div className="text-slate-400 text-xs font-semibold">Total Cumulative Trips</div>
@@ -314,7 +353,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
         </div>
       </div>
 
-      {/* 3. Search Filter */}
+      {/* Search Bar */}
       <div className="relative">
         <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
         <input
@@ -326,7 +365,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
         />
       </div>
 
-      {/* 4. Trips Ledger Table */}
+      {/* Trips Table */}
       <div className="bg-[#0B1220] border border-[#1E293B] rounded-3xl overflow-hidden shadow-2xl">
         <div className="p-4 border-b border-[#1E293B] bg-[#0d1527]/50 flex items-center justify-between">
           <div className="font-bold text-sm text-white">Daily Trippage Reconciliation Log</div>
@@ -406,7 +445,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
         </div>
       </div>
 
-      {/* 5. Modal: Log Day Trips */}
+      {/* Log Total Day Haulage Trips Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150 font-sans">
           <div className="bg-[#121927] border border-[#1E293B] rounded-3xl w-full max-w-lg p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-150 text-slate-100 max-h-[92vh] overflow-y-auto">
@@ -420,7 +459,12 @@ export const MaterialHaulageTripsModule: React.FC = () => {
               </div>
               <button
                 type="button"
-                onClick={() => setIsModalOpen(false)}
+                onClick={() => {
+                  setIsModalOpen(false);
+                  setIsAddingNewVehicle(false);
+                  setIsAddingMaterial(false);
+                  setIsEditingMaterial(false);
+                }}
                 className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
               >
                 <X className="w-5 h-5" />
@@ -463,7 +507,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                 </div>
               </div>
 
-              {/* Row 2: Vehicle Number with Machinery Fleet Link */}
+              {/* Row 2: Vehicle Number with Inline Add Button */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="text-slate-300 font-bold flex items-center gap-1">
@@ -472,7 +516,11 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                   </label>
                   <button
                     type="button"
-                    onClick={() => setIsAddingNewVehicle(!isAddingNewVehicle)}
+                    onClick={() => {
+                      setIsAddingNewVehicle(!isAddingNewVehicle);
+                      setIsAddingMaterial(false);
+                      setIsEditingMaterial(false);
+                    }}
                     className="text-[11px] font-bold text-blue-400 hover:text-blue-300 flex items-center gap-1 cursor-pointer transition-colors"
                   >
                     <Plus className="w-3 h-3" />
@@ -484,7 +532,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                   <div className="flex items-center gap-2 mb-2 p-2 bg-[#162032] border border-blue-500/40 rounded-xl animate-in fade-in">
                     <input
                       type="text"
-                      placeholder="e.g. KA-28-AB-9999"
+                      placeholder="e.g. KA28B8797"
                       value={newVehicleInput}
                       onChange={(e) => setNewVehicleInput(e.target.value.toUpperCase())}
                       className="flex-1 px-3 py-1.5 bg-[#0D111D] border border-[#1E293B] rounded-lg text-white font-mono font-bold text-xs uppercase outline-none focus:border-blue-500"
@@ -520,25 +568,139 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                 )}
               </div>
 
-              {/* Row 3: Material Name (With Fixed Rate Display) */}
+              {/* Row 3: Material Name with Inline Add & Edit Options */}
               <div>
-                <label className="block text-slate-300 font-bold mb-1.5">
-                  Material Name (With Fixed Preset Price) *
-                </label>
-                <select
-                  value={formData.materialName}
-                  onChange={(e) => handleMaterialChange(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-blue-500 cursor-pointer font-medium"
-                >
-                  {materialsList.map((m) => (
-                    <option key={m.id} value={m.name}>
-                      {m.name} (Fixed Rate: ₹{m.fixedRate}/Brass)
-                    </option>
-                  ))}
-                </select>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-slate-300 font-bold flex items-center gap-1">
+                    <Layers className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Material Name (With Fixed Preset Price) *</span>
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleOpenEditMaterial}
+                      className="text-[11px] font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 cursor-pointer transition-colors"
+                      title="Edit selected material name or preset price"
+                    >
+                      <Edit2 className="w-3 h-3" />
+                      <span>Edit Material / Rate</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleOpenAddMaterial}
+                      className="text-[11px] font-bold text-blue-400 hover:text-blue-300 flex items-center gap-1 cursor-pointer transition-colors"
+                      title="Add a brand new material"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>+ Add Material</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Inline Add Material Box */}
+                {isAddingMaterial && (
+                  <div className="p-3 mb-2 bg-[#162032] border border-blue-500/40 rounded-xl space-y-2 animate-in fade-in">
+                    <div className="font-bold text-blue-300 text-[11px] flex items-center justify-between">
+                      <span>Add New Material Preset</span>
+                      <button type="button" onClick={() => setIsAddingMaterial(false)} className="text-slate-400 hover:text-white">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <input
+                        type="text"
+                        placeholder="Material Name"
+                        value={customMaterialName}
+                        onChange={(e) => setCustomMaterialName(e.target.value)}
+                        className="px-2.5 py-1.5 bg-[#0D111D] border border-[#1E293B] rounded-lg text-white font-medium text-xs outline-none focus:border-blue-500"
+                      />
+                      <input
+                        type="number"
+                        placeholder="Fixed Rate (₹)"
+                        value={customMaterialRate}
+                        onChange={(e) => setCustomMaterialRate(e.target.value === '' ? '' : Number(e.target.value))}
+                        className="px-2.5 py-1.5 bg-[#0D111D] border border-[#1E293B] rounded-lg text-amber-400 font-mono font-bold text-xs outline-none focus:border-blue-500"
+                      />
+                      <input
+                        type="number"
+                        step="0.1"
+                        placeholder="Brass/Trip (e.g. 6)"
+                        value={customMaterialBrass}
+                        onChange={(e) => setCustomMaterialBrass(e.target.value === '' ? '' : Number(e.target.value))}
+                        className="px-2.5 py-1.5 bg-[#0D111D] border border-[#1E293B] rounded-lg text-white font-mono text-xs outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleSaveNewMaterial}
+                      className="w-full py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold text-xs flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Save & Apply Material</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* Inline Edit Material Box */}
+                {isEditingMaterial && (
+                  <div className="p-3 mb-2 bg-[#162032] border border-amber-500/40 rounded-xl space-y-2 animate-in fade-in">
+                    <div className="font-bold text-amber-300 text-[11px] flex items-center justify-between">
+                      <span>Edit Current Material Preset</span>
+                      <button type="button" onClick={() => setIsEditingMaterial(false)} className="text-slate-400 hover:text-white">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <input
+                        type="text"
+                        placeholder="Material Name"
+                        value={customMaterialName}
+                        onChange={(e) => setCustomMaterialName(e.target.value)}
+                        className="px-2.5 py-1.5 bg-[#0D111D] border border-[#1E293B] rounded-lg text-white font-medium text-xs outline-none focus:border-amber-500"
+                      />
+                      <input
+                        type="number"
+                        placeholder="Fixed Rate (₹)"
+                        value={customMaterialRate}
+                        onChange={(e) => setCustomMaterialRate(e.target.value === '' ? '' : Number(e.target.value))}
+                        className="px-2.5 py-1.5 bg-[#0D111D] border border-[#1E293B] rounded-lg text-amber-400 font-mono font-bold text-xs outline-none focus:border-amber-500"
+                      />
+                      <input
+                        type="number"
+                        step="0.1"
+                        placeholder="Brass/Trip (e.g. 6)"
+                        value={customMaterialBrass}
+                        onChange={(e) => setCustomMaterialBrass(e.target.value === '' ? '' : Number(e.target.value))}
+                        className="px-2.5 py-1.5 bg-[#0D111D] border border-[#1E293B] rounded-lg text-white font-mono text-xs outline-none focus:border-amber-500"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleUpdateCurrentMaterial}
+                      className="w-full py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Update Preset & Rate</span>
+                    </button>
+                  </div>
+                )}
+
+                {!isAddingMaterial && !isEditingMaterial && (
+                  <select
+                    value={formData.materialName}
+                    onChange={(e) => handleMaterialChange(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-blue-500 cursor-pointer font-medium"
+                  >
+                    {materialsList.map((m) => (
+                      <option key={m.id} value={m.name}>
+                        {m.name} (Fixed Rate: ₹{m.fixedRate}/Brass)
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
-              {/* Row 4: Total Day Trips + Brass Per Trip + Rate Per 1 Brass (Editable) */}
+              {/* Row 4: Total Day Trips + Brass Per Trip + Rate Per Brass */}
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-slate-300 font-bold mb-1.5 flex items-center gap-1">
@@ -582,8 +744,8 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                     type="number"
                     min="0"
                     required
-                    value={formData.ratePerBrass || ''}
-                    onChange={(e) => setFormData({ ...formData, ratePerBrass: Number(e.target.value) })}
+                    value={formData.ratePerBrass === 0 ? '' : formData.ratePerBrass}
+                    onChange={(e) => setFormData({ ...formData, ratePerBrass: e.target.value === '' ? 0 : Number(e.target.value) })}
                     className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-amber-400 font-mono font-bold outline-none focus:border-blue-500"
                   />
                 </div>
@@ -636,99 +798,6 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* 6. Modal: Manage Fixed Material Base Rates */}
-      {isMaterialsModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150 font-sans">
-          <div className="bg-[#121927] border border-[#1E293B] rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-150 text-slate-100 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
-              <div className="flex items-center gap-2.5 text-white font-bold text-base">
-                <Settings className="w-4 h-4 text-amber-400" />
-                <span>Material Master & Fixed Rates</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsMaterialsModalOpen(false)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* List of Current Materials */}
-            <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-              {materialsList.map((m) => (
-                <div
-                  key={m.id}
-                  className="flex items-center justify-between p-3 rounded-xl bg-[#0d1527] border border-[#1E293B]"
-                >
-                  <div>
-                    <div className="text-xs font-bold text-white">{m.name}</div>
-                    <div className="text-[11px] text-amber-400 font-mono">
-                      Fixed Base Rate: ₹{m.fixedRate.toLocaleString('en-IN')}/Brass • {m.defaultBrass} Brass/Trip
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteMaterial(m.id)}
-                    className="p-1.5 text-slate-500 hover:text-rose-400 transition-colors"
-                    title="Remove Preset"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            {/* Add New Material Form */}
-            <form onSubmit={handleAddMaterial} className="p-3.5 rounded-2xl bg-[#080d19] border border-[#182643] space-y-3 text-xs">
-              <div className="font-bold text-slate-300">+ Add New Material Preset</div>
-              <div>
-                <input
-                  type="text"
-                  required
-                  placeholder="Material Name (e.g. Granular Sand)"
-                  value={newMaterialForm.name}
-                  onChange={(e) => setNewMaterialForm({ ...newMaterialForm, name: e.target.value })}
-                  className="w-full px-3 py-2 bg-[#121927] border border-[#1E293B] rounded-lg text-white outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[10px] text-slate-400 font-bold block mb-1">Fixed Rate (₹/Brass)</label>
-                  <input
-                    type="number"
-                    required
-                    value={newMaterialForm.fixedRate}
-                    onChange={(e) => setNewMaterialForm({ ...newMaterialForm, fixedRate: Number(e.target.value) })}
-                    className="w-full px-3 py-2 bg-[#121927] border border-[#1E293B] rounded-lg text-amber-400 font-mono font-bold outline-none focus:border-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[10px] text-slate-400 font-bold block mb-1">Default Brass/Trip</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    required
-                    value={newMaterialForm.defaultBrass}
-                    onChange={(e) => setNewMaterialForm({ ...newMaterialForm, defaultBrass: Number(e.target.value) })}
-                    className="w-full px-3 py-2 bg-[#121927] border border-[#1E293B] rounded-lg text-white font-mono outline-none focus:border-blue-500"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-lg transition-colors cursor-pointer"
-              >
-                Save Material Preset
-              </button>
             </form>
           </div>
         </div>

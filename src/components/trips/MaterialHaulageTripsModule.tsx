@@ -11,7 +11,9 @@ import {
   Hash,
   ArrowRight,
   Building2,
-  Check
+  Check,
+  Settings,
+  DollarSign
 } from 'lucide-react';
 
 export interface DayTripLog {
@@ -28,25 +30,25 @@ export interface DayTripLog {
   totalAmount: number;
 }
 
-const DEFAULT_MATERIALS = [
-  { name: 'Murum', defaultRate: 1400, defaultBrass: 6 },
-  { name: 'Granular Sub-Base (GSB)', defaultRate: 1650, defaultBrass: 5.5 },
-  { name: 'Wet Mix Macadam (WMM)', defaultRate: 1850, defaultBrass: 5.5 },
-  { name: 'M-Sand / Crushed Sand', defaultRate: 2200, defaultBrass: 5 },
-  { name: '20mm Aggregate', defaultRate: 2100, defaultBrass: 5 },
-  { name: '40mm Ballast / Base', defaultRate: 1950, defaultBrass: 6 }
+export interface MaterialRateItem {
+  id: string;
+  name: string;
+  fixedRate: number;
+  defaultBrass: number;
+}
+
+const DEFAULT_MATERIALS: MaterialRateItem[] = [
+  { id: 'm-1', name: 'Murum Base Material', fixedRate: 1400, defaultBrass: 6 },
+  { id: 'm-2', name: 'Granular Sub-Base (GSB)', fixedRate: 1650, defaultBrass: 5.5 },
+  { id: 'm-3', name: 'Wet Mix Macadam (WMM)', fixedRate: 1850, defaultBrass: 5.5 },
+  { id: 'm-4', name: 'M-Sand / Crushed Sand', fixedRate: 2200, defaultBrass: 5 },
+  { id: 'm-5', name: '20mm Aggregate Metal', fixedRate: 2100, defaultBrass: 5 },
+  { id: 'm-6', name: '40mm Ballast Metal', fixedRate: 1950, defaultBrass: 6 }
 ];
 
-const DEFAULT_VEHICLES = [
-  'KA-28-EX-8901',
-  'KA-28-JC-3342',
-  'MH-12-DT-5510',
-  'KA-28-TR-1092',
-  'KA-28-JP-7890'
-];
-
-const STORAGE_TRIPS_KEY = 'CONSTRUCTION_PRO_DAY_TRIPS_V2';
-const STORAGE_VEHICLES_KEY = 'CONSTRUCTION_PRO_TRIP_VEHICLES_V1';
+const STORAGE_TRIPS_KEY = 'CONSTRUCTION_PRO_DAY_TRIPS_V3';
+const STORAGE_FLEET_KEY = 'CONSTRUCTION_PRO_FLEET_VEHICLES_V1';
+const STORAGE_MATERIALS_KEY = 'CONSTRUCTION_PRO_MATERIAL_RATES_V1';
 
 export const MaterialHaulageTripsModule: React.FC = () => {
   const { siteSheets, selectedSiteId } = useERP();
@@ -56,16 +58,30 @@ export const MaterialHaulageTripsModule: React.FC = () => {
     ? siteSheets.map((s) => s.siteName) 
     : ['NH-50 Ongoing Site Stretch', 'Mulwad Murum Quarry Pit', 'Main Express Highway Package-3'];
 
-  // Persistent Vehicles List
-  const [vehiclesList, setVehiclesList] = useState<string[]>(() => {
+  // 1. Linked Vehicles from Machinery Fleet Registry
+  const [fleetVehicles, setFleetVehicles] = useState<string[]>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_VEHICLES_KEY);
-      if (saved) return JSON.parse(saved);
+      const savedFleet = localStorage.getItem(STORAGE_FLEET_KEY);
+      if (savedFleet) {
+        const parsed = JSON.parse(savedFleet);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((item: any) => item.vehicleNumber || item.code || item);
+        }
+      }
     } catch {}
-    return DEFAULT_VEHICLES;
+    return ['KA-28-EX-8901', 'KA-28-JC-3342', 'MH-12-DT-5510', 'KA-28-TR-1092', 'KA-28-JP-7890'];
   });
 
-  // Persistent Day Trips State
+  // 2. Materials List with Master Fixed Rates
+  const [materialsList, setMaterialsList] = useState<MaterialRateItem[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_MATERIALS_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return DEFAULT_MATERIALS;
+  });
+
+  // 3. Day Trips Ledger
   const [tripLogs, setTripLogs] = useState<DayTripLog[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_TRIPS_KEY);
@@ -78,7 +94,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
         dayNumber: 1,
         siteName: siteList[0] || 'NH-50 Ongoing Site Stretch',
         vehicleNumber: 'MH-12-DT-5510',
-        materialName: 'Murum',
+        materialName: 'Murum Base Material',
         totalTrips: 10,
         brassPerTrip: 6,
         totalBrass: 60,
@@ -89,6 +105,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
   });
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isMaterialsModalOpen, setIsMaterialsModalOpen] = useState(false);
   const [isAddingNewVehicle, setIsAddingNewVehicle] = useState(false);
   const [newVehicleInput, setNewVehicleInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -97,44 +114,89 @@ export const MaterialHaulageTripsModule: React.FC = () => {
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     siteName: siteList[0] || 'NH-50 Ongoing Site Stretch',
-    vehicleNumber: vehiclesList[0] || 'MH-12-DT-5510',
-    materialName: DEFAULT_MATERIALS[0].name,
+    vehicleNumber: fleetVehicles[0] || 'MH-12-DT-5510',
+    materialName: materialsList[0]?.name || 'Murum Base Material',
     totalTrips: 10,
-    brassPerTrip: DEFAULT_MATERIALS[0].defaultBrass,
-    ratePerBrass: DEFAULT_MATERIALS[0].defaultRate
+    brassPerTrip: materialsList[0]?.defaultBrass || 6,
+    ratePerBrass: materialsList[0]?.fixedRate || 1400
   });
 
-  // Sync to localStorage
+  // Material Creation Form
+  const [newMaterialForm, setNewMaterialForm] = useState({
+    name: '',
+    fixedRate: 1500,
+    defaultBrass: 6
+  });
+
+  // Auto-sync storage
   useEffect(() => {
     localStorage.setItem(STORAGE_TRIPS_KEY, JSON.stringify(tripLogs));
   }, [tripLogs]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_VEHICLES_KEY, JSON.stringify(vehiclesList));
-  }, [vehiclesList]);
+    localStorage.setItem(STORAGE_MATERIALS_KEY, JSON.stringify(materialsList));
+  }, [materialsList]);
 
+  // When selected material changes, prefill its fixed base rate
   const handleMaterialChange = (matName: string) => {
-    const matched = DEFAULT_MATERIALS.find((m) => m.name === matName);
+    const matched = materialsList.find((m) => m.name === matName);
     setFormData((prev) => ({
       ...prev,
       materialName: matName,
-      ratePerBrass: matched ? matched.defaultRate : prev.ratePerBrass,
+      ratePerBrass: matched ? matched.fixedRate : prev.ratePerBrass,
       brassPerTrip: matched ? matched.defaultBrass : prev.brassPerTrip
     }));
   };
 
+  // Add vehicle to both local state and Machinery Fleet storage
   const handleAddNewVehicle = (e: React.FormEvent) => {
     e.preventDefault();
     const cleanPlate = newVehicleInput.trim().toUpperCase();
     if (!cleanPlate) return;
 
-    if (!vehiclesList.includes(cleanPlate)) {
-      const updated = [cleanPlate, ...vehiclesList];
-      setVehiclesList(updated);
+    if (!fleetVehicles.includes(cleanPlate)) {
+      const updated = [cleanPlate, ...fleetVehicles];
+      setFleetVehicles(updated);
       setFormData((prev) => ({ ...prev, vehicleNumber: cleanPlate }));
+
+      // Update Machinery Fleet storage as well
+      try {
+        const savedFleet = localStorage.getItem(STORAGE_FLEET_KEY);
+        const fleetArray = savedFleet ? JSON.parse(savedFleet) : [];
+        fleetArray.unshift({
+          id: `v-${Date.now()}`,
+          vehicleNumber: cleanPlate,
+          vehicleType: 'Tipper / Dump Truck',
+          category: 'Haulage',
+          metricType: 'KM',
+          currentReading: 0
+        });
+        localStorage.setItem(STORAGE_FLEET_KEY, JSON.stringify(fleetArray));
+      } catch {}
     }
     setNewVehicleInput('');
     setIsAddingNewVehicle(false);
+  };
+
+  // Add / Edit Material Master
+  const handleAddMaterial = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMaterialForm.name.trim()) return;
+
+    const newMat: MaterialRateItem = {
+      id: `mat-${Date.now()}`,
+      name: newMaterialForm.name.trim(),
+      fixedRate: Number(newMaterialForm.fixedRate),
+      defaultBrass: Number(newMaterialForm.defaultBrass)
+    };
+
+    setMaterialsList([...materialsList, newMat]);
+    setNewMaterialForm({ name: '', fixedRate: 1500, defaultBrass: 6 });
+  };
+
+  const handleDeleteMaterial = (id: string) => {
+    if (materialsList.length <= 1) return alert('At least one material preset must remain.');
+    setMaterialsList(materialsList.filter((m) => m.id !== id));
   };
 
   const handleSaveDayTrip = (e: React.FormEvent) => {
@@ -163,7 +225,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
   };
 
   const handleDeleteTrip = (id: string) => {
-    if (window.confirm('Delete this day trip entry?')) {
+    if (window.confirm('Delete this day trip record?')) {
       setTripLogs(tripLogs.filter((t) => t.id !== id));
     }
   };
@@ -194,10 +256,10 @@ export const MaterialHaulageTripsModule: React.FC = () => {
           <div>
             <div className="flex items-center gap-2">
               <span className="px-2 py-0.5 rounded-full bg-blue-950/60 text-blue-400 border border-blue-800 text-[10px] font-black uppercase">
-                Haulage Matrix
+                Fleet-Linked Haulage
               </span>
               <span className="text-xs text-slate-400 font-semibold">
-                Active Site: {formData.siteName}
+                {fleetVehicles.length} Active Fleet Tippers
               </span>
             </div>
             <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight mt-0.5">
@@ -206,13 +268,24 @@ export const MaterialHaulageTripsModule: React.FC = () => {
           </div>
         </div>
 
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs flex items-center gap-2 transition-all shadow-lg shadow-blue-600/30 cursor-pointer shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          <span>+ Log Day Trips</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsMaterialsModalOpen(true)}
+            className="px-3.5 py-2.5 rounded-xl bg-[#162032] hover:bg-[#1f2c44] border border-[#1E293B] text-slate-300 hover:text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
+            title="Manage Materials & Fixed Base Rates"
+          >
+            <Settings className="w-4 h-4 text-amber-400" />
+            <span>Manage Material Rates</span>
+          </button>
+
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs flex items-center gap-2 transition-all shadow-lg shadow-blue-600/30 cursor-pointer shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            <span>+ Log Day Trips</span>
+          </button>
+        </div>
       </div>
 
       {/* 2. Top Summary KPI Cards */}
@@ -221,7 +294,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
           <div className="text-slate-400 text-xs font-semibold">Total Cumulative Trips</div>
           <div className="text-2xl font-extrabold text-white mt-1">
             {grandTotalTrips.toLocaleString('en-IN')}{' '}
-            <span className="text-xs font-normal text-slate-400">Trips Delivered</span>
+            <span className="text-xs font-normal text-slate-400">Trips</span>
           </div>
         </div>
 
@@ -229,7 +302,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
           <div className="text-slate-400 text-xs font-semibold">Total Material Volume</div>
           <div className="text-2xl font-extrabold text-blue-400 mt-1">
             {grandTotalBrass.toFixed(1)}{' '}
-            <span className="text-xs font-normal text-slate-400">Brass Quantity</span>
+            <span className="text-xs font-normal text-slate-400">Brass</span>
           </div>
         </div>
 
@@ -253,7 +326,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
         />
       </div>
 
-      {/* 4. Trips Table */}
+      {/* 4. Trips Ledger Table */}
       <div className="bg-[#0B1220] border border-[#1E293B] rounded-3xl overflow-hidden shadow-2xl">
         <div className="p-4 border-b border-[#1E293B] bg-[#0d1527]/50 flex items-center justify-between">
           <div className="font-bold text-sm text-white">Daily Trippage Reconciliation Log</div>
@@ -333,7 +406,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
         </div>
       </div>
 
-      {/* 5. Log Total Day Haulage Trips Modal */}
+      {/* 5. Modal: Log Day Trips */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150 font-sans">
           <div className="bg-[#121927] border border-[#1E293B] rounded-3xl w-full max-w-lg p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-150 text-slate-100 max-h-[92vh] overflow-y-auto">
@@ -390,11 +463,12 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                 </div>
               </div>
 
-              {/* Row 2: Vehicle Number with Inline Add Button */}
+              {/* Row 2: Vehicle Number with Machinery Fleet Link */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-slate-300 font-bold">
-                    Vehicle Number / Tipper *
+                  <label className="text-slate-300 font-bold flex items-center gap-1">
+                    <Truck className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Vehicle Number (From Machinery Fleet) *</span>
                   </label>
                   <button
                     type="button"
@@ -437,7 +511,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                     onChange={(e) => setFormData({ ...formData, vehicleNumber: e.target.value })}
                     className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono font-bold outline-none focus:border-blue-500 cursor-pointer"
                   >
-                    {vehiclesList.map((v) => (
+                    {fleetVehicles.map((v) => (
                       <option key={v} value={v}>
                         {v}
                       </option>
@@ -446,25 +520,25 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                 )}
               </div>
 
-              {/* Row 3: Material Name */}
+              {/* Row 3: Material Name (With Fixed Rate Display) */}
               <div>
                 <label className="block text-slate-300 font-bold mb-1.5">
-                  Material Name *
+                  Material Name (With Fixed Preset Price) *
                 </label>
                 <select
                   value={formData.materialName}
                   onChange={(e) => handleMaterialChange(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-blue-500 cursor-pointer font-medium"
                 >
-                  {DEFAULT_MATERIALS.map((m) => (
-                    <option key={m.name} value={m.name}>
-                      {m.name} (Preset: ₹{m.defaultRate}/Brass)
+                  {materialsList.map((m) => (
+                    <option key={m.id} value={m.name}>
+                      {m.name} (Fixed Rate: ₹{m.fixedRate}/Brass)
                     </option>
                   ))}
                 </select>
               </div>
 
-              {/* Row 4: Total Day Trips + Brass Per Trip + Rate Per 1 Brass (Directly Editable) */}
+              {/* Row 4: Total Day Trips + Brass Per Trip + Rate Per 1 Brass (Editable) */}
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-slate-300 font-bold mb-1.5 flex items-center gap-1">
@@ -501,7 +575,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
 
                 <div>
                   <label className="block text-slate-300 font-bold mb-1.5 flex items-center justify-between">
-                    <span>Rate / 1 Brass (₹)</span>
+                    <span>Rate / Brass (₹)</span>
                     <span className="text-[10px] text-amber-400 font-normal">Editable</span>
                   </label>
                   <input
@@ -529,7 +603,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                 <div className="flex items-center justify-between pt-2 border-t border-[#182643]">
                   <div>
                     <div className="text-[11px] text-slate-400">
-                      Rate: ₹{Number(formData.ratePerBrass || 0).toLocaleString('en-IN')} / 1 Brass
+                      Rate Applied: ₹{Number(formData.ratePerBrass || 0).toLocaleString('en-IN')} / 1 Brass
                     </div>
                     <div className="text-xs font-bold text-slate-200">
                       Total Day Amount ({formData.totalTrips || 0} Trips):
@@ -562,6 +636,99 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 6. Modal: Manage Fixed Material Base Rates */}
+      {isMaterialsModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150 font-sans">
+          <div className="bg-[#121927] border border-[#1E293B] rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-150 text-slate-100 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
+              <div className="flex items-center gap-2.5 text-white font-bold text-base">
+                <Settings className="w-4 h-4 text-amber-400" />
+                <span>Material Master & Fixed Rates</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsMaterialsModalOpen(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* List of Current Materials */}
+            <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+              {materialsList.map((m) => (
+                <div
+                  key={m.id}
+                  className="flex items-center justify-between p-3 rounded-xl bg-[#0d1527] border border-[#1E293B]"
+                >
+                  <div>
+                    <div className="text-xs font-bold text-white">{m.name}</div>
+                    <div className="text-[11px] text-amber-400 font-mono">
+                      Fixed Base Rate: ₹{m.fixedRate.toLocaleString('en-IN')}/Brass • {m.defaultBrass} Brass/Trip
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteMaterial(m.id)}
+                    className="p-1.5 text-slate-500 hover:text-rose-400 transition-colors"
+                    title="Remove Preset"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Add New Material Form */}
+            <form onSubmit={handleAddMaterial} className="p-3.5 rounded-2xl bg-[#080d19] border border-[#182643] space-y-3 text-xs">
+              <div className="font-bold text-slate-300">+ Add New Material Preset</div>
+              <div>
+                <input
+                  type="text"
+                  required
+                  placeholder="Material Name (e.g. Granular Sand)"
+                  value={newMaterialForm.name}
+                  onChange={(e) => setNewMaterialForm({ ...newMaterialForm, name: e.target.value })}
+                  className="w-full px-3 py-2 bg-[#121927] border border-[#1E293B] rounded-lg text-white outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] text-slate-400 font-bold block mb-1">Fixed Rate (₹/Brass)</label>
+                  <input
+                    type="number"
+                    required
+                    value={newMaterialForm.fixedRate}
+                    onChange={(e) => setNewMaterialForm({ ...newMaterialForm, fixedRate: Number(e.target.value) })}
+                    className="w-full px-3 py-2 bg-[#121927] border border-[#1E293B] rounded-lg text-amber-400 font-mono font-bold outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] text-slate-400 font-bold block mb-1">Default Brass/Trip</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    required
+                    value={newMaterialForm.defaultBrass}
+                    onChange={(e) => setNewMaterialForm({ ...newMaterialForm, defaultBrass: Number(e.target.value) })}
+                    className="w-full px-3 py-2 bg-[#121927] border border-[#1E293B] rounded-lg text-white font-mono outline-none focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-lg transition-colors cursor-pointer"
+              >
+                Save Material Preset
+              </button>
             </form>
           </div>
         </div>

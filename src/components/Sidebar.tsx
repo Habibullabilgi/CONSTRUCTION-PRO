@@ -34,13 +34,6 @@ export const Sidebar: React.FC<Props> = ({ activeTab, setActiveTab }) => {
   const operationsItems: NavItem[] = [
     { id: 'dashboard', label: 'Site Overview', icon: LayoutDashboard },
     {
-      id: 'users',
-      label: 'User Management',
-      icon: Users,
-      badge: 'RBAC',
-      badgeStyle: 'bg-indigo-900/40 text-indigo-300 border border-indigo-500/40'
-    },
-    {
       id: 'road-sites',
       label: 'Road Sites & Stretches',
       icon: Milestone,
@@ -81,6 +74,17 @@ export const Sidebar: React.FC<Props> = ({ activeTab, setActiveTab }) => {
     },
     { id: 'machinery', label: 'Machinery & Equipment Fleet', icon: HardHat },
     { id: 'reports', label: 'Daily Progress Report (DPR)', icon: FileText }
+  ];
+
+  // 3. ADMINISTRATION (At Bottom)
+  const administrationItems: NavItem[] = [
+    {
+      id: 'users',
+      label: 'User Management',
+      icon: Users,
+      badge: 'RBAC',
+      badgeStyle: 'bg-indigo-900/40 text-indigo-300 border border-indigo-500/40'
+    }
   ];
 
   const renderNavGroup = (title: string, items: NavItem[]) => (
@@ -148,6 +152,9 @@ export const Sidebar: React.FC<Props> = ({ activeTab, setActiveTab }) => {
 
         {/* Section 2: ENGINEERING & FLEET */}
         {renderNavGroup('ENGINEERING & FLEET', engineeringItems)}
+
+        {/* Section 3: ADMINISTRATION & USERS (Bottom Section) */}
+        {renderNavGroup('ADMINISTRATION', administrationItems)}
       </div>
 
       {/* User Profile Card at Bottom */}

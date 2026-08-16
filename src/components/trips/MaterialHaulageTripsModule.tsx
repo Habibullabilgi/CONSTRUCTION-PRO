@@ -5,15 +5,9 @@ import {
   Plus,
   Download,
   Search,
-  CheckCircle2,
-  Clock,
-  Trash2,
-  Layers,
-  MapPin,
   Calendar,
   X
 } from 'lucide-react';
-import { VehicleTrip } from '../../types/erp';
 
 export const MaterialHaulageTripsModule: React.FC = () => {
   const {
@@ -29,21 +23,21 @@ export const MaterialHaulageTripsModule: React.FC = () => {
   const [filterVehicle, setFilterVehicle] = useState('ALL');
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
 
-  // Form State
-  const [tripForm, setTripForm] = useState({
-    slipNumber: '',
-    vehicleNumber: '8797',
-    driverName: 'Santosh Kamble',
-    materialName: 'Murum',
-    sourceQuarry: 'Bilgi Pit #1',
-    destinationChainage: 'Ch. 4+200',
-    netWeightTons: 18.5,
-    ratePerUnitOrTrip: 350,
-    travelDistanceKm: 12.0
-  });
-
   const currentSheet = siteSheets.find((s) => s.siteId === selectedSiteId);
   const vehicles = currentSheet?.vehicles || ['8797', '7352', '7353', '9579', '9580'];
+
+  // Form State (Only Site Name, Vehicle Number, Material Name, Material in Brass)
+  const [tripForm, setTripForm] = useState<{
+    siteName: string;
+    vehicleNumber: string;
+    materialName: string;
+    brassQty: number | '';
+  }>({
+    siteName: currentSheet?.siteName || 'Ongoing Highway Site',
+    vehicleNumber: '8797',
+    materialName: 'Murum',
+    brassQty: 4.5
+  });
 
   const siteTrips = vehicleTrips.filter(
     (t) => !selectedSiteId || t.siteId === selectedSiteId || (t as any).siteId === 'all'
@@ -53,7 +47,6 @@ export const MaterialHaulageTripsModule: React.FC = () => {
     const matchesSearch =
       t.slipNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       t.vehicleNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.driverName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       t.materialName?.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesMaterial = filterMaterial === 'ALL' || t.materialName === filterMaterial;
@@ -63,7 +56,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
   });
 
   const totalTrips = filteredTrips.length;
-  const totalWeight = filteredTrips.reduce((acc, t) => acc + (t.netWeightTons || 0), 0);
+  const totalBrass = filteredTrips.reduce((acc, t) => acc + (t.netWeightTons || 0), 0);
   const totalValuation = filteredTrips.reduce(
     (acc, t) => acc + (t.netWeightTons || 1) * (t.ratePerUnitOrTrip || 350),
     0
@@ -73,25 +66,26 @@ export const MaterialHaulageTripsModule: React.FC = () => {
     e.preventDefault();
     const today = new Date().toISOString().substring(0, 10);
     const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const brass = typeof tripForm.brassQty === 'number' ? tripForm.brassQty : Number(tripForm.brassQty) || 1;
 
     addVehicleTrip({
       projectId: currentProject?.id || 'proj-ongoing-1',
       siteId: selectedSiteId || 'site-ongoing-1',
-      slipNumber: tripForm.slipNumber || `TRIP-${Math.floor(1000 + Math.random() * 9000)}`,
+      slipNumber: `TRIP-${Math.floor(1000 + Math.random() * 9000)}`,
       date: today,
       time: timeNow,
       vehicleNumber: tripForm.vehicleNumber,
-      driverName: tripForm.driverName,
+      driverName: 'Driver',
       materialName: tripForm.materialName,
-      sourceLocation: tripForm.sourceQuarry,
-      destinationChainage: tripForm.destinationChainage,
-      grossWeightKg: (tripForm.netWeightTons + 10) * 1000,
-      tareWeightKg: 10000,
-      netWeightKg: tripForm.netWeightTons * 1000,
-      netWeightTons: Number(tripForm.netWeightTons),
-      ratePerUnitOrTrip: Number(tripForm.ratePerUnitOrTrip),
-      totalAmount: Number(tripForm.netWeightTons) * Number(tripForm.ratePerUnitOrTrip),
-      travelDistanceKm: Number(tripForm.travelDistanceKm),
+      sourceLocation: tripForm.siteName,
+      destinationChainage: 'Site Location',
+      grossWeightKg: brass * 1000,
+      tareWeightKg: 0,
+      netWeightKg: brass * 1000,
+      netWeightTons: brass, // Storing Brass value
+      ratePerUnitOrTrip: 350,
+      totalAmount: brass * 350,
+      travelDistanceKm: 0,
       approvalStatus: 'APPROVED'
     });
 
@@ -99,11 +93,11 @@ export const MaterialHaulageTripsModule: React.FC = () => {
   };
 
   const handleExportCSV = () => {
-    const headers = 'Trip Slip,Date,Vehicle,Driver,Material,Source,Drop-off,Net Tons,Rate,Total (INR)\n';
+    const headers = 'Trip Slip,Date,Site Name,Vehicle,Material,Brass Qty,Billing (INR)\n';
     const rows = filteredTrips
       .map(
         (t) =>
-          `"${t.slipNumber}","${t.date}","${t.vehicleNumber}","${t.driverName}","${t.materialName}","${t.sourceLocation}","${t.destinationChainage}","${t.netWeightTons}","${t.ratePerUnitOrTrip}","${t.totalAmount}"`
+          `"${t.slipNumber}","${t.date}","${t.sourceLocation || currentSheet?.siteName || ''}","${t.vehicleNumber}","${t.materialName}","${t.netWeightTons}","${t.totalAmount}"`
       )
       .join('\n');
 
@@ -131,7 +125,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
               </span>
             </div>
             <p className="text-xs text-[#94A3B8] mt-0.5">
-              Record and track tipper trip slips, net material weights, and drop-off chainages.
+              Record and track tipper trip slips, brass quantities, and materials.
             </p>
           </div>
         </div>
@@ -168,10 +162,10 @@ export const MaterialHaulageTripsModule: React.FC = () => {
 
         <div className="p-4 rounded-2xl bg-[#121927] border border-[#1E293B] shadow-sm">
           <span className="text-[11px] font-bold uppercase tracking-wider text-[#94A3B8]">
-            Net Material Hauled
+            Total Material (Brass)
           </span>
           <div className="text-2xl font-black text-cyan-400 mt-1.5">
-            {totalWeight.toFixed(1)} <span className="text-xs font-semibold text-[#94A3B8]">Tons</span>
+            {totalBrass.toFixed(2)} <span className="text-xs font-semibold text-[#94A3B8]">Brass</span>
           </div>
         </div>
 
@@ -198,6 +192,8 @@ export const MaterialHaulageTripsModule: React.FC = () => {
           <option value="WMM">WMM</option>
           <option value="20 MM">20 MM Aggregate</option>
           <option value="M SAND">M-Sand</option>
+          <option value="40 MM">40 MM Aggregate</option>
+          <option value="Grit / Dust">Grit / Dust</option>
         </select>
 
         <select
@@ -217,7 +213,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
           <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3.5 top-3" />
           <input
             type="text"
-            placeholder="Search slip, chainage, vehicle..."
+            placeholder="Search slip, vehicle, material..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-9 pr-3.5 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white text-xs placeholder-slate-500 outline-none focus:border-blue-500"
@@ -232,18 +228,17 @@ export const MaterialHaulageTripsModule: React.FC = () => {
             <thead>
               <tr className="border-b border-[#1E293B] text-[10px] font-extrabold uppercase tracking-wider text-[#94A3B8] bg-[#080D19]">
                 <th className="py-3 px-5">Trip Slip & Date</th>
-                <th className="py-3 px-5">Vehicle & Driver</th>
-                <th className="py-3 px-5">Source</th>
-                <th className="py-3 px-5">Drop-off Chainage</th>
-                <th className="py-3 px-5">Material</th>
-                <th className="py-3 px-5 text-right">Net Weight</th>
+                <th className="py-3 px-5">Site Name</th>
+                <th className="py-3 px-5">Vehicle Number</th>
+                <th className="py-3 px-5">Material Name</th>
+                <th className="py-3 px-5 text-right">Material (Brass)</th>
                 <th className="py-3 px-5 text-right">Billing (₹)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#1E293B]/60 text-slate-200">
               {filteredTrips.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-xs text-slate-500">
+                  <td colSpan={6} className="py-12 text-center text-xs text-slate-500">
                     No trips recorded yet. Click <strong>+ Log Trip</strong> to create an entry.
                   </td>
                 </tr>
@@ -260,17 +255,12 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                       </div>
                     </td>
 
+                    <td className="py-3.5 px-5 text-slate-300 whitespace-nowrap font-medium">
+                      {t.sourceLocation || currentSheet?.siteName || 'Ongoing Site'}
+                    </td>
+
                     <td className="py-3.5 px-5 whitespace-nowrap">
                       <div className="font-bold text-blue-400 font-mono">#{t.vehicleNumber}</div>
-                      <div className="text-[10px] text-slate-400">{t.driverName}</div>
-                    </td>
-
-                    <td className="py-3.5 px-5 text-slate-300 whitespace-nowrap">
-                      {t.sourceLocation || 'Quarry Pit #1'}
-                    </td>
-
-                    <td className="py-3.5 px-5 text-slate-300 font-mono whitespace-nowrap">
-                      {t.destinationChainage || 'Ch. 0+000'}
                     </td>
 
                     <td className="py-3.5 px-5 whitespace-nowrap">
@@ -280,7 +270,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                     </td>
 
                     <td className="py-3.5 px-5 text-right font-mono font-bold text-cyan-400 whitespace-nowrap">
-                      {t.netWeightTons ? `${t.netWeightTons} Tons` : '1 Trip'}
+                      {t.netWeightTons ? `${t.netWeightTons.toFixed(2)} Brass` : '1.00 Brass'}
                     </td>
 
                     <td className="py-3.5 px-5 text-right font-mono font-bold text-amber-400 whitespace-nowrap">
@@ -294,149 +284,116 @@ export const MaterialHaulageTripsModule: React.FC = () => {
         </div>
       </div>
 
-      {/* Log New Trip Modal */}
-{isLogModalOpen && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150 font-sans">
-    <div className="bg-[#121927] border border-[#1E293B] rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-150 text-slate-100">
-      
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
-        <div className="flex items-center gap-2 text-white font-bold text-base">
-          <Truck className="w-5 h-5 text-blue-400" />
-          <span>Log New Trip</span>
-        </div>
-        <button
-          type="button"
-          onClick={() => setIsLogModalOpen(false)}
-          className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
-        >
-          <X className="w-5 h-5" />
-        </button>
-      </div>
+      {/* 5. Log New Trip Modal */}
+      {isLogModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150 font-sans">
+          <div className="bg-[#121927] border border-[#1E293B] rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-150 text-slate-100">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
+              <div className="flex items-center gap-2 text-white font-bold text-base">
+                <Truck className="w-5 h-5 text-blue-400" />
+                <span>Log New Trip</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsLogModalOpen(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-      <form onSubmit={handleCreateTrip} className="space-y-4 text-xs">
-        
-        {/* 1. Site Name */}
-        <div>
-          <label className="block text-slate-300 font-bold mb-1">
-            Site Name <span className="text-blue-400">*</span>
-          </label>
-          <select
-            value={tripForm.siteName || (currentSheet?.siteName || '')}
-            onChange={(e) => setTripForm({ ...tripForm, siteName: e.target.value })}
-            className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-blue-500 font-medium cursor-pointer"
-          >
-            {siteSheets.map((s) => (
-              <option key={s.siteId} value={s.siteName}>
-                {s.siteName}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* 2. Vehicle Number */}
-        <div>
-          <label className="block text-slate-300 font-bold mb-1">
-            Vehicle Number <span className="text-blue-400">*</span>
-          </label>
-          <select
-            value={tripForm.vehicleNumber}
-            onChange={(e) => setTripForm({ ...tripForm, vehicleNumber: e.target.value })}
-            className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-blue-500 font-mono font-bold cursor-pointer"
-          >
-            {vehicles.map((v) => (
-              <option key={v} value={v}>
-                #{v}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* 3. Material Name */}
-        <div>
-          <label className="block text-slate-300 font-bold mb-1">
-            Material Name <span className="text-blue-400">*</span>
-          </label>
-          <select
-            value={tripForm.materialName}
-            onChange={(e) => setTripForm({ ...tripForm, materialName: e.target.value })}
-            className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-blue-500 font-medium cursor-pointer"
-          >
-            <option value="Murum">Murum</option>
-            <option value="GSB">GSB</option>
-            <option value="WMM">WMM</option>
-            <option value="20 MM">20 MM Aggregate</option>
-            <option value="M SAND">M-Sand</option>
-            <option value="40 MM">40 MM Aggregate</option>
-            <option value="Grit / Dust">Grit / Dust</option>
-          </select>
-        </div>
-
-        {/* 4. Material Quantity (in Brass) */}
-        <div>
-          <label className="block text-slate-300 font-bold mb-1">
-            Material (in Brass) <span className="text-blue-400">*</span>
-          </label>
-          <input
-            type="number"
-            step="0.01"
-            min="0.1"
-            required
-            placeholder="e.g. 4.50"
-            value={tripForm.brassQty ?? ''}
-            onChange={(e) =>
-              setTripForm({ ...tripForm, brassQty: e.target.value === '' ? '' : Number(e.target.value) })
-            }
-            className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-blue-500 font-mono font-bold placeholder-slate-500"
-          />
-        </div>
-
-        {/* Footer Actions */}
-        <div className="flex justify-end items-center gap-2 pt-3 border-t border-[#1E293B]">
-          <button
-            type="button"
-            onClick={() => setIsLogModalOpen(false)}
-            className="px-4 py-2 rounded-xl text-slate-400 hover:text-white transition-colors cursor-pointer"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold transition-all shadow-lg shadow-blue-600/30 cursor-pointer"
-          >
-            Save Trip
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-)}
-
+            <form onSubmit={handleCreateTrip} className="space-y-4 text-xs">
+              {/* 1. Site Name */}
               <div>
-                <label className="block text-slate-400 font-bold mb-1">Drop-off Chainage *</label>
+                <label className="block text-slate-300 font-bold mb-1">
+                  Site Name <span className="text-blue-400">*</span>
+                </label>
+                <select
+                  value={tripForm.siteName}
+                  onChange={(e) => setTripForm({ ...tripForm, siteName: e.target.value })}
+                  className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-blue-500 font-medium cursor-pointer"
+                >
+                  {siteSheets.map((s) => (
+                    <option key={s.siteId} value={s.siteName}>
+                      {s.siteName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 2. Vehicle Number */}
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">
+                  Vehicle Number <span className="text-blue-400">*</span>
+                </label>
+                <select
+                  value={tripForm.vehicleNumber}
+                  onChange={(e) => setTripForm({ ...tripForm, vehicleNumber: e.target.value })}
+                  className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-blue-500 font-mono font-bold cursor-pointer"
+                >
+                  {vehicles.map((v) => (
+                    <option key={v} value={v}>
+                      #{v}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 3. Material Name */}
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">
+                  Material Name <span className="text-blue-400">*</span>
+                </label>
+                <select
+                  value={tripForm.materialName}
+                  onChange={(e) => setTripForm({ ...tripForm, materialName: e.target.value })}
+                  className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-blue-500 font-medium cursor-pointer"
+                >
+                  <option value="Murum">Murum</option>
+                  <option value="GSB">GSB</option>
+                  <option value="WMM">WMM</option>
+                  <option value="20 MM">20 MM Aggregate</option>
+                  <option value="M SAND">M-Sand</option>
+                  <option value="40 MM">40 MM Aggregate</option>
+                  <option value="Grit / Dust">Grit / Dust</option>
+                </select>
+              </div>
+
+              {/* 4. Material Quantity (in Brass) */}
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">
+                  Material (in Brass) <span className="text-blue-400">*</span>
+                </label>
                 <input
-                  type="text"
+                  type="number"
+                  step="0.01"
+                  min="0.1"
                   required
-                  placeholder="e.g. Ch. 4+500"
-                  value={tripForm.destinationChainage}
+                  placeholder="e.g. 4.50"
+                  value={tripForm.brassQty ?? ''}
                   onChange={(e) =>
-                    setTripForm({ ...tripForm, destinationChainage: e.target.value })
+                    setTripForm({
+                      ...tripForm,
+                      brassQty: e.target.value === '' ? '' : Number(e.target.value)
+                    })
                   }
-                  className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-blue-500 font-mono"
+                  className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-blue-500 font-mono font-bold placeholder-slate-500"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-[#1E293B]">
+              {/* Footer Actions */}
+              <div className="flex justify-end items-center gap-2 pt-3 border-t border-[#1E293B]">
                 <button
                   type="button"
                   onClick={() => setIsLogModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white"
+                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black shadow-lg shadow-blue-600/30"
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold transition-all shadow-lg shadow-blue-600/30 cursor-pointer"
                 >
                   Save Trip
                 </button>

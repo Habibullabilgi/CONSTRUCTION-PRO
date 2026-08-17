@@ -1,3 +1,4 @@
+```tsx
 import React from 'react';
 import { useERP } from '../context/ERPContext';
 import {
@@ -5,7 +6,6 @@ import {
   Truck,
   Fuel,
   DollarSign,
-  FileText,
   Calculator,
   HardHat,
   LogOut,
@@ -76,11 +76,6 @@ export const Sidebar: React.FC<Props> = ({ activeTab, setActiveTab }) => {
       id: 'machinery_fleet',
       label: 'Machinery',
       icon: HardHat
-    },
-    {
-      id: 'dpr',
-      label: 'Daily Progress Report (DPR)',
-      icon: FileText
     }
   ];
 
@@ -196,3 +191,5 @@ export const Sidebar: React.FC<Props> = ({ activeTab, setActiveTab }) => {
 };
 
 export default Sidebar;
+
+```

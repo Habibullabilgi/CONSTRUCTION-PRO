@@ -116,6 +116,22 @@ const DEFAULT_MANAGED_USERS: ManagedUser[] = [
   }
 ];
 
+export interface AddRoadSiteInput {
+  projectId?: string;
+  siteName: string;
+  siteCode?: string;
+  location: string;
+  supervisor: string;
+  startChainageKm?: number;
+  endChainageKm?: number;
+  carriagewayWidthMeters?: number;
+  carriagewayType?: string;
+  vehicles?: string[];
+  projectType?: 'ROAD' | 'BUILDING';
+  category?: 'ROAD' | 'BUILDING' | string;
+  buildingFloors?: string;
+}
+
 interface ERPContextType {
   isAuthenticated: boolean;
   login: (username: string, password?: string) => { success: boolean; message?: string };
@@ -147,18 +163,8 @@ interface ERPContextType {
   deleteProject: (id: string) => void;
   addSiteToProject: (projectId: string, siteName: string, location: string, supervisor: string) => void;
   deleteSite: (siteId: string) => void;
-  addRoadSiteSection: (input: {
-    projectId?: string;
-    siteName: string;
-    siteCode?: string;
-    location: string;
-    supervisor: string;
-    startChainageKm: number;
-    endChainageKm: number;
-    carriagewayWidthMeters?: number;
-    carriagewayType?: string;
-    vehicles?: string[];
-  }) => string;
+  addRoadSiteSection: (input: AddRoadSiteInput) => string;
+  deleteRoadSiteSection: (siteId: string) => void;
 
   roadSections: RoadSection[];
   updateRoadLayerProgress: (sectionId: string, layerId: string, completedMeters: number, actualQty: number) => void;
@@ -182,6 +188,7 @@ interface ERPContextType {
   updateVehicleTripStatus: (tripId: string, status: ApprovalStatus) => void;
 
   siteSheets: SiteMatrixSheet[];
+  setSiteSheets: React.Dispatch<React.SetStateAction<SiteMatrixSheet[]>>;
   updateSiteCellValue: (siteId: string, tabKey: string, rowId: string, vehicle: string, value: number) => void;
   updateSiteRowRate: (siteId: string, tabKey: string, rowId: string, rate: number) => void;
   addSiteSheetRow: (siteId: string, tabKey: string, date: string, item: string) => void;
@@ -656,12 +663,23 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const deleteSite = (siteId: string) => {
+    deleteRoadSiteSection(siteId);
+  };
+
+  const deleteRoadSiteSection = (siteId: string) => {
     const updatedDeleted = Array.from(new Set([...deletedSiteIds, siteId]));
     setDeletedSiteIds(updatedDeleted);
     localStorage.setItem(DELETED_SITES_KEY, JSON.stringify(updatedDeleted));
 
-    const remainingSheets = siteSheets.filter((s) => s.siteId !== siteId);
-    setSiteSheets(remainingSheets);
+    setSiteSheets((prev) => {
+      const remaining = prev.filter((s) => s.siteId !== siteId);
+      try {
+        localStorage.setItem(LOCAL_STORAGE_KEY + '_SITE_SHEETS', JSON.stringify(remaining));
+      } catch (err) {
+        console.error(err);
+      }
+      return remaining;
+    });
 
     setProjects((prev) =>
       prev.map((p) => ({
@@ -676,22 +694,17 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setVehicleTrips((prev) => prev.filter((t) => t.siteId !== siteId));
 
     if (selectedSiteId === siteId) {
-      setSelectedSiteId(remainingSheets[0]?.siteId || '');
+      const nextRemaining = siteSheets.filter((s) => s.siteId !== siteId);
+      if (nextRemaining.length > 0) {
+        setSelectedSiteId(nextRemaining[0].siteId);
+      } else {
+        setSelectedSiteId('');
+        sessionStorage.removeItem('CONSTRUCTION_PRO_SITE_CHOSEN_SESSION');
+      }
     }
   };
 
-  const addRoadSiteSection = (input: {
-    projectId?: string;
-    siteName: string;
-    siteCode?: string;
-    location: string;
-    supervisor: string;
-    startChainageKm: number;
-    endChainageKm: number;
-    carriagewayWidthMeters?: number;
-    carriagewayType?: string;
-    vehicles?: string[];
-  }): string => {
+  const addRoadSiteSection = (input: AddRoadSiteInput): string => {
     const targetProjId = input.projectId || selectedProjectId || (projects[0]?.id || 'proj-ongoing-1');
     const newSiteId = 'site-' + Date.now();
     const vehicleList = input.vehicles?.length ? input.vehicles : ['8797', '7352', '7353', '9579', '9580'];
@@ -701,7 +714,7 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       projectId: targetProjId,
       name: input.siteName,
       code: input.siteCode || 'ST-' + Math.floor(100 + Math.random() * 900),
-      location,
+      location: input.location,
       supervisor: input.supervisor
     };
 
@@ -709,9 +722,16 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       prev.map((p) => (p.id === targetProjId ? { ...p, sites: [...p.sites, newSite] } : p))
     );
 
-    const newSheet: SiteMatrixSheet = {
+    const newSheet: any = {
       siteId: newSiteId,
       siteName: input.siteName,
+      location: input.location,
+      supervisor: input.supervisor,
+      startChainageKm: input.startChainageKm || 0,
+      endChainageKm: input.endChainageKm || 0,
+      projectType: input.projectType || input.category || 'ROAD',
+      category: input.category || input.projectType || 'ROAD',
+      buildingFloors: input.buildingFloors || '',
       monthTitle: 'AUGUST',
       year: 2026,
       vehicles: vehicleList,
@@ -1114,6 +1134,7 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         addSiteToProject,
         deleteSite,
         addRoadSiteSection,
+        deleteRoadSiteSection,
         roadSections,
         updateRoadLayerProgress,
         buildingFloors,
@@ -1132,6 +1153,7 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         deleteVehicleTrip,
         updateVehicleTripStatus,
         siteSheets,
+        setSiteSheets,
         updateSiteCellValue,
         updateSiteRowRate,
         addSiteSheetRow,
@@ -1193,3 +1215,5 @@ export const useERP = () => {
   }
   return context;
 };
+
+export default ERPContext;

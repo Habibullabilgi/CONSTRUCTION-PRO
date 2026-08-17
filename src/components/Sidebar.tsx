@@ -1,3 +1,4 @@
+```tsx
 import React from 'react';
 import { useERP } from '../context/ERPContext';
 import {
@@ -12,14 +13,12 @@ import {
   Users,
   Package,
   ArrowLeftRight,
-  ScanLine,
   FileText,
   Bell,
   ShoppingCart,
   Cpu,
   CalendarCheck,
   Tag,
-  MapPin,
   Archive,
   Building2
 } from 'lucide-react';
@@ -110,12 +109,12 @@ export const Sidebar: React.FC<Props> = ({
 
   // ==========================================
   // BUILDING CONSTRUCTION NAVIGATION ITEMS
+  // (Scan Barcode & Locations Removed)
   // ==========================================
   const buildingCoreItems: NavItem[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'products', label: 'Products', icon: Package },
-    { id: 'transactions', label: 'Transactions', icon: ArrowLeftRight },
-    { id: 'scan-barcode', label: 'Scan Barcode', icon: ScanLine }
+    { id: 'transactions', label: 'Transactions', icon: ArrowLeftRight }
   ];
 
   const buildingAnalysisItems: NavItem[] = [
@@ -134,7 +133,6 @@ export const Sidebar: React.FC<Props> = ({
 
   const buildingConfigItems: NavItem[] = [
     { id: 'categories', label: 'Categories', icon: Tag },
-    { id: 'locations', label: 'Locations', icon: MapPin },
     { id: 'users', label: 'User Management', icon: Users },
     { id: 'yearly-archive', label: 'Yearly Archive', icon: Archive }
   ];
@@ -266,3 +264,5 @@ export const Sidebar: React.FC<Props> = ({
 };
 
 export default Sidebar;
+
+```

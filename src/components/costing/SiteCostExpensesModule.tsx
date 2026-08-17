@@ -9,12 +9,9 @@ import {
   Fuel,
   TrendingDown,
   Search,
-  Filter,
   Download,
   Building2,
   X,
-  CheckCircle2,
-  Clock,
   ArrowRight
 } from 'lucide-react';
 
@@ -38,7 +35,7 @@ const STORAGE_DIESEL_KEY = 'CONSTRUCTION_PRO_DIESEL_VOUCHERS_V1';
 export const SiteCostExpensesModule: React.FC = () => {
   const { siteSheets = [], selectedSiteId, setSelectedSiteId } = useERP();
 
-  // 1. Ongoing Site List
+  // 1. Active Sites List
   const activeSites = useMemo(() => {
     if (siteSheets && siteSheets.length > 0) {
       return siteSheets.map((s) => ({
@@ -47,13 +44,12 @@ export const SiteCostExpensesModule: React.FC = () => {
       }));
     }
     return [
-      { id: 'site-mulwad', name: 'MULWAD SITE' },
-      { id: 'site-nh50', name: 'NH-50 HIGHWAY SITE' }
+      { id: 'site-sindagi', name: 'SINDAGI - ALMEL ROAD' }
     ];
   }, [siteSheets]);
 
   const [currentSiteId, setCurrentSiteId] = useState<string>(
-    selectedSiteId || activeSites[0]?.id || 'site-mulwad'
+    selectedSiteId || activeSites[0]?.id || 'site-sindagi'
   );
 
   useEffect(() => {
@@ -64,79 +60,77 @@ export const SiteCostExpensesModule: React.FC = () => {
 
   const currentSiteName = useMemo(() => {
     const matched = activeSites.find((s) => s.id === currentSiteId);
-    return matched ? matched.name : activeSites[0]?.name || 'MULWAD SITE';
+    return matched ? matched.name : activeSites[0]?.name || 'SINDAGI - ALMEL ROAD';
   }, [activeSites, currentSiteId]);
 
-  // 2. Direct Site Expenses State
+  // 2. Direct Site Expenses State (Strictly 0 if no entries exist)
   const [expenses, setExpenses] = useState<SiteExpenseItem[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_EXPENSES_KEY);
       if (saved) return JSON.parse(saved);
     } catch {}
-    return [
-      {
-        id: 'exp-1',
-        siteId: currentSiteId,
-        siteName: currentSiteName,
-        date: '2026-08-16',
-        category: 'Machinery Maintenance',
-        title: 'JCB 3DX Hydraulic Hose & Filter Replacement',
-        vendorName: 'Bilgi Auto Spares',
-        amount: 8450,
-        paymentMode: 'UPI / Online',
-        status: 'PAID'
-      },
-      {
-        id: 'exp-2',
-        siteId: currentSiteId,
-        siteName: currentSiteName,
-        date: '2026-08-16',
-        category: 'Petty Cash',
-        title: 'Site Staff Water Cans & Refreshments',
-        vendorName: 'Local Vendor',
-        amount: 1200,
-        paymentMode: 'Cash',
-        status: 'PAID'
-      }
-    ];
+    return [];
   });
 
-  // 3. Live Trips & Material Billing Amount
-  const [materialTripsBilling, setMaterialTripsBilling] = useState<number>(84000);
+  // 3. Live Trips & Material Billing Amount (Defaults to 0)
+  const [materialTripsBilling, setMaterialTripsBilling] = useState<number>(0);
 
-  // 4. Live Diesel Dispensed Cost
-  const [dieselDispensedCost, setDieselDispensedCost] = useState<number>(25900);
+  // 4. Live Diesel Dispensed Cost (Defaults to 0)
+  const [dieselDispensedCost, setDieselDispensedCost] = useState<number>(0);
 
-  // Sync with Trips and Diesel local storage whenever site changes
+  // Sync with storage and compute site-specific values
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_EXPENSES_KEY, JSON.stringify(expenses));
+      const siteQuery = currentSiteName.trim().toLowerCase();
 
-      // Read Trips data
-      const savedTrips = localStorage.getItem(STORAGE_TRIPS_KEY) || localStorage.getItem('CONSTRUCTION_PRO_DAY_TRIPS_V2');
+      // Read Trips data for THIS site only
+      const savedTrips =
+        localStorage.getItem(STORAGE_TRIPS_KEY) ||
+        localStorage.getItem('CONSTRUCTION_PRO_DAY_TRIPS_V2');
       if (savedTrips) {
         const parsed = JSON.parse(savedTrips);
-        if (Array.isArray(parsed)) {
+        if (Array.isArray(parsed) && parsed.length > 0) {
           const siteTripsSum = parsed
-            .filter((t: any) => !t.siteName || t.siteName.toLowerCase().includes(currentSiteName.toLowerCase()) || currentSiteName.toLowerCase().includes((t.siteName || '').toLowerCase()))
+            .filter(
+              (t: any) =>
+                t.siteName &&
+                (t.siteName.toLowerCase().includes(siteQuery) ||
+                  siteQuery.includes(t.siteName.toLowerCase()))
+            )
             .reduce((sum: number, t: any) => sum + (Number(t.totalAmount) || 0), 0);
-          setMaterialTripsBilling(siteTripsSum > 0 ? siteTripsSum : 84000);
+          setMaterialTripsBilling(siteTripsSum);
+        } else {
+          setMaterialTripsBilling(0);
         }
+      } else {
+        setMaterialTripsBilling(0);
       }
 
-      // Read Diesel data
+      // Read Diesel data for THIS site only
       const savedDiesel = localStorage.getItem(STORAGE_DIESEL_KEY);
       if (savedDiesel) {
         const parsed = JSON.parse(savedDiesel);
-        if (Array.isArray(parsed)) {
+        if (Array.isArray(parsed) && parsed.length > 0) {
           const siteDieselSum = parsed
-            .filter((d: any) => !d.siteName || d.siteName.toLowerCase().includes(currentSiteName.toLowerCase()) || currentSiteName.toLowerCase().includes((d.siteName || '').toLowerCase()))
+            .filter(
+              (d: any) =>
+                d.siteName &&
+                (d.siteName.toLowerCase().includes(siteQuery) ||
+                  siteQuery.includes(d.siteName.toLowerCase()))
+            )
             .reduce((sum: number, d: any) => sum + (Number(d.totalCost) || 0), 0);
-          setDieselDispensedCost(siteDieselSum > 0 ? siteDieselSum : 25900);
+          setDieselDispensedCost(siteDieselSum);
+        } else {
+          setDieselDispensedCost(0);
         }
+      } else {
+        setDieselDispensedCost(0);
       }
     } catch (e) {
       console.error(e);
+      setMaterialTripsBilling(0);
+      setDieselDispensedCost(0);
     }
   }, [expenses, currentSiteId, currentSiteName]);
 
@@ -155,16 +149,31 @@ export const SiteCostExpensesModule: React.FC = () => {
   const [formPaymentMode, setFormPaymentMode] = useState<SiteExpenseItem['paymentMode']>('Cash');
   const [formStatus, setFormStatus] = useState<'PAID' | 'PENDING'>('PAID');
 
-  // Computed Outflow Sums
+  // Computed Outflow Sums for THIS Site
   const siteDirectExpensesTotal = useMemo(() => {
+    const siteQuery = currentSiteName.trim().toLowerCase();
     return expenses
-      .filter((e) => !e.siteId || e.siteId === currentSiteId || e.siteName === currentSiteName)
+      .filter(
+        (e) =>
+          (e.siteId && e.siteId === currentSiteId) ||
+          (e.siteName &&
+            (e.siteName.toLowerCase().includes(siteQuery) ||
+              siteQuery.includes(e.siteName.toLowerCase())))
+      )
       .reduce((sum, e) => sum + Number(e.amount || 0), 0);
   }, [expenses, currentSiteId, currentSiteName]);
 
   const paidExpensesTotal = useMemo(() => {
+    const siteQuery = currentSiteName.trim().toLowerCase();
     return expenses
-      .filter((e) => (!e.siteId || e.siteId === currentSiteId || e.siteName === currentSiteName) && e.status === 'PAID')
+      .filter(
+        (e) =>
+          ((e.siteId && e.siteId === currentSiteId) ||
+            (e.siteName &&
+              (e.siteName.toLowerCase().includes(siteQuery) ||
+                siteQuery.includes(e.siteName.toLowerCase())))) &&
+          e.status === 'PAID'
+      )
       .reduce((sum, e) => sum + Number(e.amount || 0), 0);
   }, [expenses, currentSiteId, currentSiteName]);
 
@@ -229,7 +238,12 @@ export const SiteCostExpensesModule: React.FC = () => {
   };
 
   const filteredExpenses = expenses.filter((e) => {
-    const matchesSite = !e.siteId || e.siteId === currentSiteId || e.siteName === currentSiteName;
+    const siteQuery = currentSiteName.trim().toLowerCase();
+    const matchesSite =
+      (e.siteId && e.siteId === currentSiteId) ||
+      (e.siteName &&
+        (e.siteName.toLowerCase().includes(siteQuery) ||
+          siteQuery.includes(e.siteName.toLowerCase())));
     const matchesSearch =
       e.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       e.vendorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -252,7 +266,6 @@ export const SiteCostExpensesModule: React.FC = () => {
               DEDICATED SITE COST & EXPENSE LEDGER
             </span>
 
-            {/* Site Switcher Dropdown */}
             <div className="mt-1 flex items-center gap-2">
               <select
                 value={currentSiteId}
@@ -265,7 +278,11 @@ export const SiteCostExpensesModule: React.FC = () => {
                 className="bg-transparent text-2xl sm:text-3xl font-black text-white outline-none cursor-pointer border-b border-dashed border-slate-600 pb-0.5"
               >
                 {activeSites.map((site) => (
-                  <option key={site.id} value={site.id} className="bg-[#121927] text-white text-base font-bold">
+                  <option
+                    key={site.id}
+                    value={site.id}
+                    className="bg-[#121927] text-white text-base font-bold"
+                  >
                     {site.name.toUpperCase()}
                   </option>
                 ))}
@@ -295,7 +312,7 @@ export const SiteCostExpensesModule: React.FC = () => {
         </div>
       </div>
 
-      {/* 2. Top 4 Live Financial Telemetry Cards */}
+      {/* 2. Top 4 Live Financial Telemetry Cards (Defaults to 0) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Site Direct Expenses */}
         <div className="p-5 rounded-3xl bg-[#0c1427] border border-[#182643] shadow-xl flex flex-col justify-between space-y-3">
@@ -304,7 +321,7 @@ export const SiteCostExpensesModule: React.FC = () => {
             <DollarSign className="w-4 h-4 text-rose-400" />
           </div>
           <div>
-            <div className="text-3xl font-black text-white">
+            <div className="text-3xl font-black text-white font-mono">
               ₹{siteDirectExpensesTotal.toLocaleString('en-IN')}
             </div>
             <div className="text-[11px] text-emerald-400 font-semibold mt-1">
@@ -313,34 +330,34 @@ export const SiteCostExpensesModule: React.FC = () => {
           </div>
         </div>
 
-        {/* Card 2: Matrix Material Logs (Linked to Trips) */}
+        {/* Card 2: Matrix Material Logs */}
         <div className="p-5 rounded-3xl bg-[#0c1427] border border-[#182643] shadow-xl flex flex-col justify-between space-y-3">
           <div className="flex items-center justify-between text-xs font-bold text-slate-400">
             <span>Matrix Material Logs</span>
             <Layers className="w-4 h-4 text-cyan-400" />
           </div>
           <div>
-            <div className="text-3xl font-black text-cyan-400">
+            <div className="text-3xl font-black text-cyan-400 font-mono">
               ₹{materialTripsBilling.toLocaleString('en-IN')}
             </div>
             <div className="text-[11px] text-slate-400 mt-1">
-              Murum, Sand, 20mm, GSB, WMM
+              {materialTripsBilling > 0 ? 'Murum, Sand, 20mm, GSB, WMM' : 'No material trips logged'}
             </div>
           </div>
         </div>
 
-        {/* Card 3: Site Diesel Dispensed (Linked to Diesel) */}
+        {/* Card 3: Site Diesel Dispensed */}
         <div className="p-5 rounded-3xl bg-[#0c1427] border border-[#182643] shadow-xl flex flex-col justify-between space-y-3">
           <div className="flex items-center justify-between text-xs font-bold text-slate-400">
             <span>Site Diesel Dispensed</span>
             <Fuel className="w-4 h-4 text-amber-400" />
           </div>
           <div>
-            <div className="text-3xl font-black text-amber-400">
+            <div className="text-3xl font-black text-amber-400 font-mono">
               ₹{dieselDispensedCost.toLocaleString('en-IN')}
             </div>
             <div className="text-[11px] text-amber-400/80 font-mono mt-1">
-              From DIESEL Dispense Log
+              {dieselDispensedCost > 0 ? 'From DIESEL Dispense Log' : 'No fuel dispensed'}
             </div>
           </div>
         </div>
@@ -352,7 +369,7 @@ export const SiteCostExpensesModule: React.FC = () => {
             <TrendingDown className="w-4 h-4 text-rose-500" />
           </div>
           <div>
-            <div className="text-3xl font-black text-white">
+            <div className="text-3xl font-black text-white font-mono">
               ₹{totalSiteOutflow.toLocaleString('en-IN')}
             </div>
             <div className="text-[11px] text-emerald-400 font-semibold mt-1">
@@ -362,7 +379,7 @@ export const SiteCostExpensesModule: React.FC = () => {
         </div>
       </div>
 
-      {/* 3. Cost Breakdown by Category Banner */}
+      {/* 3. Cost Breakdown Banner */}
       <div className="p-4 rounded-2xl bg-[#0c1427] border border-[#182643] flex items-center gap-2 text-xs font-bold text-slate-300">
         <Building2 className="w-4 h-4 text-rose-400" />
         <span>{currentSiteName.toUpperCase()} — COST BREAKDOWN & PETTY CASH VOUCHERS</span>
@@ -501,7 +518,6 @@ export const SiteCostExpensesModule: React.FC = () => {
             </div>
 
             <form onSubmit={handleSaveExpense} className="space-y-3.5 text-xs">
-              {/* Site Name & Date */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-300 font-bold mb-1 flex items-center gap-1">
@@ -528,7 +544,6 @@ export const SiteCostExpensesModule: React.FC = () => {
                 </div>
               </div>
 
-              {/* Category */}
               <div>
                 <label className="block text-slate-300 font-bold mb-1">Expense Category *</label>
                 <select
@@ -545,7 +560,6 @@ export const SiteCostExpensesModule: React.FC = () => {
                 </select>
               </div>
 
-              {/* Voucher Title */}
               <div>
                 <label className="block text-slate-300 font-bold mb-1">Voucher Description / Title *</label>
                 <input
@@ -554,11 +568,10 @@ export const SiteCostExpensesModule: React.FC = () => {
                   placeholder="e.g. Tipper puncture repair & grease oil"
                   value={formTitle}
                   onChange={(e) => setFormTitle(e.target.value)}
-                  className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-rose-500 font-medium"
+                  className="w-full px-3.5 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-rose-500 font-medium"
                 />
               </div>
 
-              {/* Vendor & Amount */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-300 font-bold mb-1">Vendor / Payee</label>
@@ -567,7 +580,7 @@ export const SiteCostExpensesModule: React.FC = () => {
                     placeholder="e.g. Bilgi Auto Spares"
                     value={formVendor}
                     onChange={(e) => setFormVendor(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-rose-500 font-medium"
+                    className="w-full px-3.5 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-rose-500 font-medium"
                   />
                 </div>
 
@@ -580,19 +593,18 @@ export const SiteCostExpensesModule: React.FC = () => {
                     placeholder="e.g. 4500"
                     value={formAmount}
                     onChange={(e) => setFormAmount(e.target.value === '' ? '' : Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-rose-400 font-mono font-bold outline-none focus:border-rose-500"
+                    className="w-full px-3.5 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-rose-400 font-mono font-bold outline-none focus:border-rose-500"
                   />
                 </div>
               </div>
 
-              {/* Payment Mode & Status */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-300 font-bold mb-1">Payment Mode</label>
                   <select
                     value={formPaymentMode}
                     onChange={(e) => setFormPaymentMode(e.target.value as any)}
-                    className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-rose-500 cursor-pointer font-medium"
+                    className="w-full px-3.5 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-rose-500 cursor-pointer font-medium"
                   >
                     <option value="Cash">Cash</option>
                     <option value="UPI / Online">UPI / Online</option>
@@ -606,7 +618,7 @@ export const SiteCostExpensesModule: React.FC = () => {
                   <select
                     value={formStatus}
                     onChange={(e) => setFormStatus(e.target.value as any)}
-                    className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-rose-500 cursor-pointer font-medium"
+                    className="w-full px-3.5 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-rose-500 cursor-pointer font-medium"
                   >
                     <option value="PAID">PAID</option>
                     <option value="PENDING">PENDING</option>
@@ -614,7 +626,6 @@ export const SiteCostExpensesModule: React.FC = () => {
                 </div>
               </div>
 
-              {/* Submit Buttons */}
               <div className="flex justify-end items-center gap-2 pt-2 border-t border-[#1E293B]">
                 <button
                   type="button"

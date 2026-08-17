@@ -7,18 +7,15 @@ import {
   Trash2,
   MapPin,
   Truck,
-  User,
-  X,
-  Layers,
-  ArrowRight
+  X
 } from 'lucide-react';
 
 interface Props {
   onNavigateTab?: (tab: string) => void;
 }
 
-export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
-  const { siteSheets = [], addRoadSiteSection, selectedSiteId, setSelectedSiteId, currentUser, userRole } = useERP();
+export const RoadSitesManagerModule: React.FC<Props> = () => {
+  const { siteSheets = [], setSiteSheets, addRoadSiteSection, selectedSiteId, setSelectedSiteId, currentUser, userRole } = useERP();
 
   const currentRoleStr = String(currentUser?.role || userRole || '').toLowerCase();
   const isAdmin = currentRoleStr.includes('admin');
@@ -35,6 +32,29 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
   const [buildingFloors, setBuildingFloors] = useState('G + 12 Floors');
 
   const isRoad = siteCategory === 'ROAD';
+
+  const handleDeleteSite = (e: React.MouseEvent, siteId: string, name: string) => {
+    e.stopPropagation(); // Prevent card selection click
+
+    if (window.confirm(`Are you sure you want to delete "${name}"? All associated local data for this section will be removed.`)) {
+      const remainingSites = siteSheets.filter((s: any) => s.siteId !== siteId);
+      if (setSiteSheets) {
+        setSiteSheets(remainingSites);
+      }
+      
+      // Also update localStorage if persisting directly
+      try {
+        localStorage.setItem('CONSTRUCTION_PRO_ERP_STORAGE_V7_SHEETS', JSON.stringify(remainingSites));
+      } catch (err) {
+        console.error(err);
+      }
+
+      // If the deleted site was currently active, select the first remaining site
+      if (selectedSiteId === siteId && remainingSites.length > 0) {
+        setSelectedSiteId(remainingSites[0].siteId);
+      }
+    }
+  };
 
   const handleCreateSite = (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,7 +126,7 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
             <div
               key={site.siteId}
               onClick={() => setSelectedSiteId(site.siteId)}
-              className={`p-5 rounded-3xl border transition-all cursor-pointer flex flex-col justify-between space-y-4 shadow-xl ${
+              className={`p-5 rounded-3xl border transition-all cursor-pointer flex flex-col justify-between space-y-4 shadow-xl relative group ${
                 isSelected
                   ? 'bg-[#111c36] border-blue-500 shadow-blue-950/40'
                   : 'bg-[#0c1427] border-[#182643] hover:border-slate-600'
@@ -117,8 +137,21 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
                   <span className="px-2.5 py-0.5 rounded-md font-mono font-bold text-[10px] bg-[#080d19] text-blue-400 border border-[#182643] uppercase">
                     {siteIsRoad ? 'Road Section' : 'Building Site'}
                   </span>
-                  <span className="text-[10px] font-mono text-slate-500">{site.siteId}</span>
+                  
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-mono text-slate-500">{site.siteId}</span>
+                    {isAdmin && (
+                      <button
+                        onClick={(e) => handleDeleteSite(e, site.siteId, site.siteName)}
+                        title="Delete Site Section"
+                        className="p-1 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
+
                 <h3 className="text-base font-bold text-white leading-snug">{site.siteName}</h3>
                 <div className="text-xs text-slate-400 flex items-center gap-1">
                   <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0" />
@@ -162,13 +195,10 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
         })}
       </div>
 
-      {/* ========================================================= */}
-      {/* MODAL: ADD ONGOING SITE SECTION WITH CATEGORY SELECTOR    */}
-      {/* ========================================================= */}
+      {/* Modal: Add Ongoing Site Section */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
           <div className="bg-[#121927] border border-[#1E293B] rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4 text-slate-100 max-h-[92vh] overflow-y-auto animate-in zoom-in-95 duration-150">
-            {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
               <div className="flex items-center gap-2 text-white font-bold text-base">
                 <Milestone className="w-5 h-5 text-blue-400" />
@@ -184,7 +214,6 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
             </div>
 
             <form onSubmit={handleCreateSite} className="space-y-3.5 text-xs">
-              {/* 1. Site Category (Road vs Building) */}
               <div>
                 <label className="block text-slate-300 font-bold mb-1.5">
                   Site Construction Category *
@@ -218,7 +247,6 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
                 </div>
               </div>
 
-              {/* 2. Site Section Name */}
               <div>
                 <label className="block text-slate-300 font-bold mb-1">
                   {isRoad ? 'Site Section Name *' : 'Building / Tower Project Name *'}
@@ -233,7 +261,6 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
                 />
               </div>
 
-              {/* 3. Location / Corridor */}
               <div>
                 <label className="block text-slate-300 font-bold mb-1">
                   {isRoad ? 'Location / Corridor' : 'Site Location / Campus'}
@@ -247,7 +274,6 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
                 />
               </div>
 
-              {/* 4. Site Supervisor */}
               <div>
                 <label className="block text-slate-300 font-bold mb-1">Site Supervisor</label>
                 <input
@@ -258,7 +284,6 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
                 />
               </div>
 
-              {/* 5. Dynamic Chainage or Floor Scope */}
               {isRoad ? (
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -295,7 +320,6 @@ export const RoadSitesManagerModule: React.FC<Props> = ({ onNavigateTab }) => {
                 </div>
               )}
 
-              {/* Actions */}
               <div className="flex justify-end items-center gap-2 pt-3 border-t border-[#1E293B]">
                 <button
                   type="button"

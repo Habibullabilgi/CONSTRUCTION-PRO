@@ -5,9 +5,6 @@ import {
   Download,
   Search,
   X,
-  TrendingDown,
-  TrendingUp,
-  FileCheck,
   Trash2
 } from 'lucide-react';
 
@@ -17,11 +14,8 @@ export interface StockTransaction {
   type: 'Stock In' | 'Stock Out';
   quantity: number;
   date: string;
-  vehicleNo?: string;
   department?: string;
   issuedTo?: string;
-  workOrderNo?: string;
-  purpose?: string;
 }
 
 const STORAGE_TXNS_KEY = 'CONSTRUCTION_PRO_BUILDING_TXNS_V1';
@@ -33,11 +27,8 @@ const INITIAL_TXNS: StockTransaction[] = [
     type: 'Stock Out',
     quantity: 13,
     date: '2026-08-17',
-    vehicleNo: 'HR-01-A-1234',
     department: 'Plant Maintenance',
-    issuedTo: 'Pivar Operator',
-    workOrderNo: 'WO-2026-001',
-    purpose: 'Transit mixer batching pump refill'
+    issuedTo: 'Pivar Operator'
   },
   {
     id: 'TXN-102',
@@ -45,11 +36,8 @@ const INITIAL_TXNS: StockTransaction[] = [
     type: 'Stock In',
     quantity: 240,
     date: '2026-08-14',
-    vehicleNo: 'MH-12-TR-9901',
     department: 'Stores Inward',
-    issuedTo: 'Store Incharge',
-    workOrderNo: 'GRN-8821',
-    purpose: 'Delivery from UltraTech plant'
+    issuedTo: 'Store Incharge'
   },
   {
     id: 'TXN-103',
@@ -57,11 +45,8 @@ const INITIAL_TXNS: StockTransaction[] = [
     type: 'Stock Out',
     quantity: 5,
     date: '2026-08-12',
-    vehicleNo: 'KA-28-EX-8901',
     department: 'Civil Works',
-    issuedTo: 'Ramesh (Bar Bender)',
-    workOrderNo: 'WO-TOWER-A-L4',
-    purpose: '4th floor slab reinforcement cut pieces'
+    issuedTo: 'Ramesh (Bar Bender)'
   }
 ];
 
@@ -81,16 +66,13 @@ export const StockTransactionsModule: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Form
+  // Form State (Cleaned)
   const [productName, setProductName] = useState('');
   const [type, setType] = useState<'Stock In' | 'Stock Out'>('Stock Out');
   const [quantity, setQuantity] = useState<number | ''>(0);
   const [date, setDate] = useState('2026-08-17');
-  const [vehicleNo, setVehicleNo] = useState('');
   const [department, setDepartment] = useState('Maintenance');
   const [issuedTo, setIssuedTo] = useState('');
-  const [workOrderNo, setWorkOrderNo] = useState('WO-2026-001');
-  const [purpose, setPurpose] = useState('');
 
   useEffect(() => {
     localStorage.setItem(STORAGE_TXNS_KEY, JSON.stringify(transactions));
@@ -105,7 +87,7 @@ export const StockTransactionsModule: React.FC = () => {
         !q ||
         t.productName.toLowerCase().includes(q) ||
         t.id.toLowerCase().includes(q) ||
-        (t.vehicleNo && t.vehicleNo.toLowerCase().includes(q)) ||
+        (t.department && t.department.toLowerCase().includes(q)) ||
         (t.issuedTo && t.issuedTo.toLowerCase().includes(q));
       return matchType && matchDate && matchQuery;
     });
@@ -135,33 +117,27 @@ export const StockTransactionsModule: React.FC = () => {
       type,
       quantity: Number(quantity),
       date,
-      vehicleNo: vehicleNo.trim() || undefined,
       department: department.trim() || undefined,
-      issuedTo: issuedTo.trim() || undefined,
-      workOrderNo: workOrderNo.trim() || undefined,
-      purpose: purpose.trim() || undefined
+      issuedTo: issuedTo.trim() || undefined
     };
 
     setTransactions([newTxn, ...transactions]);
     setIsModalOpen(false);
     setProductName('');
     setQuantity(0);
-    setVehicleNo('');
     setIssuedTo('');
-    setPurpose('');
   };
 
   const handleExportCSV = () => {
-    const headers = ['Txn ID', 'Date', 'Type', 'Product', 'Quantity', 'Vehicle', 'Issued To', 'Work Order'];
+    const headers = ['Txn ID', 'Date', 'Type', 'Product', 'Quantity', 'Department', 'Issued To'];
     const rows = filtered.map((t) => [
       t.id,
       t.date,
       t.type,
       `"${t.productName}"`,
       t.quantity,
-      t.vehicleNo || '-',
-      `"${t.issuedTo || '-'}"`,
-      t.workOrderNo || '-'
+      `"${t.department || '-'}"`,
+      `"${t.issuedTo || '-'}"`
     ]);
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
     const link = document.createElement('a');
@@ -235,7 +211,7 @@ export const StockTransactionsModule: React.FC = () => {
             <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-500" />
             <input
               type="text"
-              placeholder="Search ID, product, vehicle..."
+              placeholder="Search ID, product, employee..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-8 pr-3 py-2 bg-[#080d19] border border-[#1E293B] rounded-xl text-white outline-none"
@@ -268,13 +244,13 @@ export const StockTransactionsModule: React.FC = () => {
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="border-b border-[#1E293B] text-[10px] font-extrabold uppercase tracking-wider text-slate-400 bg-[#080d19]/80">
-                <th className="py-3.5 px-4">TXN ID & DATE</th>
-                <th className="py-3.5 px-4">PRODUCT</th>
+                <th className="py-3.5 px-6">TXN ID & DATE</th>
+                <th className="py-3.5 px-6">PRODUCT</th>
                 <th className="py-3.5 px-4 text-center">TYPE</th>
                 <th className="py-3.5 px-4 text-right">QTY</th>
-                <th className="py-3.5 px-4">VEHICLE / EMPLOYEE</th>
-                <th className="py-3.5 px-4">WORK ORDER & PURPOSE</th>
-                <th className="py-3.5 px-4 text-right">ACTION</th>
+                <th className="py-3.5 px-6">DEPARTMENT</th>
+                <th className="py-3.5 px-6">ISSUED TO / EMPLOYEE</th>
+                <th className="py-3.5 px-6 text-right">ACTION</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#1E293B]/60 text-slate-200">
@@ -289,14 +265,14 @@ export const StockTransactionsModule: React.FC = () => {
                   const isOut = t.type === 'Stock Out';
                   return (
                     <tr key={t.id} className="hover:bg-[#121c33]/50 transition-colors">
-                      <td className="py-3.5 px-4 font-mono">
+                      <td className="py-3.5 px-6 font-mono">
                         <div className="font-bold text-white">{t.id}</div>
                         <div className="text-[10px] text-slate-400">{t.date}</div>
                       </td>
-                      <td className="py-3.5 px-4 font-bold text-white">{t.productName}</td>
+                      <td className="py-3.5 px-6 font-bold text-white text-xs">{t.productName}</td>
                       <td className="py-3.5 px-4 text-center">
                         <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+                          className={`px-2.5 py-0.5 rounded text-[10px] font-black uppercase ${
                             isOut
                               ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
                               : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
@@ -308,15 +284,13 @@ export const StockTransactionsModule: React.FC = () => {
                       <td className={`py-3.5 px-4 text-right font-mono font-black text-sm ${isOut ? 'text-rose-400' : 'text-emerald-400'}`}>
                         {isOut ? `-${t.quantity}` : `+${t.quantity}`}
                       </td>
-                      <td className="py-3.5 px-4">
-                        <div className="font-medium text-slate-200">{t.issuedTo || '-'}</div>
-                        <div className="text-[10px] text-slate-500 font-mono">{t.vehicleNo || 'Site Internal'}</div>
+                      <td className="py-3.5 px-6 font-medium text-slate-300">
+                        {t.department || '-'}
                       </td>
-                      <td className="py-3.5 px-4">
-                        <div className="font-mono text-[11px] text-cyan-400">{t.workOrderNo || '-'}</div>
-                        <div className="text-[10px] text-slate-400 truncate max-w-xs">{t.purpose || '-'}</div>
+                      <td className="py-3.5 px-6 font-medium text-slate-200">
+                        {t.issuedTo || '-'}
                       </td>
-                      <td className="py-3.5 px-4 text-right">
+                      <td className="py-3.5 px-6 text-right">
                         <button
                           type="button"
                           onClick={() => handleDelete(t.id, t.productName)}
@@ -335,10 +309,10 @@ export const StockTransactionsModule: React.FC = () => {
         </div>
       </div>
 
-      {/* New Transaction Modal */}
+      {/* New Transaction Modal (Simplified) */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-[#121927] border border-[#1E293B] rounded-3xl w-full max-w-lg p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto text-slate-100">
+          <div className="bg-[#121927] border border-[#1E293B] rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto text-slate-100">
             <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
               <h3 className="text-base font-bold text-white">New Transaction</h3>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-white p-1">
@@ -384,27 +358,15 @@ export const StockTransactionsModule: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-300 font-bold mb-1">Transaction Date *</label>
-                  <input
-                    type="date"
-                    required
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-300 font-bold mb-1">Vehicle No. *</label>
-                  <input
-                    type="text"
-                    placeholder="HR-01-A-1234"
-                    value={vehicleNo}
-                    onChange={(e) => setVehicleNo(e.target.value.toUpperCase())}
-                    className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono outline-none uppercase"
-                  />
-                </div>
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">Transaction Date *</label>
+                <input
+                  type="date"
+                  required
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono outline-none"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -412,7 +374,7 @@ export const StockTransactionsModule: React.FC = () => {
                   <label className="block text-slate-300 font-bold mb-1">Department</label>
                   <input
                     type="text"
-                    placeholder="Maintenance"
+                    placeholder="e.g. Maintenance"
                     value={department}
                     onChange={(e) => setDepartment(e.target.value)}
                     className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none"
@@ -431,28 +393,6 @@ export const StockTransactionsModule: React.FC = () => {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-slate-300 font-bold mb-1">Work Order No.</label>
-                <input
-                  type="text"
-                  placeholder="WO-2024-001"
-                  value={workOrderNo}
-                  onChange={(e) => setWorkOrderNo(e.target.value)}
-                  className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-bold mb-1">Purpose</label>
-                <textarea
-                  rows={2}
-                  placeholder="Brief description..."
-                  value={purpose}
-                  onChange={(e) => setPurpose(e.target.value)}
-                  className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none resize-none"
-                />
-              </div>
-
               <div className="flex justify-end gap-2 pt-3 border-t border-[#1E293B]">
                 <button
                   type="button"
@@ -463,7 +403,7 @@ export const StockTransactionsModule: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold cursor-pointer"
+                  className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold transition-all shadow-lg shadow-rose-600/30 cursor-pointer"
                 >
                   Record Transaction
                 </button>

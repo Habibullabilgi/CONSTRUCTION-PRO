@@ -214,16 +214,16 @@ const UserManagementModule: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col gap-3 font-sans text-slate-100">
+    <div className="space-y-6 font-sans text-slate-100 pb-12">
       {/* 1. Page Header */}
-      <div className="flex items-center justify-between px-4 py-2.5 bg-[#121927] border border-[#1E293B] rounded-2xl shrink-0 shadow-md">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0">
-            <Users className="w-4 h-4" />
+          <div className="w-10 h-10 rounded-2xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400">
+            <Users className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-lg font-black text-white tracking-tight leading-none">User Management</h1>
-            <p className="text-[11px] text-slate-400 mt-0.5">
+            <h1 className="text-2xl font-black text-white tracking-tight">User Management</h1>
+            <p className="text-xs text-slate-400 mt-0.5">
               Manage system users, passwords, and role-based access control.
             </p>
           </div>
@@ -231,98 +231,98 @@ const UserManagementModule: React.FC = () => {
 
         <button
           onClick={handleOpenAddModal}
-          className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-black flex items-center gap-1.5 transition-all shadow-md shadow-blue-600/30 cursor-pointer"
+          className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-black flex items-center gap-1.5 transition-all shadow-lg shadow-blue-600/30 cursor-pointer w-fit"
         >
-          <Plus className="w-3.5 h-3.5" />
+          <Plus className="w-4 h-4" />
           <span>Add User</span>
         </button>
       </div>
 
-      {/* 2. Role Overview Cards */}
-      <div className="grid grid-cols-5 gap-2.5 shrink-0">
-        <div className="p-3 rounded-xl bg-[#0e1626] border border-rose-600/50 space-y-0.5">
-          <div className="text-xs font-bold text-rose-400">Admin</div>
-          <p className="text-[10px] text-slate-400 leading-tight">
+      {/* 2. Top Role Cards Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div className="p-4 rounded-2xl bg-[#0e1626] border border-rose-600/50 space-y-1.5">
+          <div className="text-sm font-bold text-rose-400">Admin</div>
+          <p className="text-[11px] text-slate-400 leading-relaxed">
             Full access — manage users, products, transactions
           </p>
         </div>
 
-        <div className="p-3 rounded-xl bg-[#0e1626] border border-blue-600/50 space-y-0.5">
-          <div className="text-xs font-bold text-blue-400">Inventory Manager</div>
-          <p className="text-[10px] text-slate-400 leading-tight">
+        <div className="p-4 rounded-2xl bg-[#0e1626] border border-blue-600/50 space-y-1.5">
+          <div className="text-sm font-bold text-blue-400">Inventory Manager</div>
+          <p className="text-[11px] text-slate-400 leading-relaxed">
             Manage products, transactions, reports
           </p>
         </div>
 
-        <div className="p-3 rounded-xl bg-[#0e1626] border border-emerald-600/50 space-y-0.5">
-          <div className="text-xs font-bold text-emerald-400">Store Keeper</div>
-          <p className="text-[10px] text-slate-400 leading-tight">
+        <div className="p-4 rounded-2xl bg-[#0e1626] border border-emerald-600/50 space-y-1.5">
+          <div className="text-sm font-bold text-emerald-400">Store Keeper</div>
+          <p className="text-[11px] text-slate-400 leading-relaxed">
             Record stock in/out transactions, scan barcodes
           </p>
         </div>
 
-        <div className="p-3 rounded-xl bg-[#0e1626] border border-amber-600/50 space-y-0.5">
-          <div className="text-xs font-bold text-amber-400">Auditor</div>
-          <p className="text-[10px] text-slate-400 leading-tight">
+        <div className="p-4 rounded-2xl bg-[#0e1626] border border-amber-600/50 space-y-1.5">
+          <div className="text-sm font-bold text-amber-400">Auditor</div>
+          <p className="text-[11px] text-slate-400 leading-relaxed">
             Read-only access to all data and reports
           </p>
         </div>
 
-        <div className="p-3 rounded-xl bg-[#0e1626] border border-slate-700 space-y-0.5">
-          <div className="text-xs font-bold text-slate-300">Read Only</div>
-          <p className="text-[10px] text-slate-400 leading-tight">
+        <div className="p-4 rounded-2xl bg-[#0e1626] border border-slate-700 space-y-1.5">
+          <div className="text-sm font-bold text-slate-300">Read Only</div>
+          <p className="text-[11px] text-slate-400 leading-relaxed">
             View dashboard and products only
           </p>
         </div>
       </div>
 
       {/* 3. System Users Registry Table */}
-      <div className="bg-[#0b1220] border border-[#1e293b] rounded-2xl flex-1 flex flex-col overflow-hidden shadow-xl min-h-0">
-        <div className="px-4 py-2 border-b border-[#1e293b] bg-[#0d1527]/50 flex items-center justify-between shrink-0">
-          <h2 className="text-xs font-bold text-white">System Users</h2>
-          <p className="text-[11px] text-slate-400">{users.length} users registered</p>
+      <div className="bg-[#0b1220] border border-[#1e293b] rounded-2xl overflow-hidden shadow-2xl">
+        <div className="px-6 py-4 border-b border-[#1e293b] bg-[#0d1527]/50">
+          <h2 className="text-base font-bold text-white">System Users</h2>
+          <p className="text-xs text-slate-400 mt-0.5">{users.length} users registered</p>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
-            <thead className="sticky top-0 z-10 bg-[#080d19] shadow-sm">
-              <tr className="border-b border-[#1e293b] text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-                <th className="py-2.5 px-4">Name</th>
-                <th className="py-2.5 px-4">Username</th>
-                <th className="py-2.5 px-4">Email</th>
-                <th className="py-2.5 px-4">Role</th>
-                <th className="py-2.5 px-4">Account Expiry</th>
-                <th className="py-2.5 px-4">Created</th>
-                <th className="py-2.5 px-4 text-right">Actions</th>
+            <thead>
+              <tr className="border-b border-[#1e293b] text-[10px] font-extrabold uppercase tracking-wider text-slate-400 bg-[#080d19]/60">
+                <th className="py-3.5 px-6">Name</th>
+                <th className="py-3.5 px-6">Username</th>
+                <th className="py-3.5 px-6">Email</th>
+                <th className="py-3.5 px-6">Role</th>
+                <th className="py-3.5 px-6">Account Expiry</th>
+                <th className="py-3.5 px-6">Created</th>
+                <th className="py-3.5 px-6 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#1e293b]/60 text-slate-200">
               {users.map((user) => (
                 <tr
                   key={user.id}
-                  className="hover:bg-[#121c33]/50 transition-colors"
+                  className="hover:bg-[#121c33]/50 transition-colors group"
                 >
-                  <td className="py-2.5 px-4 font-bold text-white whitespace-nowrap">
+                  <td className="py-4 px-6 font-bold text-white whitespace-nowrap">
                     {user.name}{' '}
                     {user.isCurrentUser && (
-                      <span className="text-blue-400 font-normal text-[10px] ml-1">(you)</span>
+                      <span className="text-blue-400 font-normal text-[11px] ml-1">(you)</span>
                     )}
                   </td>
-                  <td className="py-2.5 px-4 font-mono text-slate-300">{user.username}</td>
-                  <td className="py-2.5 px-4 text-slate-400">{user.email}</td>
-                  <td className="py-2.5 px-4">
+                  <td className="py-4 px-6 font-mono text-slate-300">{user.username}</td>
+                  <td className="py-4 px-6 text-slate-400">{user.email}</td>
+                  <td className="py-4 px-6">
                     <span
-                      className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${getRoleBadgeStyle(
+                      className={`inline-block px-3 py-0.5 rounded-full text-[11px] font-semibold border ${getRoleBadgeStyle(
                         user.role
                       )}`}
                     >
                       {user.role}
                     </span>
                   </td>
-                  <td className="py-2.5 px-4 text-slate-400">{user.accountExpiry}</td>
-                  <td className="py-2.5 px-4 font-mono text-slate-400">{user.createdDate}</td>
-                  <td className="py-2.5 px-4 text-right whitespace-nowrap">
-                    <div className="flex items-center justify-end gap-2">
+                  <td className="py-4 px-6 text-slate-400">{user.accountExpiry}</td>
+                  <td className="py-4 px-6 font-mono text-slate-400">{user.createdDate}</td>
+                  <td className="py-4 px-6 text-right whitespace-nowrap">
+                    <div className="flex items-center justify-end gap-3">
                       <button
                         onClick={() => handleOpenEditModal(user)}
                         title="Edit User"
@@ -349,24 +349,24 @@ const UserManagementModule: React.FC = () => {
         </div>
       </div>
 
-      {/* 4. Add/Edit User Modal */}
+      {/* 4. Add/Edit Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="bg-[#121927] border border-[#1E293B] rounded-2xl w-full max-w-md p-5 shadow-2xl space-y-4 text-slate-100">
-            <div className="flex items-center justify-between border-b border-[#1E293B] pb-2.5">
-              <div className="flex items-center gap-2 text-white font-bold text-sm">
+          <div className="bg-[#121927] border border-[#1E293B] rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
+              <div className="flex items-center gap-2 text-white font-bold text-base">
                 <Shield className="w-4 h-4 text-blue-400" />
                 <span>{editingUser ? 'Edit System User' : 'Add New System User'}</span>
               </div>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="text-slate-400 hover:text-white"
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveUser} className="space-y-3 text-xs">
+            <form onSubmit={handleSaveUser} className="space-y-3.5 text-xs">
               <div>
                 <label className="block text-slate-400 font-bold mb-1">Full Name *</label>
                 <input
@@ -375,11 +375,11 @@ const UserManagementModule: React.FC = () => {
                   placeholder="e.g. Anand Patil"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-blue-500"
+                  className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-blue-500"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-400 font-bold mb-1">Username *</label>
                   <input
@@ -388,7 +388,7 @@ const UserManagementModule: React.FC = () => {
                     placeholder="e.g. anand"
                     value={formData.username}
                     onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                    className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono outline-none focus:border-blue-500"
+                    className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono outline-none focus:border-blue-500"
                   />
                 </div>
 
@@ -399,7 +399,7 @@ const UserManagementModule: React.FC = () => {
                     onChange={(e) =>
                       setFormData({ ...formData, role: e.target.value as SystemRole })
                     }
-                    className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-blue-500"
+                    className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-blue-500"
                   >
                     <option value="Admin">Admin</option>
                     <option value="Inventory Manager">Inventory Manager</option>
@@ -418,7 +418,7 @@ const UserManagementModule: React.FC = () => {
                   placeholder="e.g. anand@bilgicrushers.com"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-blue-500"
+                  className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-blue-500"
                 />
               </div>
 
@@ -431,7 +431,7 @@ const UserManagementModule: React.FC = () => {
                   placeholder="••••••••"
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono outline-none focus:border-blue-500"
+                  className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono outline-none focus:border-blue-500"
                 />
               </div>
 
@@ -441,21 +441,21 @@ const UserManagementModule: React.FC = () => {
                   type="text"
                   value={formData.accountExpiry}
                   onChange={(e) => setFormData({ ...formData, accountExpiry: e.target.value })}
-                  className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-blue-500"
+                  className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-blue-500"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-[#1E293B]">
+              <div className="flex justify-end gap-2 pt-3 border-t border-[#1E293B]">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-3.5 py-1.5 rounded-xl text-slate-400 hover:text-white"
+                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black transition-all shadow-md shadow-blue-600/30"
+                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black transition-all shadow-lg shadow-blue-600/30"
                 >
                   {editingUser ? 'Save Changes' : 'Create User'}
                 </button>
@@ -469,7 +469,7 @@ const UserManagementModule: React.FC = () => {
 };
 
 // ==========================================
-// Main Application Content Router
+// Main Application Content Router with Full Scrolling
 // ==========================================
 export const AppContent: React.FC = () => {
   const { isAuthenticated } = useERP();
@@ -481,16 +481,16 @@ export const AppContent: React.FC = () => {
   }
 
   return (
-    <div className="h-screen w-screen bg-[#080C14] text-slate-100 flex flex-col overflow-hidden select-none font-sans">
-      {/* Top Fixed Header */}
+    <div className="min-h-screen bg-[#080C14] text-slate-100 flex flex-col selection:bg-blue-600 selection:text-white font-sans">
+      {/* Sticky Top Header */}
       <Header
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
       />
 
-      {/* Main Container */}
-      <div className="flex flex-1 overflow-hidden h-[calc(100vh-48px)]">
+      {/* Main ERP Layout: Sticky Sidebar + Scrollable Viewport */}
+      <div className="flex flex-1 relative min-h-[calc(100vh-48px)]">
         {/* Left Sidebar */}
         {isSidebarOpen && (
           <Sidebar
@@ -499,9 +499,9 @@ export const AppContent: React.FC = () => {
           />
         )}
 
-        {/* Central Viewport */}
-        <main className="flex-1 h-full p-3.5 overflow-hidden flex flex-col">
-          <div className="w-full h-full flex flex-col">
+        {/* Central Viewport with Natural Smooth Scrolling */}
+        <main className="flex-1 p-4 sm:p-6 overflow-y-auto max-h-[calc(100vh-48px)] scrollbar-thin scrollbar-thumb-[#1E293B] scrollbar-track-transparent">
+          <div className="max-w-7xl mx-auto pb-12">
             {/* 1. Dashboard Overview */}
             {activeTab === 'dashboard' && (
               <SiteCentricMidnightDashboard onNavigateTab={setActiveTab} />

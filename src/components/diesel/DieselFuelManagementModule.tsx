@@ -5,11 +5,7 @@ import {
   Plus,
   Trash2,
   Calendar,
-  Truck,
-  User,
   Search,
-  DollarSign,
-  Droplet,
   Check,
   Edit2,
   X,
@@ -31,10 +27,14 @@ const STORAGE_DIESEL_KEY = 'CONSTRUCTION_PRO_DIESEL_VOUCHERS_V1';
 const STORAGE_FLEET_KEY = 'CONSTRUCTION_PRO_FLEET_VEHICLES_V1';
 
 export const DieselFuelManagementModule: React.FC = () => {
-  const { siteSheets, selectedSiteId } = useERP();
+  const { siteSheets, selectedSiteId, currentUser, userRole } = useERP();
+
+  // Strict Admin Check: Only Admin can delete diesel vouchers
+  const currentRoleStr = String(currentUser?.role || userRole || '').toLowerCase();
+  const isAdmin = currentRoleStr.includes('admin');
 
   const currentSite = siteSheets.find((s) => s.siteId === selectedSiteId) || siteSheets[0];
-  const siteList = siteSheets.length > 0
+  const siteList = siteSheets && siteSheets.length > 0
     ? siteSheets.map((s) => s.siteName)
     : ['Mulwad Ongoing Stretch', 'NH-50 Flexible Pavement Section', 'Quarry Crusher Unit'];
 
@@ -58,28 +58,7 @@ export const DieselFuelManagementModule: React.FC = () => {
       const saved = localStorage.getItem(STORAGE_DIESEL_KEY);
       if (saved) return JSON.parse(saved);
     } catch {}
-    return [
-      {
-        id: 'dsl-1',
-        date: '2026-08-16',
-        siteName: siteList[0] || 'Mulwad Ongoing Stretch',
-        vehicleNumber: 'KA28B8797',
-        driverName: 'Santosh Kamble',
-        litresDispensed: 100,
-        ratePerLitre: 92.5,
-        totalCost: 9250
-      },
-      {
-        id: 'dsl-2',
-        date: '2026-08-16',
-        siteName: siteList[0] || 'Mulwad Ongoing Stretch',
-        vehicleNumber: 'KA-28-EX-8901',
-        driverName: 'Ibrahim (Operator)',
-        litresDispensed: 180,
-        ratePerLitre: 92.5,
-        totalCost: 16650
-      }
-    ];
+    return [];
   });
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -87,7 +66,7 @@ export const DieselFuelManagementModule: React.FC = () => {
 
   // Form States inside modal
   const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [siteName, setSiteName] = useState<string>(siteList[0] || 'Mulwad Ongoing Stretch');
+  const [siteName, setSiteName] = useState<string>(currentSite?.siteName || siteList[0] || 'Mulwad Ongoing Stretch');
   const [vehicleNumber, setVehicleNumber] = useState<string>(vehiclesList[0] || 'KA28B8797');
   const [driverName, setDriverName] = useState<string>('Santosh Kamble');
   const [litresDispensed, setLitresDispensed] = useState<number | ''>(100);
@@ -144,7 +123,11 @@ export const DieselFuelManagementModule: React.FC = () => {
   };
 
   const handleDeleteVoucher = (id: string) => {
-    if (window.confirm('Delete this fuel refueling voucher?')) {
+    if (!isAdmin) {
+      alert('Action Restricted: Only Administrators are authorized to delete fuel vouchers.');
+      return;
+    }
+    if (window.confirm('Delete this fuel refueling voucher permanently?')) {
       setVouchers(vouchers.filter((v) => v.id !== id));
     }
   };
@@ -203,7 +186,7 @@ export const DieselFuelManagementModule: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-[#0c1427] border border-[#182643] p-4 rounded-2xl">
           <div className="text-slate-400 text-xs font-semibold">Total Diesel Consumed</div>
-          <div className="text-2xl font-extrabold text-amber-400 mt-1">
+          <div className="text-2xl font-extrabold text-amber-400 mt-1 font-mono">
             {grandTotalLitres.toLocaleString('en-IN')}{' '}
             <span className="text-xs font-normal text-slate-400">Litres</span>
           </div>
@@ -211,14 +194,14 @@ export const DieselFuelManagementModule: React.FC = () => {
 
         <div className="bg-[#0c1427] border border-[#182643] p-4 rounded-2xl">
           <div className="text-slate-400 text-xs font-semibold">Total Fuel Expenditure</div>
-          <div className="text-2xl font-extrabold text-emerald-400 mt-1">
+          <div className="text-2xl font-extrabold text-emerald-400 mt-1 font-mono">
             ₹{grandTotalCost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
         </div>
 
         <div className="bg-[#0c1427] border border-[#182643] p-4 rounded-2xl">
           <div className="text-slate-400 text-xs font-semibold">Total Vouchers Logged</div>
-          <div className="text-2xl font-extrabold text-white mt-1">
+          <div className="text-2xl font-extrabold text-white mt-1 font-mono">
             {totalFuelVouchers}{' '}
             <span className="text-xs font-normal text-slate-400">Slips</span>
           </div>
@@ -255,13 +238,13 @@ export const DieselFuelManagementModule: React.FC = () => {
                 <th className="py-3 px-4 text-right">Litres Dispensed</th>
                 <th className="py-3 px-4 text-right">Rate / Litre</th>
                 <th className="py-3 px-4 text-right">Total Voucher Cost (₹)</th>
-                <th className="py-3 px-4 text-center">Action</th>
+                {isAdmin && <th className="py-3 px-4 text-center">Action</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-[#1E293B]/60 text-slate-200">
               {filteredVouchers.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-slate-500 text-xs">
+                  <td colSpan={isAdmin ? 8 : 7} className="py-8 text-center text-slate-500 text-xs">
                     No diesel vouchers logged yet. Click "+ Record Diesel Slip" to add.
                   </td>
                 </tr>
@@ -285,16 +268,18 @@ export const DieselFuelManagementModule: React.FC = () => {
                     <td className="py-3.5 px-4 text-right font-mono font-black text-emerald-400">
                       ₹{item.totalCost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
-                    <td className="py-3.5 px-4 text-center">
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteVoucher(item.id)}
-                        className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 transition-colors cursor-pointer"
-                        title="Delete Slip"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </td>
+                    {isAdmin && (
+                      <td className="py-3.5 px-4 text-center">
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteVoucher(item.id)}
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 transition-colors cursor-pointer"
+                          title="Delete Slip (Admin Only)"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))
               )}
@@ -359,14 +344,16 @@ export const DieselFuelManagementModule: React.FC = () => {
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="text-slate-300 font-bold">Vehicle Number / Equipment *</label>
-                  <button
-                    type="button"
-                    onClick={() => setIsAddingVehicle(!isAddingVehicle)}
-                    className="text-[11px] font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 cursor-pointer transition-colors"
-                  >
-                    <Plus className="w-3 h-3" />
-                    <span>+ Add New Vehicle</span>
-                  </button>
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => setIsAddingVehicle(!isAddingVehicle)}
+                      className="text-[11px] font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 cursor-pointer transition-colors"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>+ Add New Vehicle</span>
+                    </button>
+                  )}
                 </div>
 
                 {isAddingVehicle ? (

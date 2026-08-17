@@ -9,14 +9,8 @@ import {
   Plus,
   ArrowRight,
   Layers,
-  AlertTriangle,
   HardHat,
-  Gauge,
-  Clock,
-  Activity,
-  CheckCircle2,
-  TrendingUp,
-  MapPin
+  ChevronRight
 } from 'lucide-react';
 
 interface Props {
@@ -26,67 +20,121 @@ interface Props {
 export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab }) => {
   const {
     siteSheets = [],
-    selectedSiteId,
-    setSelectedSiteId,
-    machinery = []
+    selectedSiteId
   } = useERP();
 
   // Active Site Data
   const currentSite = siteSheets.find((s) => s.siteId === selectedSiteId) || siteSheets[0] || {
-    siteId: 'site-mulwad',
-    siteName: 'NH-48 Highway Extension - Package 3 (Mulwad Stretch)'
+    siteId: 'site-default',
+    siteName: 'SINDAGI - ALMEL ROAD'
   };
 
-  // 1. Live Trips & Material Calculation from localStorage
-  const [totalMaterialBrass, setTotalMaterialBrass] = useState<number>(60);
-  const [totalTripsCount, setTotalTripsCount] = useState<number>(10);
+  // 1. Live Trips & Material Calculation (Defaults to 0 if no entries exist)
+  const [totalMaterialBrass, setTotalMaterialBrass] = useState<number>(0);
+  const [totalTripsCount, setTotalTripsCount] = useState<number>(0);
 
-  // 2. Live Diesel Fuel Calculation from localStorage
-  const [totalDieselLitres, setTotalDieselLitres] = useState<number>(280);
+  // 2. Live Diesel Fuel Calculation (Defaults to 0)
+  const [totalDieselLitres, setTotalDieselLitres] = useState<number>(0);
 
-  // 3. Live Site Expenses Calculation from localStorage
+  // 3. Live Site Expenses Calculation (Defaults to 0)
   const [totalExpensesAmount, setTotalExpensesAmount] = useState<number>(0);
 
   useEffect(() => {
     try {
-      const savedTrips = localStorage.getItem('CONSTRUCTION_PRO_DAY_TRIPS_V3') || localStorage.getItem('CONSTRUCTION_PRO_DAY_TRIPS_V2');
+      const siteQuery = (currentSite.siteName || '').trim().toLowerCase();
+
+      // Read Trips data for THIS specific site only
+      const savedTrips =
+        localStorage.getItem('CONSTRUCTION_PRO_DAY_TRIPS_V3') ||
+        localStorage.getItem('CONSTRUCTION_PRO_DAY_TRIPS_V2');
       if (savedTrips) {
         const parsed = JSON.parse(savedTrips);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const brassSum = parsed.reduce((sum: number, t: any) => sum + (Number(t.totalBrass) || 0), 0);
-          const tripsSum = parsed.reduce((sum: number, t: any) => sum + (Number(t.totalTrips) || 0), 0);
+          const matchingTrips = parsed.filter(
+            (t: any) =>
+              t.siteName &&
+              (t.siteName.toLowerCase().includes(siteQuery) ||
+                siteQuery.includes(t.siteName.toLowerCase()))
+          );
+          const brassSum = matchingTrips.reduce(
+            (sum: number, t: any) => sum + (Number(t.totalBrass) || 0),
+            0
+          );
+          const tripsSum = matchingTrips.reduce(
+            (sum: number, t: any) => sum + (Number(t.totalTrips) || 0),
+            0
+          );
           setTotalMaterialBrass(brassSum);
           setTotalTripsCount(tripsSum);
+        } else {
+          setTotalMaterialBrass(0);
+          setTotalTripsCount(0);
         }
+      } else {
+        setTotalMaterialBrass(0);
+        setTotalTripsCount(0);
       }
 
+      // Read Diesel data for THIS specific site only
       const savedDiesel = localStorage.getItem('CONSTRUCTION_PRO_DIESEL_VOUCHERS_V1');
       if (savedDiesel) {
         const parsed = JSON.parse(savedDiesel);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const dslSum = parsed.reduce((sum: number, d: any) => sum + (Number(d.litresDispensed) || 0), 0);
+          const matchingDiesel = parsed.filter(
+            (d: any) =>
+              d.siteName &&
+              (d.siteName.toLowerCase().includes(siteQuery) ||
+                siteQuery.includes(d.siteName.toLowerCase()))
+          );
+          const dslSum = matchingDiesel.reduce(
+            (sum: number, d: any) => sum + (Number(d.litresDispensed) || 0),
+            0
+          );
           setTotalDieselLitres(dslSum);
+        } else {
+          setTotalDieselLitres(0);
         }
+      } else {
+        setTotalDieselLitres(0);
       }
 
-      const savedExpenses = localStorage.getItem('CONSTRUCTION_PRO_ERP_STORAGE_V7_SITE_EXPENSES') || localStorage.getItem('CONSTRUCTION_PRO_ERP_STORAGE_V6_SITE_EXPENSES');
+      // Read Expenses data for THIS specific site only
+      const savedExpenses =
+        localStorage.getItem('CONSTRUCTION_PRO_SITE_EXPENSES_V2') ||
+        localStorage.getItem('CONSTRUCTION_PRO_ERP_STORAGE_V7_SITE_EXPENSES');
       if (savedExpenses) {
         const parsed = JSON.parse(savedExpenses);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const expSum = parsed.reduce((sum: number, e: any) => sum + (Number(e.amount) || 0), 0);
+          const matchingExpenses = parsed.filter(
+            (e: any) =>
+              (e.siteId && e.siteId === currentSite.siteId) ||
+              (e.siteName &&
+                (e.siteName.toLowerCase().includes(siteQuery) ||
+                  siteQuery.includes(e.siteName.toLowerCase())))
+          );
+          const expSum = matchingExpenses.reduce(
+            (sum: number, e: any) => sum + (Number(e.amount) || 0),
+            0
+          );
           setTotalExpensesAmount(expSum);
+        } else {
+          setTotalExpensesAmount(0);
         }
+      } else {
+        setTotalExpensesAmount(0);
       }
     } catch (e) {
       console.error(e);
+      setTotalMaterialBrass(0);
+      setTotalTripsCount(0);
+      setTotalDieselLitres(0);
+      setTotalExpensesAmount(0);
     }
-  }, [selectedSiteId]);
+  }, [currentSite.siteId, currentSite.siteName, selectedSiteId]);
 
   return (
     <div className="space-y-6 font-sans text-slate-100 selection:bg-blue-600 selection:text-white">
-      {/* ========================================================================= */}
-      {/* 1. TOP COMMAND BANNER WITH DIRECT ROUTING BUTTONS                         */}
-      {/* ========================================================================= */}
+      {/* 1. TOP COMMAND BANNER */}
       <div className="p-6 rounded-3xl bg-[#0c1427] border border-[#182643] shadow-2xl flex flex-col lg:flex-row lg:items-center justify-between gap-6">
         <div>
           <div className="flex items-center gap-2 text-xs font-bold">
@@ -95,7 +143,9 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
               SITE OPERATIONS COMMAND
             </span>
             <span className="text-slate-500">•</span>
-            <span className="text-slate-400 font-mono text-[11px]">NH48-PKG3-MUL</span>
+            <span className="text-slate-400 font-mono text-[11px]">
+              {currentSite.siteId || 'ACTIVE-CORRIDOR'}
+            </span>
           </div>
 
           <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-1.5 leading-snug">
@@ -109,51 +159,41 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
 
         {/* Action Button Links */}
         <div className="flex flex-wrap items-center gap-2.5 self-start lg:self-auto">
-          {/* Button 1: Add Site Section -> road-sites */}
           <button
             onClick={() => onNavigateTab('road-sites')}
             className="px-3.5 py-2.5 rounded-2xl bg-[#142038] hover:bg-[#1f2f52] border border-[#22365e] text-blue-300 hover:text-white font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shadow-sm"
-            title="Manage Road Sites & Chainages"
           >
             <Milestone className="w-4 h-4 text-blue-400" />
             <span>+ Add Site Section</span>
           </button>
 
-          {/* Button 2: Yield Calc -> yield_calculator */}
           <button
             onClick={() => onNavigateTab('yield_calculator')}
             className="px-3.5 py-2.5 rounded-2xl bg-[#142038] hover:bg-[#1f2f52] border border-[#22365e] text-blue-300 hover:text-white font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shadow-sm"
-            title="Open Road Yield Calculator"
           >
             <Calculator className="w-4 h-4 text-cyan-400" />
             <span>Yield Calc</span>
           </button>
 
-          {/* Button 3: Log Diesel -> diesel */}
           <button
             onClick={() => onNavigateTab('diesel')}
             className="px-3.5 py-2.5 rounded-2xl bg-[#142038] hover:bg-[#1f2f52] border border-[#22365e] text-amber-300 hover:text-white font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shadow-sm"
-            title="Open Fuel Management Log"
           >
             <Fuel className="w-4 h-4 text-amber-400" />
             <span>+ Log Diesel</span>
           </button>
 
-          {/* Button 4: Log Trip -> haulage-trips */}
           <button
             onClick={() => onNavigateTab('haulage-trips')}
             className="px-3.5 py-2.5 rounded-2xl bg-[#142038] hover:bg-[#1f2f52] border border-[#22365e] text-emerald-300 hover:text-white font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shadow-sm"
-            title="Record Day Material Trips"
           >
             <Truck className="w-4 h-4 text-emerald-400" />
             <span>+ Log Trip</span>
           </button>
 
-          {/* Button 5: + Expense -> site-expenses */}
           <button
             onClick={() => onNavigateTab('site-expenses')}
             className="px-4 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs flex items-center gap-2 transition-all shadow-lg shadow-blue-600/30 cursor-pointer"
-            title="Add Site Expense Voucher"
           >
             <Plus className="w-4 h-4" />
             <span>+ Expense</span>
@@ -161,11 +201,9 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
         </div>
       </div>
 
-      {/* ========================================================================= */}
-      {/* 2. TOP 4 LIVE TELEMETRY CARDS (Clickable to jump to modules)             */}
-      {/* ========================================================================= */}
+      {/* 2. TOP 4 LIVE TELEMETRY CARDS (Shows 0 if no entries exist) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Material Laid -> haulage-trips */}
+        {/* Card 1: Material Laid */}
         <div
           onClick={() => onNavigateTab('haulage-trips')}
           className="p-5 rounded-3xl bg-[#0c1427] border border-[#182643] hover:border-blue-500/50 transition-all cursor-pointer group shadow-xl flex flex-col justify-between"
@@ -177,13 +215,17 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
             </div>
           </div>
           <div className="my-3">
-            <div className="text-3xl font-black text-white">
-              {totalMaterialBrass.toFixed(1)}{' '}
+            <div className="text-3xl font-black text-white font-mono">
+              {totalMaterialBrass > 0 ? totalMaterialBrass.toFixed(1) : '0'}{' '}
               <span className="text-sm font-normal text-slate-400">Brass</span>
             </div>
             <div className="text-xs text-blue-400 font-medium mt-1 flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
-              <span>Murum, GSB & WMM deliveries</span>
+              <span>
+                {totalMaterialBrass > 0
+                  ? 'Murum, GSB & WMM deliveries'
+                  : 'No material logged yet'}
+              </span>
             </div>
           </div>
           <div className="text-[11px] text-slate-500 group-hover:text-blue-400 transition-colors flex items-center gap-1">
@@ -192,7 +234,7 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
           </div>
         </div>
 
-        {/* Card 2: Site Expense -> site-expenses */}
+        {/* Card 2: Site Direct Expense */}
         <div
           onClick={() => onNavigateTab('site-expenses')}
           className="p-5 rounded-3xl bg-[#0c1427] border border-[#182643] hover:border-emerald-500/50 transition-all cursor-pointer group shadow-xl flex flex-col justify-between"
@@ -204,11 +246,17 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
             </div>
           </div>
           <div className="my-3">
-            <div className="text-3xl font-black text-emerald-400">
-              ₹{totalExpensesAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            <div className="text-3xl font-black text-emerald-400 font-mono">
+              ₹
+              {totalExpensesAmount.toLocaleString('en-IN', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+              })}
             </div>
             <div className="text-xs text-slate-400 font-medium mt-1">
-              Petty cash, machine maintenance & repairs
+              {totalExpensesAmount > 0
+                ? 'Petty cash, machine maintenance & repairs'
+                : 'No expenses recorded'}
             </div>
           </div>
           <div className="text-[11px] text-slate-500 group-hover:text-emerald-400 transition-colors flex items-center gap-1">
@@ -217,7 +265,7 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
           </div>
         </div>
 
-        {/* Card 3: Active Trips -> haulage-trips */}
+        {/* Card 3: Active Trips */}
         <div
           onClick={() => onNavigateTab('haulage-trips')}
           className="p-5 rounded-3xl bg-[#0c1427] border border-[#182643] hover:border-cyan-500/50 transition-all cursor-pointer group shadow-xl flex flex-col justify-between"
@@ -229,12 +277,14 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
             </div>
           </div>
           <div className="my-3">
-            <div className="text-3xl font-black text-white">
+            <div className="text-3xl font-black text-white font-mono">
               {totalTripsCount}{' '}
               <span className="text-sm font-normal text-slate-400">Trips</span>
             </div>
             <div className="text-xs text-cyan-400 font-medium mt-1">
-              Active multi-axle tipper cycle
+              {totalTripsCount > 0
+                ? 'Active multi-axle tipper cycle'
+                : '0 tippers active'}
             </div>
           </div>
           <div className="text-[11px] text-slate-500 group-hover:text-cyan-400 transition-colors flex items-center gap-1">
@@ -243,7 +293,7 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
           </div>
         </div>
 
-        {/* Card 4: Diesel & Fuel Status -> diesel */}
+        {/* Card 4: Diesel Dispensed */}
         <div
           onClick={() => onNavigateTab('diesel')}
           className="p-5 rounded-3xl bg-[#0c1427] border border-[#182643] hover:border-amber-500/50 transition-all cursor-pointer group shadow-xl flex flex-col justify-between"
@@ -255,12 +305,14 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
             </div>
           </div>
           <div className="my-3">
-            <div className="text-3xl font-black text-amber-400">
+            <div className="text-3xl font-black text-amber-400 font-mono">
               {totalDieselLitres.toLocaleString('en-IN')}{' '}
               <span className="text-sm font-normal text-slate-400">Litres</span>
             </div>
             <div className="text-xs text-slate-400 font-medium mt-1">
-              Field fuel voucher logs
+              {totalDieselLitres > 0
+                ? 'Field fuel voucher logs'
+                : 'No fuel dispensed today'}
             </div>
           </div>
           <div className="text-[11px] text-slate-500 group-hover:text-amber-400 transition-colors flex items-center gap-1">
@@ -270,11 +322,8 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
         </div>
       </div>
 
-      {/* ========================================================================= */}
-      {/* 3. MIDDLE ROW: MACHINERY FLEET STATUS + RECENT ACTIONS                    */}
-      {/* ========================================================================= */}
+      {/* 3. MIDDLE ROW: MACHINERY FLEET & ENGINEERING SHORTCUTS */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left: Machine & Operator Status (7 cols) */}
         <div className="lg:col-span-7 bg-[#0c1427] border border-[#182643] rounded-3xl p-6 shadow-xl space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-[#182643]">
             <div className="flex items-center gap-2 font-bold text-white text-sm">
@@ -286,42 +335,52 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
               className="text-xs font-bold text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors cursor-pointer"
             >
               <span>View Full Fleet</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
 
-          {/* Quick Fleet Tiles */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div
               onClick={() => onNavigateTab('machinery_fleet')}
               className="p-3.5 rounded-2xl bg-[#080d19] border border-[#182643] hover:border-slate-600 transition-all cursor-pointer"
             >
-              <div className="text-[11px] text-slate-400 font-semibold">Active Excavators</div>
-              <div className="text-xl font-extrabold text-white mt-1">2 Units</div>
-              <div className="text-[10px] text-emerald-400 font-bold mt-1">CAT & Hitachi ZX210</div>
+              <div className="text-[11px] text-slate-400 font-semibold">
+                Active Excavators
+              </div>
+              <div className="text-xl font-extrabold text-white mt-1">0 Units</div>
+              <div className="text-[10px] text-slate-500 font-bold mt-1">
+                No active machinery
+              </div>
             </div>
 
             <div
               onClick={() => onNavigateTab('machinery_fleet')}
               className="p-3.5 rounded-2xl bg-[#080d19] border border-[#182643] hover:border-slate-600 transition-all cursor-pointer"
             >
-              <div className="text-[11px] text-slate-400 font-semibold">Backhoe Loaders</div>
-              <div className="text-xl font-extrabold text-white mt-1">3 Units</div>
-              <div className="text-[10px] text-blue-400 font-bold mt-1">JCB 3DX Super</div>
+              <div className="text-[11px] text-slate-400 font-semibold">
+                Backhoe Loaders
+              </div>
+              <div className="text-xl font-extrabold text-white mt-1">0 Units</div>
+              <div className="text-[10px] text-slate-500 font-bold mt-1">
+                No active machinery
+              </div>
             </div>
 
             <div
               onClick={() => onNavigateTab('machinery_fleet')}
               className="p-3.5 rounded-2xl bg-[#080d19] border border-[#182643] hover:border-slate-600 transition-all cursor-pointer"
             >
-              <div className="text-[11px] text-slate-400 font-semibold">Tipper Dumpers</div>
-              <div className="text-xl font-extrabold text-amber-400 mt-1">6 Units</div>
-              <div className="text-[10px] text-slate-400 font-bold mt-1">16T & 25T Capacity</div>
+              <div className="text-[11px] text-slate-400 font-semibold">
+                Tipper Dumpers
+              </div>
+              <div className="text-xl font-extrabold text-white mt-1">0 Units</div>
+              <div className="text-[10px] text-slate-500 font-bold mt-1">
+                No active tippers
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Right: Quick Engineering Tools (5 cols) */}
         <div className="lg:col-span-5 bg-[#0c1427] border border-[#182643] rounded-3xl p-6 shadow-xl space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-[#182643]">
             <div className="flex items-center gap-2 font-bold text-white text-sm">

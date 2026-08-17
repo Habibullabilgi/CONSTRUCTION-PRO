@@ -7,7 +7,8 @@ import {
   X,
   TrendingDown,
   TrendingUp,
-  FileCheck
+  FileCheck,
+  Trash2
 } from 'lucide-react';
 
 export interface StockTransaction {
@@ -117,6 +118,12 @@ export const StockTransactionsModule: React.FC = () => {
   const totalStockOut = filtered
     .filter((t) => t.type === 'Stock Out')
     .reduce((sum, t) => sum + t.quantity, 0);
+
+  const handleDelete = (id: string, name: string) => {
+    if (window.confirm(`Are you sure you want to permanently delete transaction "${id}" (${name})?`)) {
+      setTransactions((prev) => prev.filter((t) => t.id !== id));
+    }
+  };
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
@@ -267,43 +274,62 @@ export const StockTransactionsModule: React.FC = () => {
                 <th className="py-3.5 px-4 text-right">QTY</th>
                 <th className="py-3.5 px-4">VEHICLE / EMPLOYEE</th>
                 <th className="py-3.5 px-4">WORK ORDER & PURPOSE</th>
+                <th className="py-3.5 px-4 text-right">ACTION</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#1E293B]/60 text-slate-200">
-              {filtered.map((t) => {
-                const isOut = t.type === 'Stock Out';
-                return (
-                  <tr key={t.id} className="hover:bg-[#121c33]/50 transition-colors">
-                    <td className="py-3.5 px-4 font-mono">
-                      <div className="font-bold text-white">{t.id}</div>
-                      <div className="text-[10px] text-slate-400">{t.date}</div>
-                    </td>
-                    <td className="py-3.5 px-4 font-bold text-white">{t.productName}</td>
-                    <td className="py-3.5 px-4 text-center">
-                      <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
-                          isOut
-                            ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                            : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                        }`}
-                      >
-                        {t.type}
-                      </span>
-                    </td>
-                    <td className={`py-3.5 px-4 text-right font-mono font-black text-sm ${isOut ? 'text-rose-400' : 'text-emerald-400'}`}>
-                      {isOut ? `-${t.quantity}` : `+${t.quantity}`}
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <div className="font-medium text-slate-200">{t.issuedTo || '-'}</div>
-                      <div className="text-[10px] text-slate-500 font-mono">{t.vehicleNo || 'Site Internal'}</div>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <div className="font-mono text-[11px] text-cyan-400">{t.workOrderNo || '-'}</div>
-                      <div className="text-[10px] text-slate-400 truncate max-w-xs">{t.purpose || '-'}</div>
-                    </td>
-                  </tr>
-                );
-              })}
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-8 text-center text-slate-500">
+                    No transactions matching your search criteria.
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((t) => {
+                  const isOut = t.type === 'Stock Out';
+                  return (
+                    <tr key={t.id} className="hover:bg-[#121c33]/50 transition-colors">
+                      <td className="py-3.5 px-4 font-mono">
+                        <div className="font-bold text-white">{t.id}</div>
+                        <div className="text-[10px] text-slate-400">{t.date}</div>
+                      </td>
+                      <td className="py-3.5 px-4 font-bold text-white">{t.productName}</td>
+                      <td className="py-3.5 px-4 text-center">
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+                            isOut
+                              ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                              : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                          }`}
+                        >
+                          {t.type}
+                        </span>
+                      </td>
+                      <td className={`py-3.5 px-4 text-right font-mono font-black text-sm ${isOut ? 'text-rose-400' : 'text-emerald-400'}`}>
+                        {isOut ? `-${t.quantity}` : `+${t.quantity}`}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <div className="font-medium text-slate-200">{t.issuedTo || '-'}</div>
+                        <div className="text-[10px] text-slate-500 font-mono">{t.vehicleNo || 'Site Internal'}</div>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <div className="font-mono text-[11px] text-cyan-400">{t.workOrderNo || '-'}</div>
+                        <div className="text-[10px] text-slate-400 truncate max-w-xs">{t.purpose || '-'}</div>
+                      </td>
+                      <td className="py-3.5 px-4 text-right">
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(t.id, t.productName)}
+                          title="Delete Transaction"
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
@@ -437,7 +463,7 @@ export const StockTransactionsModule: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold"
+                  className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold cursor-pointer"
                 >
                   Record Transaction
                 </button>

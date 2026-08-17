@@ -5,7 +5,8 @@ import {
   Download,
   Search,
   X,
-  Trash2
+  Trash2,
+  Building2
 } from 'lucide-react';
 
 export interface StockTransaction {
@@ -57,8 +58,9 @@ const INITIAL_TXNS: StockTransaction[] = [
 export const StockTransactionsModule: React.FC = () => {
   const { siteSheets = [], selectedSiteId } = useERP();
 
-  const currentActiveSite = siteSheets.find((s: any) => s.siteId === selectedSiteId);
-  const defaultSiteName = currentActiveSite?.siteName || 'HHH Tower A';
+  // Find current ongoing site from context
+  const activeOngoingSite = siteSheets.find((s: any) => s.siteId === selectedSiteId);
+  const defaultOngoingSiteName = activeOngoingSite?.siteName || siteSheets[0]?.siteName || 'Central Site';
 
   const [transactions, setTransactions] = useState<StockTransaction[]>(() => {
     try {
@@ -75,9 +77,9 @@ export const StockTransactionsModule: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Form State
+  // Form State with Site Name pre-selected from active Ongoing Site
   const [productName, setProductName] = useState('');
-  const [siteName, setSiteName] = useState(defaultSiteName);
+  const [siteName, setSiteName] = useState(defaultOngoingSiteName);
   const [type, setType] = useState<'Stock In' | 'Stock Out'>('Stock Out');
   const [quantity, setQuantity] = useState<number | ''>(0);
   const [date, setDate] = useState('2026-08-17');
@@ -125,7 +127,7 @@ export const StockTransactionsModule: React.FC = () => {
     const newTxn: StockTransaction = {
       id: `TXN-${Date.now().toString().slice(-4)}`,
       productName: productName.trim(),
-      siteName: siteName.trim() || defaultSiteName,
+      siteName: siteName.trim() || defaultOngoingSiteName,
       type,
       quantity: Number(quantity),
       date,
@@ -178,7 +180,7 @@ export const StockTransactionsModule: React.FC = () => {
           </button>
           <button
             onClick={() => {
-              setSiteName(defaultSiteName);
+              setSiteName(defaultOngoingSiteName);
               setIsModalOpen(true);
             }}
             className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-black flex items-center gap-1.5 transition-all shadow-lg shadow-blue-600/30 cursor-pointer"
@@ -236,7 +238,7 @@ export const StockTransactionsModule: React.FC = () => {
         </div>
       </div>
 
-      {/* 3 Metric Cards */}
+      {/* 3 Metric Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="p-4 rounded-2xl bg-[#0c1427] border border-[#182643]">
           <div className="text-[11px] font-semibold text-slate-400">Records shown</div>
@@ -254,7 +256,7 @@ export const StockTransactionsModule: React.FC = () => {
         </div>
       </div>
 
-      {/* Transactions Table */}
+      {/* Transactions Table with Site Column */}
       <div className="bg-[#0B1220] border border-[#1E293B] rounded-3xl overflow-hidden shadow-2xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
@@ -262,7 +264,7 @@ export const StockTransactionsModule: React.FC = () => {
               <tr className="border-b border-[#1E293B] text-[10px] font-extrabold uppercase tracking-wider text-slate-400 bg-[#080d19]/80">
                 <th className="py-3.5 px-6">TXN ID & DATE</th>
                 <th className="py-3.5 px-6">PRODUCT</th>
-                <th className="py-3.5 px-6">SITE NAME</th>
+                <th className="py-3.5 px-6">ONGOING SITE</th>
                 <th className="py-3.5 px-4 text-center">TYPE</th>
                 <th className="py-3.5 px-4 text-right">QTY</th>
                 <th className="py-3.5 px-6">DEPARTMENT</th>
@@ -288,7 +290,7 @@ export const StockTransactionsModule: React.FC = () => {
                       </td>
                       <td className="py-3.5 px-6 font-bold text-white text-xs">{t.productName}</td>
                       <td className="py-3.5 px-6 font-medium text-cyan-400">
-                        {t.siteName || defaultSiteName}
+                        {t.siteName || defaultOngoingSiteName}
                       </td>
                       <td className="py-3.5 px-4 text-center">
                         <span
@@ -329,7 +331,7 @@ export const StockTransactionsModule: React.FC = () => {
         </div>
       </div>
 
-      {/* New Transaction Modal with Site Name */}
+      {/* Modal with Ongoing Site Dropdown */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
           <div className="bg-[#121927] border border-[#1E293B] rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto text-slate-100">
@@ -353,8 +355,12 @@ export const StockTransactionsModule: React.FC = () => {
                 />
               </div>
 
+              {/* Site Name Selector from Ongoing Sites */}
               <div>
-                <label className="block text-slate-300 font-bold mb-1">Site / Project Name *</label>
+                <label className="block text-slate-300 font-bold mb-1 flex items-center justify-between">
+                  <span>Site / Ongoing Package *</span>
+                  <span className="text-[10px] text-blue-400 font-normal">From Ongoing Sites</span>
+                </label>
                 {siteSheets.length > 0 ? (
                   <select
                     value={siteName}

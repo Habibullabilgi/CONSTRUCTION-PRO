@@ -35,7 +35,7 @@ export const Sidebar: React.FC<Props> = ({ activeTab, setActiveTab }) => {
     { id: 'dashboard', label: 'Site Overview', icon: LayoutDashboard },
     {
       id: 'road-sites',
-      label: 'Ongoing Sites & Stretches',
+      label: 'Ongoing Site',
       icon: Milestone,
       badge: 'Sites',
       badgeStyle: 'bg-blue-900/40 text-blue-300 border border-blue-500/40'
@@ -56,7 +56,7 @@ export const Sidebar: React.FC<Props> = ({ activeTab, setActiveTab }) => {
     },
     {
       id: 'site-expenses',
-      label: 'Site Cost & Expenses',
+      label: 'Site Expense',
       icon: DollarSign,
       badge: 'Petty Cash',
       badgeStyle: 'bg-[#162032] text-blue-400 border border-[#1E293B]'
@@ -67,14 +67,14 @@ export const Sidebar: React.FC<Props> = ({ activeTab, setActiveTab }) => {
   const engineeringItems: NavItem[] = [
     {
       id: 'yield_calculator',
-      label: 'Road Yield Calculator',
+      label: 'Road Trip Calculator',
       icon: Calculator,
       badge: 'MoRTH',
       badgeStyle: 'bg-blue-900/60 text-blue-300 border border-blue-500/40 font-mono'
     },
     {
       id: 'machinery_fleet',
-      label: 'Machinery & Equipment Fleet',
+      label: 'Machinery',
       icon: HardHat
     },
     {

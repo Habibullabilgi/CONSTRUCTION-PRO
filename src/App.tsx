@@ -1111,11 +1111,12 @@ export const ProductsMasterModule: React.FC = () => {
 };
 
 // ==========================================
-// Stock Transactions Module (Clean Form: Vehicle No, Work Order, Purpose removed)
+// Stock Transactions Module (With Site Name & Cleaned Form)
 // ==========================================
 export interface StockTransaction {
   id: string;
   productName: string;
+  siteName: string;
   type: 'Stock In' | 'Stock Out';
   quantity: number;
   date: string;
@@ -1129,6 +1130,7 @@ const INITIAL_STOCK_TXNS: StockTransaction[] = [
   {
     id: 'TXN-001',
     productName: '15W/40 Engine Oil',
+    siteName: 'HHH Tower A',
     type: 'Stock Out',
     quantity: 13,
     date: '2026-08-17',
@@ -1138,6 +1140,7 @@ const INITIAL_STOCK_TXNS: StockTransaction[] = [
   {
     id: 'TXN-002',
     productName: 'Castrol Optigear 320',
+    siteName: 'HHH Tower A',
     type: 'Stock In',
     quantity: 240,
     date: '2026-08-14',
@@ -1147,6 +1150,7 @@ const INITIAL_STOCK_TXNS: StockTransaction[] = [
   {
     id: 'TXN-003',
     productName: 'HP-80W/90 OIL',
+    siteName: 'Central Campus',
     type: 'Stock Out',
     quantity: 300,
     date: '2026-08-10',
@@ -1156,6 +1160,11 @@ const INITIAL_STOCK_TXNS: StockTransaction[] = [
 ];
 
 export const StockTransactionsModule: React.FC = () => {
+  const { siteSheets = [], selectedSiteId } = useERP();
+
+  const currentActiveSite = siteSheets.find((s: any) => s.siteId === selectedSiteId);
+  const defaultSiteName = currentActiveSite?.siteName || 'HHH Tower A';
+
   const [transactions, setTransactions] = useState<StockTransaction[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_TXNS_KEY);
@@ -1171,8 +1180,9 @@ export const StockTransactionsModule: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Form State (Vehicle No, Work Order, and Purpose removed)
+  // Form State (Cleaned: Includes Site Name, Vehicle/WorkOrder/Purpose removed)
   const [productName, setProductName] = useState('');
+  const [siteName, setSiteName] = useState(defaultSiteName);
   const [type, setType] = useState<'Stock In' | 'Stock Out'>('Stock Out');
   const [quantity, setQuantity] = useState<number | ''>(0);
   const [date, setDate] = useState('2026-08-17');
@@ -1191,6 +1201,7 @@ export const StockTransactionsModule: React.FC = () => {
       const matchQuery =
         !q ||
         t.productName.toLowerCase().includes(q) ||
+        (t.siteName && t.siteName.toLowerCase().includes(q)) ||
         t.id.toLowerCase().includes(q) ||
         (t.department && t.department.toLowerCase().includes(q)) ||
         (t.issuedTo && t.issuedTo.toLowerCase().includes(q));
@@ -1219,6 +1230,7 @@ export const StockTransactionsModule: React.FC = () => {
     const newTxn: StockTransaction = {
       id: `TXN-${Date.now().toString().slice(-3)}`,
       productName: productName.trim(),
+      siteName: siteName.trim() || defaultSiteName,
       type,
       quantity: Number(quantity),
       date,
@@ -1234,10 +1246,11 @@ export const StockTransactionsModule: React.FC = () => {
   };
 
   const handleExportCSV = () => {
-    const headers = ['Txn ID', 'Date', 'Type', 'Product', 'Quantity', 'Department', 'Issued To'];
+    const headers = ['Txn ID', 'Date', 'Site Name', 'Type', 'Product', 'Quantity', 'Department', 'Issued To'];
     const rows = filtered.map((t) => [
       t.id,
       t.date,
+      `"${t.siteName || '-'}"`,
       t.type,
       `"${t.productName}"`,
       t.quantity,
@@ -1269,7 +1282,10 @@ export const StockTransactionsModule: React.FC = () => {
             <span>Export</span>
           </button>
           <button
-            onClick={() => setIsModalOpen(true)}
+            onClick={() => {
+              setSiteName(defaultSiteName);
+              setIsModalOpen(true);
+            }}
             className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-black flex items-center gap-1.5 transition-all shadow-lg shadow-blue-600/30 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
@@ -1316,7 +1332,7 @@ export const StockTransactionsModule: React.FC = () => {
             <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-500" />
             <input
               type="text"
-              placeholder="Search ID, product, employee..."
+              placeholder="Search ID, product, site, employee..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-8 pr-3 py-2 bg-[#080d19] border border-[#1E293B] rounded-xl text-white outline-none placeholder-slate-500"
@@ -1343,7 +1359,7 @@ export const StockTransactionsModule: React.FC = () => {
         </div>
       </div>
 
-      {/* Transactions Table with Delete Action */}
+      {/* Transactions Table with Site Column */}
       <div className="bg-[#0B1220] border border-[#1E293B] rounded-3xl overflow-hidden shadow-2xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
@@ -1351,6 +1367,7 @@ export const StockTransactionsModule: React.FC = () => {
               <tr className="border-b border-[#1E293B] text-[10px] font-extrabold uppercase tracking-wider text-slate-400 bg-[#080d19]/80">
                 <th className="py-3.5 px-6">TXN ID & DATE</th>
                 <th className="py-3.5 px-6">PRODUCT</th>
+                <th className="py-3.5 px-6">SITE / LOCATION</th>
                 <th className="py-3.5 px-4 text-center">TYPE</th>
                 <th className="py-3.5 px-4 text-right">QTY</th>
                 <th className="py-3.5 px-6">DEPARTMENT</th>
@@ -1361,7 +1378,7 @@ export const StockTransactionsModule: React.FC = () => {
             <tbody className="divide-y divide-[#1E293B]/60 text-slate-200">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-slate-500">
+                  <td colSpan={8} className="py-8 text-center text-slate-500">
                     No transactions matching your search criteria.
                   </td>
                 </tr>
@@ -1375,6 +1392,9 @@ export const StockTransactionsModule: React.FC = () => {
                         <div className="text-[10px] text-slate-400">{t.date}</div>
                       </td>
                       <td className="py-3.5 px-6 font-bold text-white text-xs">{t.productName}</td>
+                      <td className="py-3.5 px-6 font-medium text-cyan-400">
+                        {t.siteName || defaultSiteName}
+                      </td>
                       <td className="py-3.5 px-4 text-center">
                         <span
                           className={`px-2.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wide ${
@@ -1414,7 +1434,7 @@ export const StockTransactionsModule: React.FC = () => {
         </div>
       </div>
 
-      {/* New Transaction Modal (Simplified) */}
+      {/* New Transaction Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
           <div className="bg-[#121927] border border-[#1E293B] rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto text-slate-100">
@@ -1436,6 +1456,32 @@ export const StockTransactionsModule: React.FC = () => {
                   onChange={(e) => setProductName(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-blue-500 font-medium"
                 />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">Site / Project Name *</label>
+                {siteSheets.length > 0 ? (
+                  <select
+                    value={siteName}
+                    onChange={(e) => setSiteName(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-cyan-400 font-medium outline-none focus:border-blue-500 cursor-pointer"
+                  >
+                    {siteSheets.map((s: any) => (
+                      <option key={s.siteId} value={s.siteName}>
+                        {s.siteName}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. HHH Tower A"
+                    value={siteName}
+                    onChange={(e) => setSiteName(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-cyan-400 font-medium outline-none focus:border-blue-500"
+                  />
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">

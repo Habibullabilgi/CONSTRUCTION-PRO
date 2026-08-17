@@ -329,7 +329,7 @@ export const StockTransactionsModule: React.FC = () => {
         </div>
       </div>
 
-      {/* New Transaction Modal */}
+      {/* New Transaction Modal with Site Name */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
           <div className="bg-[#121927] border border-[#1E293B] rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto text-slate-100">
@@ -385,7 +385,7 @@ export const StockTransactionsModule: React.FC = () => {
                   <select
                     value={type}
                     onChange={(e) => setType(e.target.value as 'Stock In' | 'Stock Out')}
-                    className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none cursor-pointer"
+                    className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none cursor-pointer"
                   >
                     <option value="Stock Out">Stock Out</option>
                     <option value="Stock In">Stock In</option>

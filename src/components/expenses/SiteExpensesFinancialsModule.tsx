@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useRoadERP } from '../../context/RoadERPContext';
+import { useERP } from '../../context/ERPContext';
 import { SiteExpenseCategory, SiteExpenseVoucher, ExpensePaymentMode } from '../../types/roadERP';
 import {
   DollarSign,
@@ -45,6 +46,12 @@ export const SiteExpensesFinancialsModule: React.FC = () => {
     kpis,
     project
   } = useRoadERP();
+
+  const { currentUser, userRole } = useERP();
+
+  // Strict Admin Check: Only Admin can delete expense vouchers
+  const currentRoleStr = String(currentUser?.role || userRole || '').toLowerCase();
+  const isAdmin = currentRoleStr.includes('admin');
 
   const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -103,7 +110,7 @@ export const SiteExpensesFinancialsModule: React.FC = () => {
       payeeVendorName: formPayee.trim(),
       description: formDesc.trim() || 'Site operational disbursement',
       invoiceReceiptNumber: formRefNo.trim() || undefined,
-      requestedBy: 'Ibrahim (Site Supervisor)',
+      requestedBy: currentUser?.name || 'Ibrahim (Site Supervisor)',
       status: 'SUBMITTED'
     });
 
@@ -120,6 +127,16 @@ export const SiteExpensesFinancialsModule: React.FC = () => {
       refillPettyCash(primaryWallet.id, refillAmount);
     }
     setIsRefillOpen(false);
+  };
+
+  const handleDelete = (voucherId: string) => {
+    if (!isAdmin) {
+      alert('Action Restricted: Only Administrators are authorized to delete expense vouchers.');
+      return;
+    }
+    if (window.confirm('Delete this site expense voucher permanently?')) {
+      deleteExpenseVoucher(voucherId);
+    }
   };
 
   // Export to CSV
@@ -218,12 +235,14 @@ export const SiteExpensesFinancialsModule: React.FC = () => {
           <div className="p-3.5 bg-[#070c18] rounded-2xl border border-[#182643] flex flex-col justify-between">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-semibold text-slate-400">Petty Cash Balance</span>
-              <button
-                onClick={() => setIsRefillOpen(true)}
-                className="text-[10px] text-amber-400 hover:underline font-bold"
-              >
-                + Refill
-              </button>
+              {isAdmin && (
+                <button
+                  onClick={() => setIsRefillOpen(true)}
+                  className="text-[10px] text-amber-400 hover:underline font-bold"
+                >
+                  + Refill
+                </button>
+              )}
             </div>
             <div className="text-2xl font-black text-white font-mono mt-1">
               ₹{primaryWallet.remainingBalance.toLocaleString('en-IN')}{' '}
@@ -241,7 +260,7 @@ export const SiteExpensesFinancialsModule: React.FC = () => {
             </div>
           </div>
 
-          {/* 4. Total Combined Burn (Diesel + Expenses) */}
+          {/* 4. Total Combined Burn */}
           <div className="p-3.5 bg-[#070c18] rounded-2xl border border-[#182643]">
             <div className="text-[11px] font-semibold text-slate-400">Combined Project Cash Outflow</div>
             <div className="text-2xl font-black text-amber-400 font-mono mt-1">
@@ -312,20 +331,19 @@ export const SiteExpensesFinancialsModule: React.FC = () => {
                 <th className="py-3 px-3 text-right">AMOUNT (₹)</th>
                 <th className="py-3 px-3 text-center">PAY MODE</th>
                 <th className="py-3 px-3 text-center">APPROVAL STATUS</th>
-                <th className="py-3 px-3 text-center">ACTION</th>
+                {isAdmin && <th className="py-3 px-3 text-center">ACTION</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-[#15223c] text-slate-200">
               {filteredExpenses.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-slate-500">
+                  <td colSpan={isAdmin ? 8 : 7} className="py-8 text-center text-slate-500">
                     No site expense vouchers found.
                   </td>
                 </tr>
               ) : (
                 filteredExpenses.map((voucher) => {
                   const isApproved = voucher.status === 'APPROVED' || voucher.status === 'PAID';
-                  const isSubmitted = voucher.status === 'SUBMITTED';
                   const isRejected = voucher.status === 'REJECTED';
 
                   return (
@@ -381,38 +399,55 @@ export const SiteExpensesFinancialsModule: React.FC = () => {
 
                       {/* Approval Status Selector */}
                       <td className="py-3 px-3 text-center">
-                        <select
-                          value={voucher.status}
-                          onChange={(e) =>
-                            updateExpenseStatus(
-                              voucher.id,
-                              e.target.value as SiteExpenseVoucher['status']
-                            )
-                          }
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded-lg outline-none cursor-pointer uppercase ${
-                            isApproved
-                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                              : isRejected
-                              ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
-                              : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
-                          }`}
-                        >
-                          <option value="SUBMITTED">SUBMITTED</option>
-                          <option value="APPROVED">APPROVED</option>
-                          <option value="PAID">PAID</option>
-                          <option value="REJECTED">REJECTED</option>
-                        </select>
+                        {isAdmin ? (
+                          <select
+                            value={voucher.status}
+                            onChange={(e) =>
+                              updateExpenseStatus(
+                                voucher.id,
+                                e.target.value as SiteExpenseVoucher['status']
+                              )
+                            }
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-lg outline-none cursor-pointer uppercase ${
+                              isApproved
+                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                                : isRejected
+                                ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
+                                : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+                            }`}
+                          >
+                            <option value="SUBMITTED">SUBMITTED</option>
+                            <option value="APPROVED">APPROVED</option>
+                            <option value="PAID">PAID</option>
+                            <option value="REJECTED">REJECTED</option>
+                          </select>
+                        ) : (
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-lg uppercase ${
+                              isApproved
+                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                                : isRejected
+                                ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
+                                : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+                            }`}
+                          >
+                            {voucher.status}
+                          </span>
+                        )}
                       </td>
 
-                      {/* Delete */}
-                      <td className="py-3 px-3 text-center">
-                        <button
-                          onClick={() => deleteExpenseVoucher(voucher.id)}
-                          className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 transition-colors"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </td>
+                      {/* Delete (Admin Only) */}
+                      {isAdmin && (
+                        <td className="py-3 px-3 text-center">
+                          <button
+                            onClick={() => handleDelete(voucher.id)}
+                            className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 transition-colors"
+                            title="Delete Voucher (Admin Only)"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   );
                 })
@@ -422,8 +457,8 @@ export const SiteExpensesFinancialsModule: React.FC = () => {
         </div>
       </div>
 
-      {/* REFILL PETTY CASH MODAL */}
-      {isRefillOpen && (
+      {/* REFILL PETTY CASH MODAL (Admin Only) */}
+      {isRefillOpen && isAdmin && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
           <div className="bg-[#0c1427] border border-[#1b2845] rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between">

@@ -30,12 +30,10 @@ import {
   Shield,
   Clock,
   CheckCircle2,
-  ScanLine,
   FileText,
   Bell,
   ShoppingCart,
   Tag,
-  MapPin,
   Archive
 } from 'lucide-react';
 
@@ -388,6 +386,7 @@ export const UserManagementModule: React.FC = () => {
         </div>
       </div>
 
+      {/* Add/Edit Modal */}
       {isModalOpen && isAdmin && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
           <div className="bg-[#121927] border border-[#1E293B] rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 text-slate-100 max-h-[92vh] overflow-y-auto">
@@ -532,7 +531,7 @@ export const UserManagementModule: React.FC = () => {
 };
 
 // ==========================================
-// Building Scaffold Views
+// Building Generic Views Scaffold
 // ==========================================
 const BuildingGenericModuleView: React.FC<{
   title: string;
@@ -661,13 +660,6 @@ export const AppContent: React.FC = () => {
                 {activeTab === 'transactions' && <StockTransactionsModule />}
                 {activeTab === 'attendance-salary' && <AttendancePayrollModule />}
                 {activeTab === 'equipment-register' && <MachineryFleetModule />}
-                {activeTab === 'scan-barcode' && (
-                  <BuildingGenericModuleView
-                    title="Barcode & QR Material Scanner"
-                    subtitle="Scan item barcodes for fast batch inwards and plant equipment tracking."
-                    icon={ScanLine}
-                  />
-                )}
                 {activeTab === 'reports' && (
                   <BuildingGenericModuleView
                     title="Material Consumption & Audit Reports"
@@ -694,13 +686,6 @@ export const AppContent: React.FC = () => {
                     title="Building Material Categories"
                     subtitle="Manage Structural RCC, Masonry, Plumbing, Electrical, and Finishing item groups."
                     icon={Tag}
-                  />
-                )}
-                {activeTab === 'locations' && (
-                  <BuildingGenericModuleView
-                    title="Storage Locations & Tower Yards"
-                    subtitle="Central stockyard, tower floor staging points, and batching plant bins."
-                    icon={MapPin}
                   />
                 )}
                 {activeTab === 'yearly-archive' && (

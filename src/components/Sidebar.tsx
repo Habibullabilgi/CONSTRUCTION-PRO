@@ -1,4 +1,3 @@
-```tsx
 import React from 'react';
 import { useERP } from '../context/ERPContext';
 import {
@@ -109,7 +108,7 @@ export const Sidebar: React.FC<Props> = ({
 
   // ==========================================
   // BUILDING CONSTRUCTION NAVIGATION ITEMS
-  // (Scan Barcode & Locations Removed)
+  // (Scan Barcode & Locations removed)
   // ==========================================
   const buildingCoreItems: NavItem[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -264,5 +263,3 @@ export const Sidebar: React.FC<Props> = ({
 };
 
 export default Sidebar;
-
-```

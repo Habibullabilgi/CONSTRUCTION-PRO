@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ERPProvider, useERP } from './context/ERPContext';
 import { RoadERPProvider } from './context/RoadERPContext';
 import { LoginPage } from './components/auth/LoginPage';
+import { SiteSelectionPage } from './components/auth/SiteSelectionPage';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { SiteCentricMidnightDashboard } from './components/dashboard/SiteCentricMidnightDashboard';
@@ -21,8 +22,7 @@ import {
   X,
   Shield,
   Clock,
-  CheckCircle2,
-  AlertTriangle
+  CheckCircle2
 } from 'lucide-react';
 
 // ==========================================
@@ -37,7 +37,7 @@ export interface ManagedUser {
   password?: string;
   role: SystemRole;
   expiryType: 'PERMANENT' | 'DEMO';
-  expiryDateTime?: string; // ISO / YYYY-MM-DDTHH:mm
+  expiryDateTime?: string;
   createdDate: string;
   isCurrentUser?: boolean;
 }
@@ -88,7 +88,6 @@ const LOCAL_STORAGE_USERS_KEY = 'CONSTRUCTION_PRO_SYSTEM_USERS_V2';
 export const UserManagementModule: React.FC = () => {
   const { currentUser, userRole } = useERP();
 
-  // Strict check: Only Admin has management controls
   const roleStr = String(currentUser?.role || userRole || '').toLowerCase();
   const isAdmin = roleStr.includes('admin');
 
@@ -104,7 +103,6 @@ export const UserManagementModule: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<ManagedUser | null>(null);
 
-  // Form State (Email completely removed, demo date+time added)
   const [formData, setFormData] = useState({
     name: '',
     username: '',
@@ -217,7 +215,7 @@ export const UserManagementModule: React.FC = () => {
 
   return (
     <div className="space-y-6 font-sans text-slate-100 pb-12">
-      {/* 1. Page Header */}
+      {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400">
@@ -231,7 +229,6 @@ export const UserManagementModule: React.FC = () => {
           </div>
         </div>
 
-        {/* Only Admin can add users */}
         {isAdmin && (
           <button
             onClick={handleOpenAddModal}
@@ -243,7 +240,7 @@ export const UserManagementModule: React.FC = () => {
         )}
       </div>
 
-      {/* 2. Top Role Cards Grid */}
+      {/* Roles Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         <div className="p-4 rounded-2xl bg-[#0e1626] border border-rose-600/50 space-y-1.5">
           <div className="text-sm font-bold text-rose-400">Admin</div>
@@ -281,7 +278,7 @@ export const UserManagementModule: React.FC = () => {
         </div>
       </div>
 
-      {/* 3. System Users Registry Table */}
+      {/* Users Table */}
       <div className="bg-[#0b1220] border border-[#1e293b] rounded-2xl overflow-hidden shadow-2xl">
         <div className="px-6 py-4 border-b border-[#1e293b] bg-[#0d1527]/50 flex items-center justify-between">
           <div>
@@ -377,7 +374,7 @@ export const UserManagementModule: React.FC = () => {
         </div>
       </div>
 
-      {/* 4. Add / Edit System User Modal (Admin Only) */}
+      {/* Modal */}
       {isModalOpen && isAdmin && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
           <div className="bg-[#121927] border border-[#1E293B] rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 text-slate-100 max-h-[92vh] overflow-y-auto">
@@ -395,7 +392,6 @@ export const UserManagementModule: React.FC = () => {
             </div>
 
             <form onSubmit={handleSaveUser} className="space-y-3.5 text-xs">
-              {/* Full Name */}
               <div>
                 <label className="block text-slate-300 font-bold mb-1">Full Name *</label>
                 <input
@@ -408,7 +404,6 @@ export const UserManagementModule: React.FC = () => {
                 />
               </div>
 
-              {/* Username & Role */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-300 font-bold mb-1">Username (Login ID) *</label>
@@ -440,11 +435,8 @@ export const UserManagementModule: React.FC = () => {
                 </div>
               </div>
 
-              {/* Password */}
               <div>
-                <label className="block text-slate-300 font-bold mb-1">
-                  Login Password *
-                </label>
+                <label className="block text-slate-300 font-bold mb-1">Login Password *</label>
                 <input
                   type="text"
                   required
@@ -455,7 +447,6 @@ export const UserManagementModule: React.FC = () => {
                 />
               </div>
 
-              {/* Account Expiry Type */}
               <div>
                 <label className="block text-slate-300 font-bold mb-1">Account Expiry Plan *</label>
                 <div className="grid grid-cols-2 gap-2">
@@ -485,7 +476,6 @@ export const UserManagementModule: React.FC = () => {
                 </div>
               </div>
 
-              {/* Date & Time Picker for Demo Expiry */}
               {formData.expiryType === 'DEMO' && (
                 <div className="p-3 bg-[#0d1527] border border-amber-500/40 rounded-2xl space-y-1.5 animate-in fade-in">
                   <label className="block text-amber-400 font-bold flex items-center gap-1">
@@ -505,7 +495,6 @@ export const UserManagementModule: React.FC = () => {
                 </div>
               )}
 
-              {/* Action Buttons */}
               <div className="flex justify-end gap-2 pt-3 border-t border-[#1E293B]">
                 <button
                   type="button"
@@ -533,24 +522,47 @@ export const UserManagementModule: React.FC = () => {
 // Main Application Content Router
 // ==========================================
 export const AppContent: React.FC = () => {
-  const { isAuthenticated } = useERP();
+  const { isAuthenticated, selectedSiteId, setSelectedSiteId, siteSheets } = useERP();
+  
+  // Track whether the user has chosen a site during THIS session
+  const [hasSelectedSite, setHasSelectedSite] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem('CONSTRUCTION_PRO_SITE_CHOSEN_SESSION') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
 
+  // 1. Not Authenticated -> Login Page
   if (!isAuthenticated) {
     return <LoginPage />;
   }
 
+  // 2. Authenticated but haven't selected a site in this session OR no sites exist -> Site Selection Page
+  if (!hasSelectedSite || !selectedSiteId || siteSheets.length === 0) {
+    return (
+      <SiteSelectionPage
+        onSelectSite={(siteId) => {
+          setSelectedSiteId(siteId);
+          setHasSelectedSite(true);
+          sessionStorage.setItem('CONSTRUCTION_PRO_SITE_CHOSEN_SESSION', 'true');
+        }}
+      />
+    );
+  }
+
+  // 3. Authenticated & Site Chosen -> Main Application Viewport
   return (
     <div className="min-h-screen bg-[#080C14] text-slate-100 flex flex-col selection:bg-blue-600 selection:text-white font-sans">
-      {/* Sticky Top Header */}
       <Header
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
       />
 
-      {/* Main Layout: Sticky Sidebar + Smooth Scroll Area */}
       <div className="flex flex-1 relative min-h-[calc(100vh-48px)]">
         {isSidebarOpen && (
           <Sidebar

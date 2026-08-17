@@ -629,9 +629,11 @@ export const AppContent: React.FC = () => {
 
         <main className="flex-1 p-4 sm:p-6 overflow-y-auto max-h-[calc(100vh-48px)] scrollbar-thin scrollbar-thumb-[#1E293B] scrollbar-track-transparent">
           <div className="max-w-7xl mx-auto pb-12">
-            {/* Shared Dashboard, Ongoing Sites & User Management */}
+            {/* Common Dashboard, Ongoing Sites & User Management */}
             {activeTab === 'dashboard' && <SiteCentricMidnightDashboard onNavigateTab={setActiveTab} />}
-            {(activeTab === 'road-sites' || activeTab === 'sites') && <RoadSitesManagerModule onNavigateTab={setActiveTab} />}
+            {(activeTab === 'road-sites' || activeTab === 'sites') && (
+              <RoadSitesManagerModule projectType={projectType || 'ROAD'} onNavigateTab={setActiveTab} />
+            )}
             {activeTab === 'users' && <UserManagementModule />}
 
             {/* Road Construction Specific Tabs */}

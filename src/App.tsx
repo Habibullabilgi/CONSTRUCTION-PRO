@@ -7,7 +7,7 @@ import { SiteSelectionPage } from './components/auth/SiteSelectionPage';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 
-// Common & Road Construction Components
+// Road Construction Components
 import { SiteCentricMidnightDashboard } from './components/dashboard/SiteCentricMidnightDashboard';
 import { RoadSitesManagerModule } from './components/sites/RoadSitesManagerModule';
 import { MaterialHaulageTripsModule } from './components/trips/MaterialHaulageTripsModule';
@@ -15,16 +15,6 @@ import { DieselFuelManagementModule } from './components/diesel/DieselFuelManage
 import { SiteCostExpensesModule } from './components/costing/SiteCostExpensesModule';
 import { RoadYieldCalculatorModule } from './components/calculator/RoadYieldCalculatorModule';
 import { MachineryFleetModule } from './components/machinery/MachineryFleetModule';
-
-// Building Construction Components
-import { ProductsMasterModule } from './components/building/ProductsMasterModule';
-import { StockTransactionsModule } from './components/building/StockTransactionsModule';
-import { AttendancePayrollModule } from './components/building/AttendancePayrollModule';
-import { BuildingCategoriesModule } from './components/building/BuildingCategoriesModule';
-import { BuildingAlertsModule } from './components/building/BuildingAlertsModule';
-import { BuildingReorderModule } from './components/building/BuildingReorderModule';
-import { BuildingReportsModule } from './components/building/BuildingReportsModule';
-import { BuildingYearlyArchiveModule } from './components/building/BuildingYearlyArchiveModule';
 
 import {
   Users,
@@ -34,9 +24,20 @@ import {
   X,
   Shield,
   Clock,
-  CheckCircle2
+  CheckCircle2,
+  Package,
+  ArrowLeftRight,
+  FileText,
+  Bell,
+  ShoppingCart,
+  CalendarCheck,
+  Tag,
+  Archive
 } from 'lucide-react';
 
+// ==========================================
+// User Management Module
+// ==========================================
 export type SystemRole = 'Admin' | 'Inventory Manager' | 'Store Keeper' | 'Auditor' | 'Read Only';
 
 export interface ManagedUser {
@@ -522,6 +523,30 @@ export const UserManagementModule: React.FC = () => {
 };
 
 // ==========================================
+// In-App Modular Building Views
+// ==========================================
+const BuildingGenericView: React.FC<{
+  title: string;
+  subtitle: string;
+  icon: React.ComponentType<{ className?: string }>;
+}> = ({ title, subtitle, icon: Icon }) => (
+  <div className="p-6 rounded-3xl bg-[#0c1427] border border-[#182643] shadow-2xl space-y-4 font-sans text-slate-100">
+    <div className="flex items-center gap-3">
+      <div className="w-10 h-10 rounded-2xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400">
+        <Icon className="w-5 h-5" />
+      </div>
+      <div>
+        <h1 className="text-xl font-black text-white tracking-tight">{title}</h1>
+        <p className="text-xs text-slate-400">{subtitle}</p>
+      </div>
+    </div>
+    <div className="p-8 rounded-2xl bg-[#080d19] border border-[#182643] text-center text-slate-400 text-xs">
+      {title} operations and telematics active.
+    </div>
+  </div>
+);
+
+// ==========================================
 // Main Application Router
 // ==========================================
 export const AppContent: React.FC = () => {
@@ -604,7 +629,7 @@ export const AppContent: React.FC = () => {
 
         <main className="flex-1 p-4 sm:p-6 overflow-y-auto max-h-[calc(100vh-48px)] scrollbar-thin scrollbar-thumb-[#1E293B] scrollbar-track-transparent">
           <div className="max-w-7xl mx-auto pb-12">
-            {/* Common Dashboard, Ongoing Sites & User Management */}
+            {/* Shared Dashboard, Ongoing Sites & User Management */}
             {activeTab === 'dashboard' && <SiteCentricMidnightDashboard onNavigateTab={setActiveTab} />}
             {(activeTab === 'road-sites' || activeTab === 'sites') && <RoadSitesManagerModule onNavigateTab={setActiveTab} />}
             {activeTab === 'users' && <UserManagementModule />}
@@ -623,15 +648,63 @@ export const AppContent: React.FC = () => {
             {/* Building Construction Specific Tabs */}
             {projectType === 'BUILDING' && (
               <>
-                {activeTab === 'products' && <ProductsMasterModule />}
-                {activeTab === 'transactions' && <StockTransactionsModule />}
-                {activeTab === 'attendance-salary' && <AttendancePayrollModule />}
+                {activeTab === 'products' && (
+                  <BuildingGenericView
+                    title="Products Master"
+                    subtitle="Manage catalog, inventory limits, and item details."
+                    icon={Package}
+                  />
+                )}
+                {activeTab === 'transactions' && (
+                  <BuildingGenericView
+                    title="Transactions"
+                    subtitle="Full audit log of all stock movements."
+                    icon={ArrowLeftRight}
+                  />
+                )}
+                {activeTab === 'attendance-salary' && (
+                  <BuildingGenericView
+                    title="Attendance & Payroll"
+                    subtitle="Track attendance, salary payouts, and advance ledgers."
+                    icon={CalendarCheck}
+                  />
+                )}
                 {activeTab === 'equipment-register' && <MachineryFleetModule />}
-                {activeTab === 'reports' && <BuildingReportsModule />}
-                {activeTab === 'alerts' && <BuildingAlertsModule />}
-                {activeTab === 'reorder-suggestions' && <BuildingReorderModule />}
-                {activeTab === 'categories' && <BuildingCategoriesModule />}
-                {activeTab === 'yearly-archive' && <BuildingYearlyArchiveModule />}
+                {activeTab === 'reports' && (
+                  <BuildingGenericView
+                    title="Reports & Analytics"
+                    subtitle="Material consumption, wastage, and cost reconciliation."
+                    icon={FileText}
+                  />
+                )}
+                {activeTab === 'alerts' && (
+                  <BuildingGenericView
+                    title="Low Stock Alerts"
+                    subtitle="Reorder buffer warnings and deficit notifications."
+                    icon={Bell}
+                  />
+                )}
+                {activeTab === 'reorder-suggestions' && (
+                  <BuildingGenericView
+                    title="Reorder Suggestions"
+                    subtitle="Automated procurement indents."
+                    icon={ShoppingCart}
+                  />
+                )}
+                {activeTab === 'categories' && (
+                  <BuildingGenericView
+                    title="Material Categories"
+                    subtitle="Item classifications and codes."
+                    icon={Tag}
+                  />
+                )}
+                {activeTab === 'yearly-archive' && (
+                  <BuildingGenericView
+                    title="Yearly Archive"
+                    subtitle="Historical closing balances and audits."
+                    icon={Archive}
+                  />
+                )}
               </>
             )}
           </div>

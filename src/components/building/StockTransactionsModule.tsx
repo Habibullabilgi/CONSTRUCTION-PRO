@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  ArrowLeftRight,
   Plus,
   Download,
   Search,
@@ -18,7 +17,7 @@ export interface StockTransaction {
   issuedTo?: string;
 }
 
-const STORAGE_TXNS_KEY = 'CONSTRUCTION_PRO_BUILDING_TXNS_V1';
+const STORAGE_TXNS_KEY = 'CONSTRUCTION_PRO_BUILDING_TXNS_V2';
 
 const INITIAL_TXNS: StockTransaction[] = [
   {
@@ -41,12 +40,12 @@ const INITIAL_TXNS: StockTransaction[] = [
   },
   {
     id: 'TXN-103',
-    productName: 'TMT 550D Rebar 12mm',
+    productName: 'HP-80W/90 OIL',
     type: 'Stock Out',
-    quantity: 5,
-    date: '2026-08-12',
-    department: 'Civil Works',
-    issuedTo: 'Ramesh (Bar Bender)'
+    quantity: 300,
+    date: '2026-08-10',
+    department: 'Heavy Fleet',
+    issuedTo: 'Site Operator'
   }
 ];
 
@@ -66,7 +65,7 @@ export const StockTransactionsModule: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Form State (Cleaned)
+  // Form State (Vehicle No, Work Order, and Purpose removed)
   const [productName, setProductName] = useState('');
   const [type, setType] = useState<'Stock In' | 'Stock Out'>('Stock Out');
   const [quantity, setQuantity] = useState<number | ''>(0);
@@ -214,7 +213,7 @@ export const StockTransactionsModule: React.FC = () => {
               placeholder="Search ID, product, employee..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-8 pr-3 py-2 bg-[#080d19] border border-[#1E293B] rounded-xl text-white outline-none"
+              className="w-full pl-8 pr-3 py-2 bg-[#080d19] border border-[#1E293B] rounded-xl text-white outline-none placeholder-slate-500"
             />
           </div>
         </div>
@@ -415,3 +414,5 @@ export const StockTransactionsModule: React.FC = () => {
     </div>
   );
 };
+
+export default StockTransactionsModule;

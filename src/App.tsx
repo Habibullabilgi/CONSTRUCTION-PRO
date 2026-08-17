@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ERPProvider, useERP } from './context/ERPContext';
 import { RoadERPProvider } from './context/RoadERPContext';
 import { LoginPage } from './components/auth/LoginPage';
+import { ProjectTypeSelectionPage } from './components/auth/ProjectTypeSelectionPage';
 import { SiteSelectionPage } from './components/auth/SiteSelectionPage';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
@@ -11,7 +12,6 @@ import { DieselFuelManagementModule } from './components/diesel/DieselFuelManage
 import { SiteCostExpensesModule } from './components/costing/SiteCostExpensesModule';
 import { RoadSitesManagerModule } from './components/sites/RoadSitesManagerModule';
 import { RoadYieldCalculatorModule } from './components/calculator/RoadYieldCalculatorModule';
-import { RoadAnalyticsDPRModule } from './components/analytics/RoadAnalyticsDPRModule';
 import { MachineryFleetModule } from './components/machinery/MachineryFleetModule';
 
 import {
@@ -266,7 +266,7 @@ export const UserManagementModule: React.FC = () => {
         <div className="p-4 rounded-2xl bg-[#0e1626] border border-amber-600/50 space-y-1.5">
           <div className="text-sm font-bold text-amber-400">Auditor</div>
           <p className="text-[11px] text-slate-400 leading-relaxed">
-            Read-only audit access to telemetry and DPR
+            Read-only audit access to telemetry and records
           </p>
         </div>
 
@@ -374,7 +374,6 @@ export const UserManagementModule: React.FC = () => {
         </div>
       </div>
 
-      {/* Modal */}
       {isModalOpen && isAdmin && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
           <div className="bg-[#121927] border border-[#1E293B] rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 text-slate-100 max-h-[92vh] overflow-y-auto">
@@ -523,8 +522,17 @@ export const UserManagementModule: React.FC = () => {
 // ==========================================
 export const AppContent: React.FC = () => {
   const { isAuthenticated, selectedSiteId, setSelectedSiteId, siteSheets } = useERP();
-  
-  // Track whether the user has chosen a site during THIS session
+
+  // 1. Domain Type Selection State ('ROAD' | 'BUILDING' | null)
+  const [projectType, setProjectType] = useState<'ROAD' | 'BUILDING' | null>(() => {
+    try {
+      return (sessionStorage.getItem('CONSTRUCTION_PRO_DOMAIN_SESSION') as any) || null;
+    } catch {
+      return null;
+    }
+  });
+
+  // 2. Specific Site Chosen State
   const [hasSelectedSite, setHasSelectedSite] = useState<boolean>(() => {
     try {
       return sessionStorage.getItem('CONSTRUCTION_PRO_SITE_CHOSEN_SESSION') === 'true';
@@ -536,25 +544,44 @@ export const AppContent: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
 
-  // 1. Not Authenticated -> Login Page
+  // Step 1: Authentication Check
   if (!isAuthenticated) {
     return <LoginPage />;
   }
 
-  // 2. Authenticated but haven't selected a site in this session OR no sites exist -> Site Selection Page
-  if (!hasSelectedSite || !selectedSiteId || siteSheets.length === 0) {
+  // Step 2: Domain Choice Check (Road vs Building)
+  if (!projectType) {
     return (
-      <SiteSelectionPage
-        onSelectSite={(siteId) => {
-          setSelectedSiteId(siteId);
-          setHasSelectedSite(true);
-          sessionStorage.setItem('CONSTRUCTION_PRO_SITE_CHOSEN_SESSION', 'true');
+      <ProjectTypeSelectionPage
+        onSelectProjectType={(type) => {
+          setProjectType(type);
+          sessionStorage.setItem('CONSTRUCTION_PRO_DOMAIN_SESSION', type);
         }}
       />
     );
   }
 
-  // 3. Authenticated & Site Chosen -> Main Application Viewport
+  // Step 3: Site Selection Check
+  if (!hasSelectedSite || !selectedSiteId || siteSheets.length === 0) {
+    return (
+      <SiteSelectionPage
+        projectType={projectType}
+        onSelectSite={(siteId) => {
+          setSelectedSiteId(siteId);
+          setHasSelectedSite(true);
+          sessionStorage.setItem('CONSTRUCTION_PRO_SITE_CHOSEN_SESSION', 'true');
+        }}
+        onBackToDomainSelect={() => {
+          setProjectType(null);
+          setHasSelectedSite(false);
+          sessionStorage.removeItem('CONSTRUCTION_PRO_DOMAIN_SESSION');
+          sessionStorage.removeItem('CONSTRUCTION_PRO_SITE_CHOSEN_SESSION');
+        }}
+      />
+    );
+  }
+
+  // Step 4: Main Application Viewport
   return (
     <div className="min-h-screen bg-[#080C14] text-slate-100 flex flex-col selection:bg-blue-600 selection:text-white font-sans">
       <Header
@@ -581,7 +608,6 @@ export const AppContent: React.FC = () => {
             {activeTab === 'site-expenses' && <SiteCostExpensesModule />}
             {(activeTab === 'yield_calculator' || activeTab === 'road-yield') && <RoadYieldCalculatorModule />}
             {(activeTab === 'machinery_fleet' || activeTab === 'machinery') && <MachineryFleetModule />}
-            {(activeTab === 'dpr' || activeTab === 'reports') && <RoadAnalyticsDPRModule />}
           </div>
         </main>
       </div>

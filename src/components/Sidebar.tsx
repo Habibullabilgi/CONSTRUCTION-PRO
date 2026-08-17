@@ -1,4 +1,3 @@
-```tsx
 import React from 'react';
 import { useERP } from '../context/ERPContext';
 import {
@@ -63,7 +62,7 @@ export const Sidebar: React.FC<Props> = ({ activeTab, setActiveTab }) => {
     }
   ];
 
-  // 2. ENGINEERING
+  // 2. ENGINEERING (DPR removed)
   const engineeringItems: NavItem[] = [
     {
       id: 'yield_calculator',
@@ -191,5 +190,3 @@ export const Sidebar: React.FC<Props> = ({ activeTab, setActiveTab }) => {
 };
 
 export default Sidebar;
-
-```

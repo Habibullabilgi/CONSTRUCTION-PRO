@@ -7,12 +7,12 @@ import { SiteSelectionPage } from './components/auth/SiteSelectionPage';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 
-// Road Construction Components
+// Common & Road Construction Components
 import { SiteCentricMidnightDashboard } from './components/dashboard/SiteCentricMidnightDashboard';
+import { RoadSitesManagerModule } from './components/sites/RoadSitesManagerModule';
 import { MaterialHaulageTripsModule } from './components/trips/MaterialHaulageTripsModule';
 import { DieselFuelManagementModule } from './components/diesel/DieselFuelManagementModule';
 import { SiteCostExpensesModule } from './components/costing/SiteCostExpensesModule';
-import { RoadSitesManagerModule } from './components/sites/RoadSitesManagerModule';
 import { RoadYieldCalculatorModule } from './components/calculator/RoadYieldCalculatorModule';
 import { MachineryFleetModule } from './components/machinery/MachineryFleetModule';
 
@@ -20,6 +20,11 @@ import { MachineryFleetModule } from './components/machinery/MachineryFleetModul
 import { ProductsMasterModule } from './components/building/ProductsMasterModule';
 import { StockTransactionsModule } from './components/building/StockTransactionsModule';
 import { AttendancePayrollModule } from './components/building/AttendancePayrollModule';
+import { BuildingCategoriesModule } from './components/building/BuildingCategoriesModule';
+import { BuildingAlertsModule } from './components/building/BuildingAlertsModule';
+import { BuildingReorderModule } from './components/building/BuildingReorderModule';
+import { BuildingReportsModule } from './components/building/BuildingReportsModule';
+import { BuildingYearlyArchiveModule } from './components/building/BuildingYearlyArchiveModule';
 
 import {
   Users,
@@ -29,17 +34,9 @@ import {
   X,
   Shield,
   Clock,
-  CheckCircle2,
-  FileText,
-  Bell,
-  ShoppingCart,
-  Tag,
-  Archive
+  CheckCircle2
 } from 'lucide-react';
 
-// ==========================================
-// User Management Module
-// ==========================================
 export type SystemRole = 'Admin' | 'Inventory Manager' | 'Store Keeper' | 'Auditor' | 'Read Only';
 
 export interface ManagedUser {
@@ -99,9 +96,7 @@ const LOCAL_STORAGE_USERS_KEY = 'CONSTRUCTION_PRO_SYSTEM_USERS_V2';
 
 export const UserManagementModule: React.FC = () => {
   const { currentUser, userRole } = useERP();
-
-  const roleStr = String(currentUser?.role || userRole || '').toLowerCase();
-  const isAdmin = roleStr.includes('admin');
+  const isAdmin = String(currentUser?.role || userRole || '').toLowerCase().includes('admin');
 
   const [users, setUsers] = useState<ManagedUser[]>(() => {
     try {
@@ -227,7 +222,6 @@ export const UserManagementModule: React.FC = () => {
 
   return (
     <div className="space-y-6 font-sans text-slate-100 pb-12">
-      {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400">
@@ -252,7 +246,6 @@ export const UserManagementModule: React.FC = () => {
         )}
       </div>
 
-      {/* Roles Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         <div className="p-4 rounded-2xl bg-[#0e1626] border border-rose-600/50 space-y-1.5">
           <div className="text-sm font-bold text-rose-400">Admin</div>
@@ -290,7 +283,6 @@ export const UserManagementModule: React.FC = () => {
         </div>
       </div>
 
-      {/* Users Table */}
       <div className="bg-[#0b1220] border border-[#1e293b] rounded-2xl overflow-hidden shadow-2xl">
         <div className="px-6 py-4 border-b border-[#1e293b] bg-[#0d1527]/50 flex items-center justify-between">
           <div>
@@ -386,7 +378,6 @@ export const UserManagementModule: React.FC = () => {
         </div>
       </div>
 
-      {/* Add/Edit Modal */}
       {isModalOpen && isAdmin && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
           <div className="bg-[#121927] border border-[#1E293B] rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 text-slate-100 max-h-[92vh] overflow-y-auto">
@@ -531,30 +522,6 @@ export const UserManagementModule: React.FC = () => {
 };
 
 // ==========================================
-// Building Generic Views Scaffold
-// ==========================================
-const BuildingGenericModuleView: React.FC<{
-  title: string;
-  subtitle: string;
-  icon: React.ComponentType<{ className?: string }>;
-}> = ({ title, subtitle, icon: Icon }) => (
-  <div className="p-6 rounded-3xl bg-[#0c1427] border border-[#182643] shadow-2xl space-y-4 font-sans text-slate-100">
-    <div className="flex items-center gap-3">
-      <div className="w-10 h-10 rounded-2xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400">
-        <Icon className="w-5 h-5" />
-      </div>
-      <div>
-        <h1 className="text-xl font-black text-white tracking-tight">{title}</h1>
-        <p className="text-xs text-slate-400">{subtitle}</p>
-      </div>
-    </div>
-    <div className="p-8 rounded-2xl bg-[#080d19] border border-[#182643] text-center text-slate-500 text-xs">
-      {title} records & automated workflows are active for this site.
-    </div>
-  </div>
-);
-
-// ==========================================
 // Main Application Router
 // ==========================================
 export const AppContent: React.FC = () => {
@@ -637,14 +604,14 @@ export const AppContent: React.FC = () => {
 
         <main className="flex-1 p-4 sm:p-6 overflow-y-auto max-h-[calc(100vh-48px)] scrollbar-thin scrollbar-thumb-[#1E293B] scrollbar-track-transparent">
           <div className="max-w-7xl mx-auto pb-12">
-            {/* Common Dashboard & User Management */}
+            {/* Common Dashboard, Ongoing Sites & User Management */}
             {activeTab === 'dashboard' && <SiteCentricMidnightDashboard onNavigateTab={setActiveTab} />}
+            {(activeTab === 'road-sites' || activeTab === 'sites') && <RoadSitesManagerModule onNavigateTab={setActiveTab} />}
             {activeTab === 'users' && <UserManagementModule />}
 
             {/* Road Construction Specific Tabs */}
             {projectType === 'ROAD' && (
               <>
-                {(activeTab === 'road-sites' || activeTab === 'sites') && <RoadSitesManagerModule onNavigateTab={setActiveTab} />}
                 {activeTab === 'haulage-trips' && <MaterialHaulageTripsModule />}
                 {activeTab === 'diesel' && <DieselFuelManagementModule />}
                 {activeTab === 'site-expenses' && <SiteCostExpensesModule />}
@@ -660,41 +627,11 @@ export const AppContent: React.FC = () => {
                 {activeTab === 'transactions' && <StockTransactionsModule />}
                 {activeTab === 'attendance-salary' && <AttendancePayrollModule />}
                 {activeTab === 'equipment-register' && <MachineryFleetModule />}
-                {activeTab === 'reports' && (
-                  <BuildingGenericModuleView
-                    title="Material Consumption & Audit Reports"
-                    subtitle="Floor-wise RCC structural burn rates, steel cut-length wastage, and stock reconciliation."
-                    icon={FileText}
-                  />
-                )}
-                {activeTab === 'alerts' && (
-                  <BuildingGenericModuleView
-                    title="Low Stock & Reorder Alerts"
-                    subtitle="Instant warnings when cement, steel rebars, or aggregate fall below safety buffers."
-                    icon={Bell}
-                  />
-                )}
-                {activeTab === 'reorder-suggestions' && (
-                  <BuildingGenericModuleView
-                    title="Automated Purchase Indents & Suggestions"
-                    subtitle="Estimated procurement schedule based on target floor casting schedules."
-                    icon={ShoppingCart}
-                  />
-                )}
-                {activeTab === 'categories' && (
-                  <BuildingGenericModuleView
-                    title="Building Material Categories"
-                    subtitle="Manage Structural RCC, Masonry, Plumbing, Electrical, and Finishing item groups."
-                    icon={Tag}
-                  />
-                )}
-                {activeTab === 'yearly-archive' && (
-                  <BuildingGenericModuleView
-                    title="Fiscal Year Audit Archive"
-                    subtitle="Locked historical stock ledgers, financial closing records, and vendor statements."
-                    icon={Archive}
-                  />
-                )}
+                {activeTab === 'reports' && <BuildingReportsModule />}
+                {activeTab === 'alerts' && <BuildingAlertsModule />}
+                {activeTab === 'reorder-suggestions' && <BuildingReorderModule />}
+                {activeTab === 'categories' && <BuildingCategoriesModule />}
+                {activeTab === 'yearly-archive' && <BuildingYearlyArchiveModule />}
               </>
             )}
           </div>

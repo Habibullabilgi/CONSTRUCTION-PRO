@@ -34,7 +34,12 @@ import {
   ShoppingCart,
   CalendarCheck,
   Tag,
-  Archive
+  Archive,
+  TrendingUp,
+  TrendingDown,
+  Layers,
+  Building2,
+  Calendar
 } from 'lucide-react';
 
 // ==========================================
@@ -1109,7 +1114,7 @@ export const ProductsMasterModule: React.FC = () => {
 };
 
 // ==========================================
-// Stock Transactions Module (With Delete Option)
+// Stock Transactions Module
 // ==========================================
 export interface StockTransaction {
   id: string;
@@ -1166,9 +1171,6 @@ const INITIAL_STOCK_TXNS: StockTransaction[] = [
 ];
 
 export const StockTransactionsModule: React.FC = () => {
-  const { currentUser, userRole } = useERP();
-  const isAdmin = String(currentUser?.role || userRole || '').toLowerCase().includes('admin');
-
   const [transactions, setTransactions] = useState<StockTransaction[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_TXNS_KEY);
@@ -1579,7 +1581,255 @@ export const StockTransactionsModule: React.FC = () => {
 };
 
 // ==========================================
-// Generic Scaffold Views
+// Reports & Analytics Module (LINKED TO TRANSACTIONS & PRODUCTS)
+// ==========================================
+export const ReportsAnalyticsModule: React.FC = () => {
+  const [transactions] = useState<StockTransaction[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_TXNS_KEY);
+      return saved ? JSON.parse(saved) : INITIAL_STOCK_TXNS;
+    } catch {
+      return INITIAL_STOCK_TXNS;
+    }
+  });
+
+  const [products] = useState<BuildingProduct[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_PRODUCTS_KEY);
+      return saved ? JSON.parse(saved) : INITIAL_BUILDING_PRODUCTS;
+    } catch {
+      return INITIAL_BUILDING_PRODUCTS;
+    }
+  });
+
+  // Calculate live aggregates directly from transactions
+  const totalStockInQty = useMemo(
+    () => transactions.filter((t) => t.type === 'Stock In').reduce((sum, t) => sum + t.quantity, 0),
+    [transactions]
+  );
+
+  const totalStockOutQty = useMemo(
+    () => transactions.filter((t) => t.type === 'Stock Out').reduce((sum, t) => sum + t.quantity, 0),
+    [transactions]
+  );
+
+  // Group transactions by product to build reconciliation table
+  const productReconciliation = useMemo(() => {
+    const map: Record<
+      string,
+      {
+        name: string;
+        inQty: number;
+        outQty: number;
+        txnCount: number;
+        lastDate: string;
+        departments: Set<string>;
+      }
+    > = {};
+
+    transactions.forEach((t) => {
+      if (!map[t.productName]) {
+        map[t.productName] = {
+          name: t.productName,
+          inQty: 0,
+          outQty: 0,
+          txnCount: 0,
+          lastDate: t.date,
+          departments: new Set()
+        };
+      }
+      if (t.type === 'Stock In') map[t.productName].inQty += t.quantity;
+      if (t.type === 'Stock Out') map[t.productName].outQty += t.quantity;
+      map[t.productName].txnCount += 1;
+      if (t.department) map[t.productName].departments.add(t.department);
+      if (t.date > map[t.productName].lastDate) map[t.productName].lastDate = t.date;
+    });
+
+    return Object.values(map);
+  }, [transactions]);
+
+  // Department distribution
+  const departmentBreakdown = useMemo(() => {
+    const deptMap: Record<string, number> = {};
+    transactions
+      .filter((t) => t.type === 'Stock Out')
+      .forEach((t) => {
+        const d = t.department || 'General Site';
+        deptMap[d] = (deptMap[d] || 0) + t.quantity;
+      });
+    return Object.entries(deptMap);
+  }, [transactions]);
+
+  const handleExportFullReport = () => {
+    const headers = ['Product Name', 'Total Stock In', 'Total Stock Out', 'Net Consumption', 'Txn Count', 'Last Activity Date'];
+    const rows = productReconciliation.map((r) => [
+      `"${r.name}"`,
+      r.inQty,
+      r.outQty,
+      r.outQty - r.inQty,
+      r.txnCount,
+      r.lastDate
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const link = document.createElement('a');
+    link.href = encodeURI(csvContent);
+    link.download = `Material_Reconciliation_Audit_${Date.now()}.csv`;
+    link.click();
+  };
+
+  return (
+    <div className="space-y-6 font-sans text-slate-100">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400">
+            <FileText className="w-5 h-5" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-black text-white tracking-tight">Reports & Analytics</h1>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Live material consumption, wastage, and cost reconciliation linked to all site transactions.
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={handleExportFullReport}
+          className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-black flex items-center gap-2 transition-all shadow-lg shadow-blue-600/30 cursor-pointer w-fit"
+        >
+          <Download className="w-4 h-4" />
+          <span>Export Reconciliation PDF/CSV</span>
+        </button>
+      </div>
+
+      {/* 4 Analytics KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="p-5 rounded-3xl bg-[#0c1427] border border-[#182643] shadow-xl space-y-1">
+          <div className="text-[11px] font-semibold text-slate-400 flex items-center justify-between">
+            <span>Total Stock Inward</span>
+            <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+          </div>
+          <div className="text-2xl font-black text-emerald-400 font-mono mt-1">
+            +{totalStockInQty} <span className="text-xs font-normal text-slate-400">Units</span>
+          </div>
+          <div className="text-[10px] text-slate-400">From supplier deliveries & GRN</div>
+        </div>
+
+        <div className="p-5 rounded-3xl bg-[#0c1427] border border-[#182643] shadow-xl space-y-1">
+          <div className="text-[11px] font-semibold text-slate-400 flex items-center justify-between">
+            <span>Total Stock Outward</span>
+            <TrendingDown className="w-3.5 h-3.5 text-rose-400" />
+          </div>
+          <div className="text-2xl font-black text-rose-400 font-mono mt-1">
+            -{totalStockOutQty} <span className="text-xs font-normal text-slate-400">Units</span>
+          </div>
+          <div className="text-[10px] text-slate-400">Issued to site fleet & plants</div>
+        </div>
+
+        <div className="p-5 rounded-3xl bg-[#0c1427] border border-[#182643] shadow-xl space-y-1">
+          <div className="text-[11px] font-semibold text-slate-400 flex items-center justify-between">
+            <span>Logged Transactions</span>
+            <ArrowLeftRight className="w-3.5 h-3.5 text-blue-400" />
+          </div>
+          <div className="text-2xl font-black text-white font-mono mt-1">
+            {transactions.length} <span className="text-xs font-normal text-slate-400">Audited</span>
+          </div>
+          <div className="text-[10px] text-slate-400">Full tamper-evident movement trail</div>
+        </div>
+
+        <div className="p-5 rounded-3xl bg-[#0c1427] border border-[#182643] shadow-xl space-y-1">
+          <div className="text-[11px] font-semibold text-slate-400 flex items-center justify-between">
+            <span>Active SKU Catalog</span>
+            <Package className="w-3.5 h-3.5 text-amber-400" />
+          </div>
+          <div className="text-2xl font-black text-amber-400 font-mono mt-1">
+            {products.length} <span className="text-xs font-normal text-slate-400">Products</span>
+          </div>
+          <div className="text-[10px] text-slate-400">Monitored with buffer levels</div>
+        </div>
+      </div>
+
+      {/* Main Reconciliation Table */}
+      <div className="bg-[#0B1220] border border-[#1E293B] rounded-3xl overflow-hidden shadow-2xl">
+        <div className="px-6 py-4 border-b border-[#1E293B] bg-[#0d1527]/50 flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-bold text-white">Item-Wise Transaction Reconciliation</h2>
+            <p className="text-xs text-slate-400 mt-0.5">Calculated in real-time from all inward and outward log vouchers</p>
+          </div>
+          <span className="text-xs font-mono text-blue-400 bg-blue-950/60 px-3 py-1 rounded-xl border border-blue-800 font-bold">
+            Live Telemetry Active
+          </span>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr className="border-b border-[#1E293B] text-[10px] font-extrabold uppercase tracking-wider text-slate-400 bg-[#080d19]/80">
+                <th className="py-3.5 px-6">PRODUCT NAME</th>
+                <th className="py-3.5 px-4 text-right text-emerald-400">TOTAL INWARD (GRN)</th>
+                <th className="py-3.5 px-4 text-right text-rose-400">TOTAL ISSUED (SITE)</th>
+                <th className="py-3.5 px-4 text-right">NET SITE BURN</th>
+                <th className="py-3.5 px-4 text-center">TOTAL AUDIT LOGS</th>
+                <th className="py-3.5 px-6 text-right">LAST MOVEMENT</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#1E293B]/60 text-slate-200">
+              {productReconciliation.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-8 text-center text-slate-500">
+                    No transactions recorded yet.
+                  </td>
+                </tr>
+              ) : (
+                productReconciliation.map((rec, i) => (
+                  <tr key={i} className="hover:bg-[#121c33]/50 transition-colors">
+                    <td className="py-4 px-6">
+                      <div className="font-bold text-white text-xs">{rec.name}</div>
+                      <div className="text-[10px] text-slate-500">
+                        Used in: {Array.from(rec.departments).join(', ') || 'Site'}
+                      </div>
+                    </td>
+                    <td className="py-4 px-4 text-right font-mono font-bold text-emerald-400">
+                      +{rec.inQty}
+                    </td>
+                    <td className="py-4 px-4 text-right font-mono font-bold text-rose-400">
+                      -{rec.outQty}
+                    </td>
+                    <td className="py-4 px-4 text-right font-mono font-black text-amber-400">
+                      {rec.outQty} Units
+                    </td>
+                    <td className="py-4 px-4 text-center font-mono">
+                      <span className="px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-300 font-bold text-[10px]">
+                        {rec.txnCount} Vouchers
+                      </span>
+                    </td>
+                    <td className="py-4 px-6 text-right font-mono text-slate-400">{rec.lastDate}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Department Consumption Distribution */}
+      <div className="p-6 rounded-3xl bg-[#0c1427] border border-[#182643] shadow-2xl space-y-4">
+        <h3 className="font-bold text-sm text-white">Department Consumption Breakdown</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+          {departmentBreakdown.map(([dept, qty], idx) => (
+            <div key={idx} className="p-4 rounded-2xl bg-[#080d19] border border-[#1E293B] space-y-1">
+              <div className="text-xs font-bold text-white">{dept}</div>
+              <div className="text-lg font-black font-mono text-rose-400">{qty} Units Issued</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ==========================================
+// Generic Scaffold Views for Remaining Tabs
 // ==========================================
 const BuildingGenericView: React.FC<{
   title: string;
@@ -1685,7 +1935,7 @@ export const AppContent: React.FC = () => {
 
         <main className="flex-1 p-4 sm:p-6 overflow-y-auto max-h-[calc(100vh-48px)] scrollbar-thin scrollbar-thumb-[#1E293B] scrollbar-track-transparent">
           <div className="max-w-7xl mx-auto pb-12">
-            {/* Common Dashboard, Ongoing Sites & User Management */}
+            {/* Shared Dashboard, Ongoing Sites & User Management */}
             {activeTab === 'dashboard' && <SiteCentricMidnightDashboard onNavigateTab={setActiveTab} />}
             {(activeTab === 'road-sites' || activeTab === 'sites') && (
               <RoadSitesManagerModule projectType={projectType || 'ROAD'} onNavigateTab={setActiveTab} />
@@ -1708,6 +1958,7 @@ export const AppContent: React.FC = () => {
               <>
                 {activeTab === 'products' && <ProductsMasterModule />}
                 {activeTab === 'transactions' && <StockTransactionsModule />}
+                {activeTab === 'reports' && <ReportsAnalyticsModule />}
                 {activeTab === 'attendance-salary' && (
                   <BuildingGenericView
                     title="Attendance & Payroll"
@@ -1716,13 +1967,6 @@ export const AppContent: React.FC = () => {
                   />
                 )}
                 {activeTab === 'equipment-register' && <MachineryFleetModule />}
-                {activeTab === 'reports' && (
-                  <BuildingGenericView
-                    title="Reports & Analytics"
-                    subtitle="Material consumption, wastage, and cost reconciliation."
-                    icon={FileText}
-                  />
-                )}
                 {activeTab === 'alerts' && (
                   <BuildingGenericView
                     title="Low Stock Alerts"

@@ -108,10 +108,17 @@ export const Sidebar: React.FC<Props> = ({
 
   // ==========================================
   // BUILDING CONSTRUCTION NAVIGATION ITEMS
-  // (Scan Barcode & Locations removed)
+  // (Ongoing Site added under Core items)
   // ==========================================
   const buildingCoreItems: NavItem[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    {
+      id: 'road-sites',
+      label: 'Ongoing Site',
+      icon: Milestone,
+      badge: 'Sites',
+      badgeStyle: 'bg-emerald-950 text-emerald-400 border border-emerald-800'
+    },
     { id: 'products', label: 'Products', icon: Package },
     { id: 'transactions', label: 'Transactions', icon: ArrowLeftRight }
   ];

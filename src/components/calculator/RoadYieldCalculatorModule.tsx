@@ -1,4 +1,3 @@
-```tsx
 import React, { useState, useEffect } from 'react';
 import { useERP } from '../../context/ERPContext';
 import {
@@ -37,18 +36,20 @@ const MATERIAL_PRESETS = [
 const STORAGE_CALCULATIONS_KEY = 'CONSTRUCTION_PRO_ROAD_YIELD_CALCS_V1';
 
 export const RoadYieldCalculatorModule: React.FC = () => {
-  const { siteSheets, selectedSiteId, currentUser, userRole } = useERP();
+  const { siteSheets = [], selectedSiteId, currentUser, userRole } = useERP();
 
   const currentRoleStr = String(currentUser?.role || userRole || '').toLowerCase();
   const isAdmin = currentRoleStr.includes('admin');
 
-  const siteList = siteSheets && siteSheets.length > 0
+  const siteList = Array.isArray(siteSheets) && siteSheets.length > 0
     ? siteSheets.map((s) => s.siteName)
     : ['SINDAGI - ALMEL ROAD', 'Mulwad Ongoing Stretch', 'NH-50 Flexible Pavement Section'];
 
-  const defaultSiteName = siteSheets.find((s) => s.siteId === selectedSiteId)?.siteName || siteList[0];
+  const defaultSiteName = Array.isArray(siteSheets)
+    ? siteSheets.find((s) => s.siteId === selectedSiteId)?.siteName || siteList[0]
+    : siteList[0];
 
-  // Default input states to empty so nothing calculates until user enters dimensions
+  // Default input states to empty so outputs display 0 until entered
   const [siteName, setSiteName] = useState<string>(defaultSiteName);
   const [materialName, setMaterialName] = useState<string>(MATERIAL_PRESETS[0].name);
   const [lengthMeters, setLengthMeters] = useState<number | ''>('');
@@ -67,7 +68,9 @@ export const RoadYieldCalculatorModule: React.FC = () => {
     try {
       const saved = localStorage.getItem(STORAGE_CALCULATIONS_KEY);
       if (saved) return JSON.parse(saved);
-    } catch {}
+    } catch {
+      // Fallback on corrupt JSON
+    }
     return [];
   });
 
@@ -75,7 +78,7 @@ export const RoadYieldCalculatorModule: React.FC = () => {
     localStorage.setItem(STORAGE_CALCULATIONS_KEY, JSON.stringify(savedRecords));
   }, [savedRecords]);
 
-  // Real-time calculation: 0 if any dimension is unentered
+  // Real-time calculation: evaluates to 0 if inputs are missing or <= 0
   const L = typeof lengthMeters === 'number' && lengthMeters > 0 ? lengthMeters : 0;
   const W = typeof widthMeters === 'number' && widthMeters > 0 ? widthMeters : 0;
   const T_meters = typeof thicknessMm === 'number' && thicknessMm > 0 ? thicknessMm / 1000 : 0;
@@ -143,7 +146,7 @@ export const RoadYieldCalculatorModule: React.FC = () => {
         </div>
       </div>
 
-      {/* 2. Top 3 Auto-Calculation Output Cards (Strict 0 when no values entered) */}
+      {/* 2. Top 3 Auto-Calculation Output Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {/* Compacted Volume */}
         <div className="p-5 rounded-3xl bg-[#0c1427] border border-[#182643] shadow-xl flex flex-col justify-between">
@@ -412,5 +415,3 @@ export const RoadYieldCalculatorModule: React.FC = () => {
 };
 
 export default RoadYieldCalculatorModule;
-
-```

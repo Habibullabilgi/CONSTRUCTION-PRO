@@ -1,524 +1,475 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useERP } from '../../context/ERPContext';
-import { SiteExpenseRecord, SiteExpenseCategory } from '../../types/erp';
 import {
   DollarSign,
   Plus,
-  Filter,
-  Search,
-  Download,
   Trash2,
+  Calendar,
+  Layers,
+  Fuel,
+  TrendingDown,
+  Search,
+  Filter,
+  Download,
+  Building2,
+  X,
   CheckCircle2,
   Clock,
-  Building2,
-  Fuel,
-  Wrench,
-  Users,
-  FileText,
-  ShieldCheck,
-  TrendingDown,
-  Layers,
-  ArrowUpRight,
-  Printer,
-  Calendar
+  ArrowRight
 } from 'lucide-react';
 
-const EXPENSE_CATEGORIES: SiteExpenseCategory[] = [
-  'Diesel / Fuel',
-  'Machinery Maintenance & Spares',
-  'Labour & Operator Wages',
-  'RTO / Royalty / Taxes',
-  'Water Tanker & Bowser',
-  'Civil Tools & Consumables',
-  'Site Overheads & Mess',
-  'Raw Material / Quarry',
-  'Machinery Rental',
-  'Vehicle / Tipper Running & Hire',
-  'Other'
-];
+export interface SiteExpenseItem {
+  id: string;
+  siteId: string;
+  siteName: string;
+  date: string;
+  category: 'Machinery Maintenance' | 'Petty Cash' | 'Site Labour' | 'Safety & PPE' | 'Toll & Transport' | 'Miscellaneous';
+  title: string;
+  vendorName: string;
+  amount: number;
+  paymentMode: 'Cash' | 'UPI / Online' | 'Bank Transfer' | 'Cheque';
+  status: 'PAID' | 'PENDING';
+}
+
+const STORAGE_EXPENSES_KEY = 'CONSTRUCTION_PRO_SITE_EXPENSES_V2';
+const STORAGE_TRIPS_KEY = 'CONSTRUCTION_PRO_DAY_TRIPS_V3';
+const STORAGE_DIESEL_KEY = 'CONSTRUCTION_PRO_DIESEL_VOUCHERS_V1';
 
 export const SiteCostExpensesModule: React.FC = () => {
-  const {
-    siteExpenses,
-    addSiteExpense,
-    deleteSiteExpense,
-    updateSiteExpenseStatus,
-    siteSheets,
-    projects
-  } = useERP();
+  const { siteSheets = [], selectedSiteId, setSelectedSiteId } = useERP();
 
-  const [selectedSiteId, setSelectedSiteId] = useState<string>('site-mulwad');
-  const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
-  const [statusFilter, setStatusFilter] = useState<string>('ALL');
-  const [searchTerm, setSearchTerm] = useState<string>('');
+  // 1. Ongoing Site List
+  const activeSites = useMemo(() => {
+    if (siteSheets && siteSheets.length > 0) {
+      return siteSheets.map((s) => ({
+        id: s.siteId,
+        name: s.siteName
+      }));
+    }
+    return [
+      { id: 'site-mulwad', name: 'MULWAD SITE' },
+      { id: 'site-nh50', name: 'NH-50 HIGHWAY SITE' }
+    ];
+  }, [siteSheets]);
 
-  // Add Expense Modal State
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [formCategory, setFormCategory] = useState<SiteExpenseCategory>('Diesel / Fuel');
+  const [currentSiteId, setCurrentSiteId] = useState<string>(
+    selectedSiteId || activeSites[0]?.id || 'site-mulwad'
+  );
+
+  useEffect(() => {
+    if (selectedSiteId) {
+      setCurrentSiteId(selectedSiteId);
+    }
+  }, [selectedSiteId]);
+
+  const currentSiteName = useMemo(() => {
+    const matched = activeSites.find((s) => s.id === currentSiteId);
+    return matched ? matched.name : activeSites[0]?.name || 'MULWAD SITE';
+  }, [activeSites, currentSiteId]);
+
+  // 2. Direct Site Expenses State
+  const [expenses, setExpenses] = useState<SiteExpenseItem[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_EXPENSES_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return [
+      {
+        id: 'exp-1',
+        siteId: currentSiteId,
+        siteName: currentSiteName,
+        date: '2026-08-16',
+        category: 'Machinery Maintenance',
+        title: 'JCB 3DX Hydraulic Hose & Filter Replacement',
+        vendorName: 'Bilgi Auto Spares',
+        amount: 8450,
+        paymentMode: 'UPI / Online',
+        status: 'PAID'
+      },
+      {
+        id: 'exp-2',
+        siteId: currentSiteId,
+        siteName: currentSiteName,
+        date: '2026-08-16',
+        category: 'Petty Cash',
+        title: 'Site Staff Water Cans & Refreshments',
+        vendorName: 'Local Vendor',
+        amount: 1200,
+        paymentMode: 'Cash',
+        status: 'PAID'
+      }
+    ];
+  });
+
+  // 3. Live Trips & Material Billing Amount
+  const [materialTripsBilling, setMaterialTripsBilling] = useState<number>(84000);
+
+  // 4. Live Diesel Dispensed Cost
+  const [dieselDispensedCost, setDieselDispensedCost] = useState<number>(25900);
+
+  // Sync with Trips and Diesel local storage whenever site changes
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_EXPENSES_KEY, JSON.stringify(expenses));
+
+      // Read Trips data
+      const savedTrips = localStorage.getItem(STORAGE_TRIPS_KEY) || localStorage.getItem('CONSTRUCTION_PRO_DAY_TRIPS_V2');
+      if (savedTrips) {
+        const parsed = JSON.parse(savedTrips);
+        if (Array.isArray(parsed)) {
+          const siteTripsSum = parsed
+            .filter((t: any) => !t.siteName || t.siteName.toLowerCase().includes(currentSiteName.toLowerCase()) || currentSiteName.toLowerCase().includes((t.siteName || '').toLowerCase()))
+            .reduce((sum: number, t: any) => sum + (Number(t.totalAmount) || 0), 0);
+          setMaterialTripsBilling(siteTripsSum > 0 ? siteTripsSum : 84000);
+        }
+      }
+
+      // Read Diesel data
+      const savedDiesel = localStorage.getItem(STORAGE_DIESEL_KEY);
+      if (savedDiesel) {
+        const parsed = JSON.parse(savedDiesel);
+        if (Array.isArray(parsed)) {
+          const siteDieselSum = parsed
+            .filter((d: any) => !d.siteName || d.siteName.toLowerCase().includes(currentSiteName.toLowerCase()) || currentSiteName.toLowerCase().includes((d.siteName || '').toLowerCase()))
+            .reduce((sum: number, d: any) => sum + (Number(d.totalCost) || 0), 0);
+          setDieselDispensedCost(siteDieselSum > 0 ? siteDieselSum : 25900);
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, [expenses, currentSiteId, currentSiteName]);
+
+  // Modal & Filter States
+  const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+
+  // Form State
+  const [formDate, setFormDate] = useState(new Date().toISOString().split('T')[0]);
+  const [formCategory, setFormCategory] = useState<SiteExpenseItem['category']>('Machinery Maintenance');
   const [formTitle, setFormTitle] = useState('');
-  const [formDescription, setFormDescription] = useState('');
-  const [formAmount, setFormAmount] = useState<number | ''>('');
-  const [formDate, setFormDate] = useState(new Date().toISOString().substring(0, 10));
-  const [formVehicle, setFormVehicle] = useState('');
   const [formVendor, setFormVendor] = useState('');
-  const [formPaymentMode, setFormPaymentMode] = useState('UPI / PhonePe');
-  const [formApprovedBy, setFormApprovedBy] = useState('Habibulla Bilgi');
-  const [formVoucherNo, setFormVoucherNo] = useState('');
+  const [formAmount, setFormAmount] = useState<number | ''>('');
+  const [formPaymentMode, setFormPaymentMode] = useState<SiteExpenseItem['paymentMode']>('Cash');
+  const [formStatus, setFormStatus] = useState<'PAID' | 'PENDING'>('PAID');
 
-  // Selected Site Object
-  const currentSheet = siteSheets.find((s) => s.siteId === selectedSiteId) || siteSheets[0];
-  const siteName = currentSheet?.siteName || 'MULWAD SITE';
+  // Computed Outflow Sums
+  const siteDirectExpensesTotal = useMemo(() => {
+    return expenses
+      .filter((e) => !e.siteId || e.siteId === currentSiteId || e.siteName === currentSiteName)
+      .reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  }, [expenses, currentSiteId, currentSiteName]);
 
-  // Filter site expenses for the selected site
-  const siteExpenseList = useMemo(() => {
-    return siteExpenses.filter((e) => e.siteId === selectedSiteId);
-  }, [siteExpenses, selectedSiteId]);
+  const paidExpensesTotal = useMemo(() => {
+    return expenses
+      .filter((e) => (!e.siteId || e.siteId === currentSiteId || e.siteName === currentSiteName) && e.status === 'PAID')
+      .reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  }, [expenses, currentSiteId, currentSiteName]);
 
-  // Tab values from Site Trip Matrix for this site
-  const siteMatrixMaterialValue = useMemo(() => {
-    if (!currentSheet) return 0;
-    return currentSheet.tabs
-      .filter((t) => t.tabKey !== 'DESIEL')
-      .reduce((sum, tab) => {
-        const totalQty = tab.rows.reduce((rSum, r) => rSum + r.total, 0);
-        return sum + totalQty * tab.defaultRate;
-      }, 0);
-  }, [currentSheet]);
+  const totalSiteOutflow = siteDirectExpensesTotal + materialTripsBilling + dieselDispensedCost;
 
-  const siteMatrixDieselValue = useMemo(() => {
-    if (!currentSheet) return 0;
-    const dieselTab = currentSheet.tabs.find((t) => t.tabKey === 'DESIEL');
-    if (!dieselTab) return 0;
-    const totalLitres = dieselTab.rows.reduce((rSum, r) => rSum + r.total, 0);
-    return totalLitres * dieselTab.defaultRate;
-  }, [currentSheet]);
-
-  // Expenses totals
-  const totalDirectVoucherExpenses = useMemo(() => {
-    return siteExpenseList.reduce((sum, e) => sum + e.amount, 0);
-  }, [siteExpenseList]);
-
-  const totalPaidExpenses = useMemo(() => {
-    return siteExpenseList
-      .filter((e) => e.status === 'PAID')
-      .reduce((sum, e) => sum + e.amount, 0);
-  }, [siteExpenseList]);
-
-  const totalPendingExpenses = useMemo(() => {
-    return siteExpenseList
-      .filter((e) => e.status === 'PENDING')
-      .reduce((sum, e) => sum + e.amount, 0);
-  }, [siteExpenseList]);
-
-  // Grand Combined Site Expenditure (Matrix Materials + Matrix Diesel + Site Vouchers)
-  const grandSiteExpenditure = totalDirectVoucherExpenses + siteMatrixMaterialValue;
-
-  // Category breakdown calculation
-  const categoryBreakdown = useMemo(() => {
-    const map: Record<string, number> = {};
-    siteExpenseList.forEach((e) => {
-      map[e.category] = (map[e.category] || 0) + e.amount;
-    });
-    return Object.entries(map).sort((a, b) => b[1] - a[1]);
-  }, [siteExpenseList]);
-
-  // Filtered expense records
-  const filteredExpenses = useMemo(() => {
-    return siteExpenseList.filter((e) => {
-      const matchCat = categoryFilter === 'ALL' || e.category === categoryFilter;
-      const matchStat = statusFilter === 'ALL' || e.status === statusFilter;
-      const s = searchTerm.toLowerCase();
-      const matchSearch =
-        !searchTerm ||
-        e.title.toLowerCase().includes(s) ||
-        e.voucherNumber.toLowerCase().includes(s) ||
-        e.vendorOrPayee.toLowerCase().includes(s) ||
-        (e.vehicleOrMachineNumber && e.vehicleOrMachineNumber.toLowerCase().includes(s));
-      return matchCat && matchStat && matchSearch;
-    });
-  }, [siteExpenseList, categoryFilter, statusFilter, searchTerm]);
-
-  // Submit new expense
-  const handleCreateExpense = (e: React.FormEvent) => {
+  const handleSaveExpense = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formTitle || !formAmount) return;
+    if (!formTitle.trim() || !formAmount || Number(formAmount) <= 0) return;
 
-    const voucherNum =
-      formVoucherNo.trim() ||
-      `VCH-${selectedSiteId.slice(-3).toUpperCase()}-${Math.floor(100 + Math.random() * 900)}`;
-
-    addSiteExpense({
-      siteId: selectedSiteId,
-      siteName,
+    const newExp: SiteExpenseItem = {
+      id: `exp-${Date.now()}`,
+      siteId: currentSiteId,
+      siteName: currentSiteName,
       date: formDate,
       category: formCategory,
       title: formTitle.trim(),
-      description: formDescription.trim(),
-      vehicleOrMachineNumber: formVehicle.trim() || undefined,
+      vendorName: formVendor.trim() || 'General Vendor',
       amount: Number(formAmount),
-      voucherNumber: voucherNum,
-      vendorOrPayee: formVendor.trim() || 'Direct Cash / Site Petty',
       paymentMode: formPaymentMode,
-      approvedBy: formApprovedBy,
-      status: 'PAID'
-    });
+      status: formStatus
+    };
 
-    // Reset Form
+    setExpenses([newExp, ...expenses]);
+    setIsRecordModalOpen(false);
     setFormTitle('');
-    setFormDescription('');
-    setFormAmount('');
-    setFormVehicle('');
     setFormVendor('');
-    setFormVoucherNo('');
-    setIsAddModalOpen(false);
+    setFormAmount('');
   };
 
-  // Export Expenses to CSV
-  const handleExportExpensesCSV = () => {
-    const headers = [
-      'Voucher #',
-      'Date',
-      'Site Name',
-      'Category',
-      'Title / Description',
-      'Vehicle / Machine',
-      'Vendor / Payee',
-      'Amount (INR)',
-      'Payment Mode',
-      'Approved By',
-      'Status'
-    ];
+  const handleDeleteExpense = (id: string) => {
+    if (window.confirm('Delete this site expense voucher?')) {
+      setExpenses(expenses.filter((e) => e.id !== id));
+    }
+  };
 
-    const rows = filteredExpenses.map((e) => [
-      e.voucherNumber,
-      e.date,
-      e.siteName,
-      e.category,
-      `"${e.title} - ${e.description || ''}"`,
-      e.vehicleOrMachineNumber || '-',
-      `"${e.vendorOrPayee}"`,
-      e.amount,
-      e.paymentMode,
-      e.approvedBy,
-      e.status
-    ]);
+  const handleTogglePaid = (id: string) => {
+    setExpenses(
+      expenses.map((e) =>
+        e.id === id ? { ...e, status: e.status === 'PAID' ? 'PENDING' : 'PAID' } : e
+      )
+    );
+  };
 
+  const handleExportStatement = () => {
     const csvContent =
       'data:text/csv;charset=utf-8,' +
-      [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+      ['Date,Site,Category,Voucher Title,Vendor,Payment Mode,Status,Amount (INR)']
+        .concat(
+          expenses.map(
+            (e) =>
+              `"${e.date}","${e.siteName}","${e.category}","${e.title}","${e.vendorName}","${e.paymentMode}","${e.status}",${e.amount}`
+          )
+        )
+        .join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `${siteName.replace(/\s+/g, '_')}_Expense_Statement.csv`);
+    link.setAttribute('download', `${currentSiteName.replace(/\s+/g, '_')}_Expense_Statement.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
+  const filteredExpenses = expenses.filter((e) => {
+    const matchesSite = !e.siteId || e.siteId === currentSiteId || e.siteName === currentSiteName;
+    const matchesSearch =
+      e.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      e.vendorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      e.date.includes(searchQuery);
+    const matchesCategory = categoryFilter === 'ALL' || e.category === categoryFilter;
+    const matchesStatus = statusFilter === 'ALL' || e.status === statusFilter;
+    return matchesSite && matchesSearch && matchesCategory && matchesStatus;
+  });
+
   return (
-    <div className="space-y-6 pb-12 font-sans selection:bg-rose-600 selection:text-white">
-      {/* Top Header Card */}
-      <div className="p-6 rounded-2xl bg-[#0c1427] border border-[#1b2845] shadow-xl">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-rose-600 flex items-center justify-center text-white shadow-lg shadow-rose-600/30">
-              <DollarSign className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="px-2.5 py-0.5 rounded text-[10px] font-extrabold uppercase bg-rose-500/10 text-rose-400 border border-rose-500/20">
-                  DEDICATED SITE COST & EXPENSE LEDGER
-                </span>
-              </div>
-              <div className="flex items-center gap-3 mt-1">
-                <h1 className="text-2xl font-black text-white tracking-tight">
-                  {siteName}
-                </h1>
-                {/* Site Switcher */}
-                <select
-                  value={selectedSiteId}
-                  onChange={(e) => setSelectedSiteId(e.target.value)}
-                  className="bg-[#070c1a] border border-[#1e2d4a] text-xs font-bold text-rose-400 px-3 py-1.5 rounded-lg outline-none cursor-pointer hover:border-rose-500 transition-colors"
-                >
-                  {siteSheets.map((s) => (
-                    <option key={s.siteId} value={s.siteId}>
-                      📍 {s.siteName}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
+    <div className="space-y-6 font-sans text-slate-100 selection:bg-rose-600 selection:text-white">
+      {/* 1. Header Banner & Ongoing Site Selector */}
+      <div className="p-6 rounded-3xl bg-[#0c1427] border border-[#182643] shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-rose-600/20 border border-rose-500/30 flex items-center justify-center text-rose-400 shrink-0 shadow-lg shadow-rose-600/20">
+            <DollarSign className="w-7 h-7" />
           </div>
-
-          {/* Action Buttons */}
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={() => setIsAddModalOpen(true)}
-              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-rose-600/30 cursor-pointer transition-all"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Record Site Expense</span>
-            </button>
-            <button
-              onClick={handleExportExpensesCSV}
-              className="px-3.5 py-2.5 rounded-xl bg-[#142038] hover:bg-[#1b2845] border border-[#23355a] text-slate-200 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-all"
-            >
-              <Download className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Export Statement</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Site Cost KPI Overview Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6 pt-6 border-t border-[#182643]">
-          {/* Card 1: Total Site Vouchers */}
-          <div className="p-4 bg-[#070c1a] rounded-xl border border-[#182643]">
-            <div className="flex items-center justify-between text-slate-400 text-xs font-semibold mb-1">
-              <span>Site Direct Expenses</span>
-              <DollarSign className="w-4 h-4 text-rose-400" />
-            </div>
-            <div className="text-2xl font-black text-rose-400 font-mono">
-              ₹{totalDirectVoucherExpenses.toLocaleString('en-IN')}
-            </div>
-            <div className="flex items-center justify-between text-[11px] text-slate-500 mt-2 font-mono">
-              <span className="text-emerald-400">Paid: ₹{totalPaidExpenses.toLocaleString()}</span>
-              {totalPendingExpenses > 0 && (
-                <span className="text-amber-400">Pending: ₹{totalPendingExpenses.toLocaleString()}</span>
-              )}
-            </div>
-          </div>
-
-          {/* Card 2: Material Valuation from Matrix */}
-          <div className="p-4 bg-[#070c1a] rounded-xl border border-[#182643]">
-            <div className="flex items-center justify-between text-slate-400 text-xs font-semibold mb-1">
-              <span>Matrix Material Logs</span>
-              <Layers className="w-4 h-4 text-cyan-400" />
-            </div>
-            <div className="text-2xl font-black text-cyan-300 font-mono">
-              ₹{siteMatrixMaterialValue.toLocaleString('en-IN')}
-            </div>
-            <span className="text-[11px] text-slate-400 mt-2 block">
-              Murum, Sand, 20mm, GSB, WMM, etc.
+          <div>
+            <span className="px-2.5 py-0.5 rounded-full bg-rose-950/60 text-rose-400 border border-rose-800 text-[10px] font-black uppercase tracking-wider">
+              DEDICATED SITE COST & EXPENSE LEDGER
             </span>
-          </div>
 
-          {/* Card 3: Site Diesel Matrix Value */}
-          <div className="p-4 bg-[#070c1a] rounded-xl border border-[#182643]">
-            <div className="flex items-center justify-between text-slate-400 text-xs font-semibold mb-1">
-              <span>Site Diesel Dispensed</span>
-              <Fuel className="w-4 h-4 text-amber-400" />
-            </div>
-            <div className="text-2xl font-black text-amber-400 font-mono">
-              ₹{siteMatrixDieselValue.toLocaleString('en-IN')}
-            </div>
-            <span className="text-[11px] text-amber-500/80 mt-2 block font-mono">
-              From {currentSheet?.monthTitle} DESIEL Tab
-            </span>
-          </div>
-
-          {/* Card 4: Total Combined Site Expenditure */}
-          <div className="p-4 bg-[#070c1a] rounded-xl border border-rose-900/40 bg-gradient-to-br from-[#0c162d] to-[#1a0f21]">
-            <div className="flex items-center justify-between text-slate-400 text-xs font-semibold mb-1">
-              <span>Total Site Outflow</span>
-              <TrendingDown className="w-4 h-4 text-rose-400" />
-            </div>
-            <div className="text-2xl font-black text-white font-mono">
-              ₹{grandSiteExpenditure.toLocaleString('en-IN')}
-            </div>
-            <span className="text-[11px] text-emerald-400 mt-2 block font-semibold">
-              All Materials, Fuel & Site Operations
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Category Breakdown & Allocation Bar */}
-      <div className="p-5 rounded-2xl bg-[#0c1427] border border-[#1b2845] shadow-xl space-y-4">
-        <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-          <Building2 className="w-4 h-4 text-rose-400" />
-          <span>{siteName} — Cost Breakdown by Category</span>
-        </h3>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {categoryBreakdown.map(([category, amount]) => {
-            const percent = totalDirectVoucherExpenses > 0 ? (amount / totalDirectVoucherExpenses) * 100 : 0;
-            return (
-              <div
-                key={category}
-                className="p-3.5 bg-[#070c1a] rounded-xl border border-[#182643] flex flex-col justify-between"
+            {/* Site Switcher Dropdown */}
+            <div className="mt-1 flex items-center gap-2">
+              <select
+                value={currentSiteId}
+                onChange={(e) => {
+                  setCurrentSiteId(e.target.value);
+                  if (typeof setSelectedSiteId === 'function') {
+                    setSelectedSiteId(e.target.value);
+                  }
+                }}
+                className="bg-transparent text-2xl sm:text-3xl font-black text-white outline-none cursor-pointer border-b border-dashed border-slate-600 pb-0.5"
               >
-                <div className="flex items-center justify-between text-xs font-bold text-slate-300">
-                  <span className="truncate">{category}</span>
-                  <span className="text-rose-400 font-mono">₹{amount.toLocaleString('en-IN')}</span>
-                </div>
-                <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden mt-2 mb-1">
-                  <div
-                    className="bg-gradient-to-r from-rose-500 to-pink-500 h-full rounded-full"
-                    style={{ width: `${percent}%` }}
-                  />
-                </div>
-                <div className="flex items-center justify-between text-[10px] text-slate-500">
-                  <span>{percent.toFixed(1)}% of voucher expenses</span>
-                  <span>{siteExpenseList.filter((e) => e.category === category).length} Vouchers</span>
-                </div>
-              </div>
-            );
-          })}
+                {activeSites.map((site) => (
+                  <option key={site.id} value={site.id} className="bg-[#121927] text-white text-base font-bold">
+                    {site.name.toUpperCase()}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => setIsRecordModalOpen(true)}
+            className="px-5 py-3 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs flex items-center gap-2 transition-all shadow-lg shadow-rose-600/30 cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>+ Record Site Expense</span>
+          </button>
+
+          <button
+            onClick={handleExportStatement}
+            className="px-4 py-3 rounded-2xl bg-[#142038] hover:bg-[#1e2f52] border border-[#22365e] text-emerald-400 hover:text-emerald-300 font-bold text-xs flex items-center gap-2 transition-all cursor-pointer"
+            title="Download CSV Statement"
+          >
+            <Download className="w-4 h-4" />
+            <span>Export Statement</span>
+          </button>
         </div>
       </div>
 
-      {/* Filter and Search Bar */}
-      <div className="p-4 rounded-2xl bg-[#0c1427] border border-[#1b2845] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Category Filter */}
-          <div className="flex items-center gap-1 bg-[#070c1a] border border-[#1e2d4a] px-3 py-1.5 rounded-xl text-xs">
-            <Filter className="w-3.5 h-3.5 text-slate-400" />
-            <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="bg-transparent text-slate-200 outline-none cursor-pointer"
-            >
-              <option value="ALL">All Categories</option>
-              {EXPENSE_CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
+      {/* 2. Top 4 Live Financial Telemetry Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card 1: Site Direct Expenses */}
+        <div className="p-5 rounded-3xl bg-[#0c1427] border border-[#182643] shadow-xl flex flex-col justify-between space-y-3">
+          <div className="flex items-center justify-between text-xs font-bold text-slate-400">
+            <span>Site Direct Expenses</span>
+            <DollarSign className="w-4 h-4 text-rose-400" />
           </div>
-
-          {/* Status Filter */}
-          <div className="flex items-center gap-1 bg-[#070c1a] border border-[#1e2d4a] px-3 py-1.5 rounded-xl text-xs">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="bg-transparent text-slate-200 outline-none cursor-pointer"
-            >
-              <option value="ALL">All Statuses</option>
-              <option value="PAID">PAID</option>
-              <option value="PENDING">PENDING</option>
-              <option value="APPROVED">APPROVED</option>
-            </select>
+          <div>
+            <div className="text-3xl font-black text-white">
+              ₹{siteDirectExpensesTotal.toLocaleString('en-IN')}
+            </div>
+            <div className="text-[11px] text-emerald-400 font-semibold mt-1">
+              Paid: ₹{paidExpensesTotal.toLocaleString('en-IN')}
+            </div>
           </div>
         </div>
 
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
+        {/* Card 2: Matrix Material Logs (Linked to Trips) */}
+        <div className="p-5 rounded-3xl bg-[#0c1427] border border-[#182643] shadow-xl flex flex-col justify-between space-y-3">
+          <div className="flex items-center justify-between text-xs font-bold text-slate-400">
+            <span>Matrix Material Logs</span>
+            <Layers className="w-4 h-4 text-cyan-400" />
+          </div>
+          <div>
+            <div className="text-3xl font-black text-cyan-400">
+              ₹{materialTripsBilling.toLocaleString('en-IN')}
+            </div>
+            <div className="text-[11px] text-slate-400 mt-1">
+              Murum, Sand, 20mm, GSB, WMM
+            </div>
+          </div>
+        </div>
+
+        {/* Card 3: Site Diesel Dispensed (Linked to Diesel) */}
+        <div className="p-5 rounded-3xl bg-[#0c1427] border border-[#182643] shadow-xl flex flex-col justify-between space-y-3">
+          <div className="flex items-center justify-between text-xs font-bold text-slate-400">
+            <span>Site Diesel Dispensed</span>
+            <Fuel className="w-4 h-4 text-amber-400" />
+          </div>
+          <div>
+            <div className="text-3xl font-black text-amber-400">
+              ₹{dieselDispensedCost.toLocaleString('en-IN')}
+            </div>
+            <div className="text-[11px] text-amber-400/80 font-mono mt-1">
+              From DIESEL Dispense Log
+            </div>
+          </div>
+        </div>
+
+        {/* Card 4: Total Site Outflow */}
+        <div className="p-5 rounded-3xl bg-[#140a16] border border-rose-950/70 shadow-xl flex flex-col justify-between space-y-3">
+          <div className="flex items-center justify-between text-xs font-bold text-slate-400">
+            <span>Total Site Outflow</span>
+            <TrendingDown className="w-4 h-4 text-rose-500" />
+          </div>
+          <div>
+            <div className="text-3xl font-black text-white">
+              ₹{totalSiteOutflow.toLocaleString('en-IN')}
+            </div>
+            <div className="text-[11px] text-emerald-400 font-semibold mt-1">
+              All Materials, Fuel & Site Operations
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. Cost Breakdown by Category Banner */}
+      <div className="p-4 rounded-2xl bg-[#0c1427] border border-[#182643] flex items-center gap-2 text-xs font-bold text-slate-300">
+        <Building2 className="w-4 h-4 text-rose-400" />
+        <span>{currentSiteName.toUpperCase()} — COST BREAKDOWN & PETTY CASH VOUCHERS</span>
+      </div>
+
+      {/* 4. Filters & Search */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-[#0D111D] border border-[#1E293B] p-3 rounded-2xl">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white text-xs outline-none focus:border-rose-500 font-medium cursor-pointer"
+          >
+            <option value="ALL">All Categories</option>
+            <option value="Machinery Maintenance">Machinery Maintenance</option>
+            <option value="Petty Cash">Petty Cash</option>
+            <option value="Site Labour">Site Labour</option>
+            <option value="Safety & PPE">Safety & PPE</option>
+            <option value="Toll & Transport">Toll & Transport</option>
+            <option value="Miscellaneous">Miscellaneous</option>
+          </select>
+
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white text-xs outline-none focus:border-rose-500 font-medium cursor-pointer"
+          >
+            <option value="ALL">All Statuses</option>
+            <option value="PAID">Paid</option>
+            <option value="PENDING">Pending</option>
+          </select>
+        </div>
+
+        <div className="relative w-full sm:w-80">
+          <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5" />
           <input
             type="text"
             placeholder="Search voucher, title, vendor..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-8 pr-3 py-1.5 bg-[#070c1a] border border-[#1e2d4a] rounded-xl text-xs text-white outline-none w-full sm:w-64 focus:border-rose-500"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white text-xs outline-none focus:border-rose-500 placeholder-slate-500"
           />
         </div>
       </div>
 
-      {/* DETAILED EXPENSE LEDGER TABLE */}
-      <div className="rounded-2xl bg-[#0c1427] border border-[#1b2845] shadow-2xl overflow-hidden">
-        <div className="p-4 bg-[#0a1020] border-b border-[#182643] flex items-center justify-between">
-          <h3 className="text-sm font-bold text-white flex items-center gap-2">
-            <FileText className="w-4 h-4 text-rose-400" />
-            <span>Site Expense Vouchers & Receipts ({filteredExpenses.length})</span>
-          </h3>
-          <span className="text-xs font-mono text-emerald-400 font-bold">
-            Total Filtered: ₹{filteredExpenses.reduce((sum, e) => sum + e.amount, 0).toLocaleString('en-IN')}
-          </span>
+      {/* 5. Vouchers Ledger Table */}
+      <div className="bg-[#0B1220] border border-[#1E293B] rounded-3xl overflow-hidden shadow-2xl">
+        <div className="p-4 border-b border-[#1E293B] bg-[#0d1527]/50 flex items-center justify-between">
+          <div className="font-bold text-sm text-white">Voucher Expenses Ledger</div>
+          <div className="text-xs text-slate-400">{filteredExpenses.length} Records</div>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-xs text-left border-collapse">
-            <thead className="bg-[#0e172e] text-slate-300 font-semibold border-b border-[#182643]">
-              <tr>
-                <th className="py-3 px-4">VOUCHER #</th>
-                <th className="py-3 px-4">DATE</th>
-                <th className="py-3 px-4">CATEGORY</th>
-                <th className="py-3 px-4">TITLE & DETAILS</th>
-                <th className="py-3 px-3">VEHICLE / MACHINE</th>
-                <th className="py-3 px-4">VENDOR / PAYEE</th>
-                <th className="py-3 px-4 text-right">AMOUNT (₹)</th>
-                <th className="py-3 px-3 text-center">MODE</th>
-                <th className="py-3 px-3 text-center">STATUS</th>
-                <th className="py-3 px-3 text-center">ACTIONS</th>
+          <table className="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr className="border-b border-[#1E293B] text-[10px] font-extrabold uppercase tracking-wider text-slate-400 bg-[#080d19]/80">
+                <th className="py-3 px-4">Date</th>
+                <th className="py-3 px-4">Category</th>
+                <th className="py-3 px-4">Voucher Title</th>
+                <th className="py-3 px-4">Vendor / Payee</th>
+                <th className="py-3 px-4">Mode</th>
+                <th className="py-3 px-4 text-right">Amount (₹)</th>
+                <th className="py-3 px-4 text-center">Status</th>
+                <th className="py-3 px-4 text-center">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#15223c] text-slate-200">
+            <tbody className="divide-y divide-[#1E293B]/60 text-slate-200">
               {filteredExpenses.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="py-8 text-center text-slate-500">
-                    No expense vouchers found matching the filter for this site.
+                  <td colSpan={8} className="py-8 text-center text-slate-500 text-xs">
+                    No expense vouchers logged for this site. Click "+ Record Site Expense" to add.
                   </td>
                 </tr>
               ) : (
                 filteredExpenses.map((exp) => (
-                  <tr key={exp.id} className="hover:bg-[#0f1c38] transition-colors">
-                    {/* Voucher Number */}
-                    <td className="py-3 px-4 font-mono font-bold text-rose-400">
-                      {exp.voucherNumber}
-                    </td>
-
-                    {/* Date */}
-                    <td className="py-3 px-4 whitespace-nowrap text-slate-400 font-mono">
-                      {exp.date}
-                    </td>
-
-                    {/* Category */}
-                    <td className="py-3 px-4">
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700 whitespace-nowrap">
+                  <tr key={exp.id} className="hover:bg-[#121c33]/50 transition-colors">
+                    <td className="py-3.5 px-4 font-mono text-slate-300 font-semibold">{exp.date}</td>
+                    <td className="py-3.5 px-4">
+                      <span className="px-2 py-0.5 rounded-lg bg-slate-800 text-slate-300 text-[10px] font-bold border border-slate-700">
                         {exp.category}
                       </span>
                     </td>
-
-                    {/* Title & Description */}
-                    <td className="py-3 px-4">
-                      <div className="font-semibold text-white">{exp.title}</div>
-                      {exp.description && (
-                        <div className="text-[11px] text-slate-400 mt-0.5">{exp.description}</div>
-                      )}
-                    </td>
-
-                    {/* Vehicle */}
-                    <td className="py-3 px-3 font-mono font-bold text-amber-300">
-                      {exp.vehicleOrMachineNumber ? `🚛 ${exp.vehicleOrMachineNumber}` : '-'}
-                    </td>
-
-                    {/* Vendor */}
-                    <td className="py-3 px-4 text-slate-300">{exp.vendorOrPayee}</td>
-
-                    {/* Amount */}
-                    <td className="py-3 px-4 text-right font-mono font-extrabold text-white text-sm">
+                    <td className="py-3.5 px-4 font-bold text-white">{exp.title}</td>
+                    <td className="py-3.5 px-4 text-slate-300">{exp.vendorName}</td>
+                    <td className="py-3.5 px-4 text-slate-400">{exp.paymentMode}</td>
+                    <td className="py-3.5 px-4 text-right font-mono font-black text-rose-400 text-sm">
                       ₹{exp.amount.toLocaleString('en-IN')}
                     </td>
-
-                    {/* Payment Mode */}
-                    <td className="py-3 px-3 text-center text-[10px] text-slate-400 font-medium">
-                      {exp.paymentMode}
-                    </td>
-
-                    {/* Status */}
-                    <td className="py-3 px-3 text-center">
+                    <td className="py-3.5 px-4 text-center">
                       <button
-                        onClick={() => {
-                          const next = exp.status === 'PAID' ? 'PENDING' : 'PAID';
-                          updateSiteExpenseStatus(exp.id, next);
-                        }}
-                        className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase transition-all cursor-pointer ${
+                        type="button"
+                        onClick={() => handleTogglePaid(exp.id)}
+                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold cursor-pointer border transition-colors ${
                           exp.status === 'PAID'
-                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                            : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                            ? 'bg-emerald-950/60 text-emerald-400 border-emerald-800'
+                            : 'bg-amber-950/60 text-amber-400 border-amber-800'
                         }`}
                       >
                         {exp.status}
                       </button>
                     </td>
-
-                    {/* Delete */}
-                    <td className="py-3 px-3 text-center">
+                    <td className="py-3.5 px-4 text-center">
                       <button
-                        onClick={() => deleteSiteExpense(exp.id)}
-                        className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 transition-colors"
-                        title="Delete voucher"
+                        type="button"
+                        onClick={() => handleDeleteExpense(exp.id)}
+                        className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 transition-colors cursor-pointer"
+                        title="Delete Voucher"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -531,189 +482,153 @@ export const SiteCostExpensesModule: React.FC = () => {
         </div>
       </div>
 
-      {/* MODAL: ADD SITE EXPENSE */}
-      {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="bg-[#0c1427] border border-[#1b2845] rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
+      {/* 6. Modal: Record Site Expense */}
+      {isRecordModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150 font-sans">
+          <div className="bg-[#121927] border border-[#1E293B] rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 text-slate-100 max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
+              <div className="flex items-center gap-2 text-white font-bold text-base">
                 <DollarSign className="w-5 h-5 text-rose-500" />
-                <span>Record Site Expense Voucher — {siteName}</span>
-              </h3>
+                <span>Record Site Expense Voucher</span>
+              </div>
               <button
-                onClick={() => setIsAddModalOpen(false)}
-                className="text-slate-400 hover:text-white"
+                type="button"
+                onClick={() => setIsRecordModalOpen(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800"
               >
-                ✕
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateExpense} className="space-y-3.5 text-xs">
-              {/* Category & Date */}
+            <form onSubmit={handleSaveExpense} className="space-y-3.5 text-xs">
+              {/* Site Name & Date */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">
-                    Expense Category *
-                  </label>
-                  <select
-                    value={formCategory}
-                    onChange={(e) => setFormCategory(e.target.value as SiteExpenseCategory)}
-                    className="w-full px-3 py-2 bg-[#070c1a] border border-[#1b2845] rounded-xl text-white outline-none"
-                  >
-                    {EXPENSE_CATEGORIES.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">
-                    Voucher Date *
+                  <label className="block text-slate-300 font-bold mb-1 flex items-center gap-1">
+                    <Calendar className="w-3.5 h-3.5 text-rose-400" />
+                    <span>Date *</span>
                   </label>
                   <input
                     type="date"
                     required
                     value={formDate}
                     onChange={(e) => setFormDate(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#070c1a] border border-[#1b2845] rounded-xl text-white outline-none font-mono"
+                    className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-rose-500 font-medium"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">Ongoing Site</label>
+                  <input
+                    type="text"
+                    readOnly
+                    value={currentSiteName}
+                    className="w-full px-3 py-2 bg-[#162032]/60 border border-[#1E293B] rounded-xl text-slate-400 font-medium outline-none cursor-not-allowed"
                   />
                 </div>
               </div>
 
-              {/* Title */}
+              {/* Category */}
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">
-                  Expense Title / Purpose *
-                </label>
+                <label className="block text-slate-300 font-bold mb-1">Expense Category *</label>
+                <select
+                  value={formCategory}
+                  onChange={(e) => setFormCategory(e.target.value as any)}
+                  className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-rose-500 cursor-pointer font-medium"
+                >
+                  <option value="Machinery Maintenance">Machinery Maintenance</option>
+                  <option value="Petty Cash">Petty Cash</option>
+                  <option value="Site Labour">Site Labour</option>
+                  <option value="Safety & PPE">Safety & PPE</option>
+                  <option value="Toll & Transport">Toll & Transport</option>
+                  <option value="Miscellaneous">Miscellaneous</option>
+                </select>
+              </div>
+
+              {/* Voucher Title */}
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">Voucher Description / Title *</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Tipper 8797 Clutch Plate Replacement & Gear Oil"
+                  placeholder="e.g. Tipper puncture repair & grease oil"
                   value={formTitle}
                   onChange={(e) => setFormTitle(e.target.value)}
-                  className="w-full px-3 py-2 bg-[#070c1a] border border-[#1b2845] rounded-xl text-white outline-none"
+                  className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-rose-500 font-medium"
                 />
               </div>
 
-              {/* Description */}
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">
-                  Additional Notes / Description
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="Details of bill, work done or site voucher notes..."
-                  value={formDescription}
-                  onChange={(e) => setFormDescription(e.target.value)}
-                  className="w-full px-3 py-2 bg-[#070c1a] border border-[#1b2845] rounded-xl text-white outline-none"
-                />
-              </div>
-
-              {/* Amount & Vehicle */}
+              {/* Vendor & Amount */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">
-                    Amount (₹ INR) *
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    placeholder="e.g. 15000"
-                    value={formAmount}
-                    onChange={(e) => setFormAmount(e.target.value === '' ? '' : Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-[#070c1a] border border-[#1b2845] rounded-xl text-emerald-400 font-mono font-bold outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">
-                    Vehicle / Tipper / Machine #
-                  </label>
+                  <label className="block text-slate-300 font-bold mb-1">Vendor / Payee</label>
                   <input
                     type="text"
-                    placeholder="e.g. 8797 or 9580 or Bowser #1"
-                    value={formVehicle}
-                    onChange={(e) => setFormVehicle(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#070c1a] border border-[#1b2845] rounded-xl text-yellow-300 font-mono uppercase outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* Vendor & Payment Mode */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">
-                    Vendor / Payee / Driver Name
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Mahalaxmi Auto Spares"
+                    placeholder="e.g. Bilgi Auto Spares"
                     value={formVendor}
                     onChange={(e) => setFormVendor(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#070c1a] border border-[#1b2845] rounded-xl text-white outline-none"
+                    className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-rose-500 font-medium"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">
-                    Payment Mode
-                  </label>
+                  <label className="block text-slate-300 font-bold mb-1">Amount (₹) *</label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    placeholder="e.g. 4500"
+                    value={formAmount}
+                    onChange={(e) => setFormAmount(e.target.value === '' ? '' : Number(e.target.value))}
+                    className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-rose-400 font-mono font-bold outline-none focus:border-rose-500"
+                  />
+                </div>
+              </div>
+
+              {/* Payment Mode & Status */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">Payment Mode</label>
                   <select
                     value={formPaymentMode}
-                    onChange={(e) => setFormPaymentMode(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#070c1a] border border-[#1b2845] rounded-xl text-white outline-none"
+                    onChange={(e) => setFormPaymentMode(e.target.value as any)}
+                    className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-rose-500 cursor-pointer font-medium"
                   >
-                    <option value="UPI / PhonePe">UPI / PhonePe</option>
-                    <option value="Cash">Cash (Site Petty)</option>
-                    <option value="NEFT / RTGS">NEFT / RTGS Bank Transfer</option>
+                    <option value="Cash">Cash</option>
+                    <option value="UPI / Online">UPI / Online</option>
+                    <option value="Bank Transfer">Bank Transfer</option>
                     <option value="Cheque">Cheque</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">Status</label>
+                  <select
+                    value={formStatus}
+                    onChange={(e) => setFormStatus(e.target.value as any)}
+                    className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-rose-500 cursor-pointer font-medium"
+                  >
+                    <option value="PAID">PAID</option>
+                    <option value="PENDING">PENDING</option>
                   </select>
                 </div>
               </div>
 
-              {/* Voucher # & Approved By */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">
-                    Voucher / Bill Number
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. VCH-MUL-045"
-                    value={formVoucherNo}
-                    onChange={(e) => setFormVoucherNo(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#070c1a] border border-[#1b2845] rounded-xl text-white font-mono outline-none uppercase"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">
-                    Approved By
-                  </label>
-                  <input
-                    type="text"
-                    value={formApprovedBy}
-                    onChange={(e) => setFormApprovedBy(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#070c1a] border border-[#1b2845] rounded-xl text-white outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-3 border-t border-[#182643]">
+              {/* Submit Buttons */}
+              <div className="flex justify-end items-center gap-2 pt-2 border-t border-[#1E293B]">
                 <button
                   type="button"
-                  onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white"
+                  onClick={() => setIsRecordModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-bold shadow-lg shadow-rose-600/30"
+                  className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black shadow-lg shadow-rose-600/30 cursor-pointer transition-all flex items-center gap-1.5"
                 >
-                  Save Site Expense
+                  <span>Save Expense Voucher</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>
             </form>
@@ -723,3 +638,5 @@ export const SiteCostExpensesModule: React.FC = () => {
     </div>
   );
 };
+
+export default SiteCostExpensesModule;

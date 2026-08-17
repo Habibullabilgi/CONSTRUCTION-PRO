@@ -1109,7 +1109,7 @@ export const ProductsMasterModule: React.FC = () => {
 };
 
 // ==========================================
-// Stock Transactions Module (Building Construction)
+// Stock Transactions Module (With Delete Option)
 // ==========================================
 export interface StockTransaction {
   id: string;
@@ -1166,6 +1166,9 @@ const INITIAL_STOCK_TXNS: StockTransaction[] = [
 ];
 
 export const StockTransactionsModule: React.FC = () => {
+  const { currentUser, userRole } = useERP();
+  const isAdmin = String(currentUser?.role || userRole || '').toLowerCase().includes('admin');
+
   const [transactions, setTransactions] = useState<StockTransaction[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_TXNS_KEY);
@@ -1219,12 +1222,18 @@ export const StockTransactionsModule: React.FC = () => {
     .filter((t) => t.type === 'Stock Out')
     .reduce((sum, t) => sum + t.quantity, 0);
 
+  const handleDelete = (id: string, name: string) => {
+    if (window.confirm(`Are you sure you want to permanently delete transaction "${id}" (${name})?`)) {
+      setTransactions((prev) => prev.filter((t) => t.id !== id));
+    }
+  };
+
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!productName.trim() || !quantity || Number(quantity) <= 0) return;
 
     const newTxn: StockTransaction = {
-      id: `TXN-${Date.now().toString().slice(-4)}`,
+      id: `TXN-${Date.now().toString().slice(-3)}`,
       productName: productName.trim(),
       type,
       quantity: Number(quantity),
@@ -1355,7 +1364,7 @@ export const StockTransactionsModule: React.FC = () => {
         </div>
       </div>
 
-      {/* Transactions Table */}
+      {/* Transactions Table with Delete Action */}
       <div className="bg-[#0B1220] border border-[#1E293B] rounded-3xl overflow-hidden shadow-2xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
@@ -1367,43 +1376,62 @@ export const StockTransactionsModule: React.FC = () => {
                 <th className="py-3.5 px-4 text-right">QTY</th>
                 <th className="py-3.5 px-4">VEHICLE / EMPLOYEE</th>
                 <th className="py-3.5 px-4">WORK ORDER & PURPOSE</th>
+                <th className="py-3.5 px-4 text-right">ACTION</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#1E293B]/60 text-slate-200">
-              {filtered.map((t) => {
-                const isOut = t.type === 'Stock Out';
-                return (
-                  <tr key={t.id} className="hover:bg-[#121c33]/50 transition-colors">
-                    <td className="py-3.5 px-4 font-mono">
-                      <div className="font-bold text-white">{t.id}</div>
-                      <div className="text-[10px] text-slate-400">{t.date}</div>
-                    </td>
-                    <td className="py-3.5 px-4 font-bold text-white">{t.productName}</td>
-                    <td className="py-3.5 px-4 text-center">
-                      <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
-                          isOut
-                            ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                            : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                        }`}
-                      >
-                        {t.type}
-                      </span>
-                    </td>
-                    <td className={`py-3.5 px-4 text-right font-mono font-black text-sm ${isOut ? 'text-rose-400' : 'text-emerald-400'}`}>
-                      {isOut ? `-${t.quantity}` : `+${t.quantity}`}
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <div className="font-medium text-slate-200">{t.issuedTo || '-'}</div>
-                      <div className="text-[10px] text-slate-500 font-mono">{t.vehicleNo || 'Site Internal'}</div>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <div className="font-mono text-[11px] text-cyan-400">{t.workOrderNo || '-'}</div>
-                      <div className="text-[10px] text-slate-400 truncate max-w-xs">{t.purpose || '-'}</div>
-                    </td>
-                  </tr>
-                );
-              })}
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-8 text-center text-slate-500">
+                    No transactions matching your search criteria.
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((t) => {
+                  const isOut = t.type === 'Stock Out';
+                  return (
+                    <tr key={t.id} className="hover:bg-[#121c33]/50 transition-colors">
+                      <td className="py-3.5 px-4 font-mono">
+                        <div className="font-bold text-white">{t.id}</div>
+                        <div className="text-[10px] text-slate-400">{t.date}</div>
+                      </td>
+                      <td className="py-3.5 px-4 font-bold text-white">{t.productName}</td>
+                      <td className="py-3.5 px-4 text-center">
+                        <span
+                          className={`px-2.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wide ${
+                            isOut
+                              ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                              : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                          }`}
+                        >
+                          {t.type}
+                        </span>
+                      </td>
+                      <td className={`py-3.5 px-4 text-right font-mono font-black text-sm ${isOut ? 'text-rose-400' : 'text-emerald-400'}`}>
+                        {isOut ? `-${t.quantity}` : `+${t.quantity}`}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <div className="font-medium text-slate-200">{t.issuedTo || '-'}</div>
+                        <div className="text-[10px] text-slate-500 font-mono">{t.vehicleNo || 'HR-01-A-1234'}</div>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <div className="font-mono text-[11px] text-cyan-400">{t.workOrderNo || '-'}</div>
+                        <div className="text-[10px] text-slate-400 truncate max-w-xs">{t.purpose || '-'}</div>
+                      </td>
+                      <td className="py-3.5 px-4 text-right">
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(t.id, t.productName)}
+                          title="Delete Transaction"
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
@@ -1551,7 +1579,7 @@ export const StockTransactionsModule: React.FC = () => {
 };
 
 // ==========================================
-// In-App Modular Building Views
+// Generic Scaffold Views
 // ==========================================
 const BuildingGenericView: React.FC<{
   title: string;

@@ -513,7 +513,7 @@ export const UserManagementModule: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black transition-all shadow-lg shadow-blue-600/30 cursor-pointer"
+                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black transition-all shadow-lg shadow-blue-600/30 cursor-pointer"
                 >
                   {editingUser ? 'Update User' : 'Create User'}
                 </button>
@@ -1111,7 +1111,7 @@ export const ProductsMasterModule: React.FC = () => {
 };
 
 // ==========================================
-// Stock Transactions Module (With Site Name & Cleaned Form)
+// Stock Transactions Module (With Ongoing Site Dropdown & Table Column)
 // ==========================================
 export interface StockTransaction {
   id: string;
@@ -1163,7 +1163,7 @@ export const StockTransactionsModule: React.FC = () => {
   const { siteSheets = [], selectedSiteId } = useERP();
 
   const currentActiveSite = siteSheets.find((s: any) => s.siteId === selectedSiteId);
-  const defaultSiteName = currentActiveSite?.siteName || 'HHH Tower A';
+  const defaultOngoingSiteName = currentActiveSite?.siteName || siteSheets[0]?.siteName || 'Ongoing Site';
 
   const [transactions, setTransactions] = useState<StockTransaction[]>(() => {
     try {
@@ -1180,9 +1180,9 @@ export const StockTransactionsModule: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Form State (Cleaned: Includes Site Name, Vehicle/WorkOrder/Purpose removed)
+  // Form State (Includes Ongoing Site Dropdown)
   const [productName, setProductName] = useState('');
-  const [siteName, setSiteName] = useState(defaultSiteName);
+  const [siteName, setSiteName] = useState(defaultOngoingSiteName);
   const [type, setType] = useState<'Stock In' | 'Stock Out'>('Stock Out');
   const [quantity, setQuantity] = useState<number | ''>(0);
   const [date, setDate] = useState('2026-08-17');
@@ -1230,7 +1230,7 @@ export const StockTransactionsModule: React.FC = () => {
     const newTxn: StockTransaction = {
       id: `TXN-${Date.now().toString().slice(-3)}`,
       productName: productName.trim(),
-      siteName: siteName.trim() || defaultSiteName,
+      siteName: siteName.trim() || defaultOngoingSiteName,
       type,
       quantity: Number(quantity),
       date,
@@ -1246,7 +1246,7 @@ export const StockTransactionsModule: React.FC = () => {
   };
 
   const handleExportCSV = () => {
-    const headers = ['Txn ID', 'Date', 'Site Name', 'Type', 'Product', 'Quantity', 'Department', 'Issued To'];
+    const headers = ['Txn ID', 'Date', 'Ongoing Site', 'Type', 'Product', 'Quantity', 'Department', 'Issued To'];
     const rows = filtered.map((t) => [
       t.id,
       t.date,
@@ -1283,7 +1283,7 @@ export const StockTransactionsModule: React.FC = () => {
           </button>
           <button
             onClick={() => {
-              setSiteName(defaultSiteName);
+              setSiteName(defaultOngoingSiteName);
               setIsModalOpen(true);
             }}
             className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-black flex items-center gap-1.5 transition-all shadow-lg shadow-blue-600/30 cursor-pointer"
@@ -1359,7 +1359,7 @@ export const StockTransactionsModule: React.FC = () => {
         </div>
       </div>
 
-      {/* Transactions Table with Site Column */}
+      {/* Transactions Table with Ongoing Site */}
       <div className="bg-[#0B1220] border border-[#1E293B] rounded-3xl overflow-hidden shadow-2xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
@@ -1367,7 +1367,7 @@ export const StockTransactionsModule: React.FC = () => {
               <tr className="border-b border-[#1E293B] text-[10px] font-extrabold uppercase tracking-wider text-slate-400 bg-[#080d19]/80">
                 <th className="py-3.5 px-6">TXN ID & DATE</th>
                 <th className="py-3.5 px-6">PRODUCT</th>
-                <th className="py-3.5 px-6">SITE / LOCATION</th>
+                <th className="py-3.5 px-6">ONGOING SITE</th>
                 <th className="py-3.5 px-4 text-center">TYPE</th>
                 <th className="py-3.5 px-4 text-right">QTY</th>
                 <th className="py-3.5 px-6">DEPARTMENT</th>
@@ -1393,7 +1393,7 @@ export const StockTransactionsModule: React.FC = () => {
                       </td>
                       <td className="py-3.5 px-6 font-bold text-white text-xs">{t.productName}</td>
                       <td className="py-3.5 px-6 font-medium text-cyan-400">
-                        {t.siteName || defaultSiteName}
+                        {t.siteName || defaultOngoingSiteName}
                       </td>
                       <td className="py-3.5 px-4 text-center">
                         <span
@@ -1458,8 +1458,12 @@ export const StockTransactionsModule: React.FC = () => {
                 />
               </div>
 
+              {/* Ongoing Site Selector */}
               <div>
-                <label className="block text-slate-300 font-bold mb-1">Site / Project Name *</label>
+                <label className="block text-slate-300 font-bold mb-1 flex items-center justify-between">
+                  <span>Site / Ongoing Package *</span>
+                  <span className="text-[10px] text-blue-400 font-normal">From Ongoing Sites</span>
+                </label>
                 {siteSheets.length > 0 ? (
                   <select
                     value={siteName}
@@ -1589,7 +1593,6 @@ export const ReportsAnalyticsModule: React.FC = () => {
     }
   });
 
-  // Calculate live aggregates directly from transactions
   const totalStockInQty = useMemo(
     () => transactions.filter((t) => t.type === 'Stock In').reduce((sum, t) => sum + t.quantity, 0),
     [transactions]
@@ -1600,7 +1603,6 @@ export const ReportsAnalyticsModule: React.FC = () => {
     [transactions]
   );
 
-  // Group transactions by product to build reconciliation table
   const productReconciliation = useMemo(() => {
     const map: Record<
       string,
@@ -1635,7 +1637,6 @@ export const ReportsAnalyticsModule: React.FC = () => {
     return Object.values(map);
   }, [transactions]);
 
-  // Department distribution
   const departmentBreakdown = useMemo(() => {
     const deptMap: Record<string, number> = {};
     transactions
@@ -1666,7 +1667,6 @@ export const ReportsAnalyticsModule: React.FC = () => {
 
   return (
     <div className="space-y-6 font-sans text-slate-100">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400">
@@ -1689,7 +1689,6 @@ export const ReportsAnalyticsModule: React.FC = () => {
         </button>
       </div>
 
-      {/* 4 Analytics KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="p-5 rounded-3xl bg-[#0c1427] border border-[#182643] shadow-xl space-y-1">
           <div className="text-[11px] font-semibold text-slate-400 flex items-center justify-between">
@@ -1736,7 +1735,6 @@ export const ReportsAnalyticsModule: React.FC = () => {
         </div>
       </div>
 
-      {/* Main Reconciliation Table */}
       <div className="bg-[#0B1220] border border-[#1E293B] rounded-3xl overflow-hidden shadow-2xl">
         <div className="px-6 py-4 border-b border-[#1E293B] bg-[#0d1527]/50 flex items-center justify-between">
           <div>
@@ -1799,7 +1797,6 @@ export const ReportsAnalyticsModule: React.FC = () => {
         </div>
       </div>
 
-      {/* Department Consumption Distribution */}
       <div className="p-6 rounded-3xl bg-[#0c1427] border border-[#182643] shadow-2xl space-y-4">
         <h3 className="font-bold text-sm text-white">Department Consumption Breakdown</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">

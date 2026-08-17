@@ -16,6 +16,11 @@ import { RoadSitesManagerModule } from './components/sites/RoadSitesManagerModul
 import { RoadYieldCalculatorModule } from './components/calculator/RoadYieldCalculatorModule';
 import { MachineryFleetModule } from './components/machinery/MachineryFleetModule';
 
+// Building Construction Components
+import { ProductsMasterModule } from './components/building/ProductsMasterModule';
+import { StockTransactionsModule } from './components/building/StockTransactionsModule';
+import { AttendancePayrollModule } from './components/building/AttendancePayrollModule';
+
 import {
   Users,
   Plus,
@@ -25,14 +30,10 @@ import {
   Shield,
   Clock,
   CheckCircle2,
-  Package,
-  ArrowLeftRight,
   ScanLine,
   FileText,
   Bell,
   ShoppingCart,
-  Cpu,
-  CalendarCheck,
   Tag,
   MapPin,
   Archive
@@ -531,7 +532,7 @@ export const UserManagementModule: React.FC = () => {
 };
 
 // ==========================================
-// Building Construction Views Scaffold
+// Building Scaffold Views
 // ==========================================
 const BuildingGenericModuleView: React.FC<{
   title: string;
@@ -549,18 +550,17 @@ const BuildingGenericModuleView: React.FC<{
       </div>
     </div>
     <div className="p-8 rounded-2xl bg-[#080d19] border border-[#182643] text-center text-slate-500 text-xs">
-      {title} records & automated workflows are configured for this site.
+      {title} records & automated workflows are active for this site.
     </div>
   </div>
 );
 
 // ==========================================
-// Main Application Content Router
+// Main Application Router
 // ==========================================
 export const AppContent: React.FC = () => {
   const { isAuthenticated, selectedSiteId, setSelectedSiteId, siteSheets } = useERP();
 
-  // Domain state: 'ROAD' | 'BUILDING' | null
   const [projectType, setProjectType] = useState<'ROAD' | 'BUILDING' | null>(() => {
     try {
       return (sessionStorage.getItem('CONSTRUCTION_PRO_DOMAIN_SESSION') as any) || null;
@@ -569,7 +569,6 @@ export const AppContent: React.FC = () => {
     }
   });
 
-  // Track site chosen state for this session
   const [hasSelectedSite, setHasSelectedSite] = useState<boolean>(() => {
     try {
       return sessionStorage.getItem('CONSTRUCTION_PRO_SITE_CHOSEN_SESSION') === 'true';
@@ -581,12 +580,10 @@ export const AppContent: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
 
-  // Step 1: Authentication Check
   if (!isAuthenticated) {
     return <LoginPage />;
   }
 
-  // Step 2: Domain Choice Check (Road vs Building)
   if (!projectType) {
     return (
       <ProjectTypeSelectionPage
@@ -598,7 +595,6 @@ export const AppContent: React.FC = () => {
     );
   }
 
-  // Step 3: Site Selection Check
   if (!hasSelectedSite || !selectedSiteId || siteSheets.length === 0) {
     return (
       <SiteSelectionPage
@@ -618,7 +614,6 @@ export const AppContent: React.FC = () => {
     );
   }
 
-  // Step 4: Active ERP Viewport
   return (
     <div className="min-h-screen bg-[#080C14] text-slate-100 flex flex-col selection:bg-blue-600 selection:text-white font-sans">
       <Header
@@ -662,20 +657,10 @@ export const AppContent: React.FC = () => {
             {/* Building Construction Specific Tabs */}
             {projectType === 'BUILDING' && (
               <>
-                {activeTab === 'products' && (
-                  <BuildingGenericModuleView
-                    title="Building Materials & Products"
-                    subtitle="Track cement bags, TMT steel bars, river sand, M-sand, bricks, and concrete grades."
-                    icon={Package}
-                  />
-                )}
-                {activeTab === 'transactions' && (
-                  <BuildingGenericModuleView
-                    title="Stock Transactions (Inward / Outward)"
-                    subtitle="Record supplier delivery challans (GRN), site issues to contractors, and returns."
-                    icon={ArrowLeftRight}
-                  />
-                )}
+                {activeTab === 'products' && <ProductsMasterModule />}
+                {activeTab === 'transactions' && <StockTransactionsModule />}
+                {activeTab === 'attendance-salary' && <AttendancePayrollModule />}
+                {activeTab === 'equipment-register' && <MachineryFleetModule />}
                 {activeTab === 'scan-barcode' && (
                   <BuildingGenericModuleView
                     title="Barcode & QR Material Scanner"
@@ -702,14 +687,6 @@ export const AppContent: React.FC = () => {
                     title="Automated Purchase Indents & Suggestions"
                     subtitle="Estimated procurement schedule based on target floor casting schedules."
                     icon={ShoppingCart}
-                  />
-                )}
-                {activeTab === 'equipment-register' && <MachineryFleetModule />}
-                {activeTab === 'attendance-salary' && (
-                  <BuildingGenericModuleView
-                    title="Labour Attendance & Contractor Wage Billing"
-                    subtitle="Daily site muster roll, mason/carpenter batta, and bar-bending contractor bills."
-                    icon={CalendarCheck}
                   />
                 )}
                 {activeTab === 'categories' && (

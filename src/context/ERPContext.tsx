@@ -61,39 +61,57 @@ export interface ManagedUser extends User {
 
 const DEFAULT_MANAGED_USERS: ManagedUser[] = [
   {
-    id: 'usr-owner-1',
+    id: 'usr-admin-1',
     username: 'admin',
     password: '123',
     name: 'Habibulla Bilgi (Director)',
     email: 'habibullabilgiabu@gmail.com',
-    role: 'SUPER_ADMIN',
+    role: 'Admin' as any,
     status: 'ACTIVE'
   },
   {
     id: 'usr-mgr-1',
-    username: 'neha',
+    username: 'manager',
     password: '123',
-    name: 'Neha (Accounts & Ops)',
-    email: 'neha.ops@bilgicrushers.com',
-    role: 'STORE_MANAGER',
+    name: 'Neha (Inventory Manager)',
+    email: 'manager@plant.com',
+    role: 'Inventory Manager' as any,
     status: 'ACTIVE'
   },
   {
-    id: 'usr-sup-1',
+    id: 'usr-store-1',
+    username: 'keeper',
+    password: '123',
+    name: 'Ibrahim (Store Keeper)',
+    email: 'keeper@plant.com',
+    role: 'Store Keeper' as any,
+    status: 'ACTIVE'
+  },
+  {
+    id: 'usr-store-2',
     username: 'ibrahim',
     password: '123',
-    name: 'Ibrahim (Site Incharge)',
-    email: 'ibrahim@bilgicrushers.com',
-    role: 'SITE_SUPERVISOR',
+    name: 'Ibrahim Site Incharge',
+    email: 'ibrahim@bilgi.com',
+    role: 'Store Keeper' as any,
     status: 'ACTIVE'
   },
   {
-    id: 'usr-eng-1',
-    username: 'billing',
+    id: 'usr-mgr-2',
+    username: 'neha',
     password: '123',
-    name: 'Er. Amit Sharma',
-    email: 'amit.billing@bilgicrushers.com',
-    role: 'SITE_ENGINEER',
+    name: 'Neha Bilgi (Accounts & Ops)',
+    email: 'neha@bilgi.com',
+    role: 'Inventory Manager' as any,
+    status: 'ACTIVE'
+  },
+  {
+    id: 'usr-aud-1',
+    username: 'auditor',
+    password: '123',
+    name: 'Auditor User',
+    email: 'auditor@plant.com',
+    role: 'Auditor' as any,
     status: 'ACTIVE'
   }
 ];
@@ -104,8 +122,8 @@ interface ERPContextType {
   logout: () => void;
   currentUser: User;
   setCurrentUser: (user: User) => void;
-  userRole: UserRole;
-  setUserRole: (role: UserRole) => void;
+  userRole: UserRole | string;
+  setUserRole: (role: UserRole | string) => void;
 
   // User Management
   usersList: ManagedUser[];
@@ -148,7 +166,6 @@ interface ERPContextType {
   updateBuildingFloor: (floorId: string, data: Partial<BuildingFloor>) => void;
   addBuildingFloor: (floor: Partial<BuildingFloor>) => void;
 
-  // Materials & Fixed Rates Management
   materials: MaterialItem[];
   addMaterial: (item: Omit<MaterialItem, 'id'>) => void;
   updateMaterial: (id: string, data: Partial<MaterialItem>) => void;
@@ -223,8 +240,8 @@ interface ERPContextType {
 
 const ERPContext = createContext<ERPContextType | undefined>(undefined);
 
-const LOCAL_STORAGE_KEY = 'CONSTRUCTION_PRO_ERP_STORAGE_V6';
-const DELETED_SITES_KEY = 'CONSTRUCTION_PRO_DELETED_SITE_IDS_V6';
+const LOCAL_STORAGE_KEY = 'CONSTRUCTION_PRO_ERP_STORAGE_V7';
+const DELETED_SITES_KEY = 'CONSTRUCTION_PRO_DELETED_SITE_IDS_V7';
 
 const safeGetJSON = <T,>(key: string, fallback: T): T => {
   if (typeof window === 'undefined') return fallback;
@@ -259,7 +276,7 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     safeGetJSON(LOCAL_STORAGE_KEY + '_USER', DEFAULT_MANAGED_USERS[0])
   );
 
-  const [userRole, setUserRole] = useState<UserRole>(() => currentUser?.role || 'SUPER_ADMIN');
+  const [userRole, setUserRole] = useState<UserRole | string>(() => currentUser?.role || 'Admin');
 
   const login = (username: string, password?: string): { success: boolean; message?: string } => {
     const cleanUser = username.trim().toLowerCase();
@@ -287,11 +304,11 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       id: matchedUser.id,
       name: matchedUser.name,
       email: matchedUser.email,
-      role: matchedUser.role
+      role: matchedUser.role as any
     };
 
     setCurrentUser(usr);
-    setUserRole(matchedUser.role);
+    setUserRole(matchedUser.role as any);
     setIsAuthenticated(true);
 
     sessionStorage.setItem(LOCAL_STORAGE_KEY + '_AUTH', JSON.stringify(true));

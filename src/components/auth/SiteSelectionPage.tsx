@@ -2,26 +2,35 @@ import React, { useState } from 'react';
 import { useERP } from '../../context/ERPContext';
 import {
   Building2,
+  Milestone,
   Plus,
   ArrowRight,
-  MapPin,
   Truck,
   HardHat,
   LogOut,
   Layers,
-  ChevronRight,
+  ArrowLeft,
   X
 } from 'lucide-react';
 
 interface Props {
+  projectType?: 'ROAD' | 'BUILDING';
   onSelectSite: (siteId: string) => void;
+  onBackToDomainSelect?: () => void;
 }
 
-export const SiteSelectionPage: React.FC<Props> = ({ onSelectSite }) => {
+export const SiteSelectionPage: React.FC<Props> = ({
+  projectType = 'ROAD',
+  onSelectSite,
+  onBackToDomainSelect
+}) => {
   const { siteSheets = [], addRoadSiteSection, logout, currentUser, userRole } = useERP();
-  
+
   const currentRoleStr = String(currentUser?.role || userRole || '').toLowerCase();
   const isAdmin = currentRoleStr.includes('admin');
+
+  // Internal domain switch support if not passed from top-level state
+  const [activeDomain, setActiveDomain] = useState<'ROAD' | 'BUILDING'>(projectType);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newSiteName, setNewSiteName] = useState('');
@@ -29,6 +38,9 @@ export const SiteSelectionPage: React.FC<Props> = ({ onSelectSite }) => {
   const [newSupervisor, setNewSupervisor] = useState(currentUser?.name || 'Ibrahim (Site Incharge)');
   const [startChainage, setStartChainage] = useState<number>(0);
   const [endChainage, setEndChainage] = useState<number>(10);
+  const [buildingFloors, setBuildingFloors] = useState<string>('G + 12 Floors');
+
+  const isRoad = activeDomain === 'ROAD';
 
   const handleCreateSite = (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,10 +48,10 @@ export const SiteSelectionPage: React.FC<Props> = ({ onSelectSite }) => {
 
     const newId = addRoadSiteSection({
       siteName: newSiteName.trim().toUpperCase(),
-      location: newLocation.trim() || 'Highway Project Stretch',
+      location: newLocation.trim() || (isRoad ? 'Highway Project Stretch' : 'Building Site Campus'),
       supervisor: newSupervisor.trim(),
-      startChainageKm: Number(startChainage),
-      endChainageKm: Number(endChainage)
+      startChainageKm: isRoad ? Number(startChainage) : 0,
+      endChainageKm: isRoad ? Number(endChainage) : 0
     });
 
     setIsAddModalOpen(false);
@@ -57,16 +69,53 @@ export const SiteSelectionPage: React.FC<Props> = ({ onSelectSite }) => {
             <HardHat className="w-6 h-6" />
           </div>
           <div>
-            <span className="text-[10px] font-black tracking-widest text-blue-400 font-mono uppercase">
-              Road Construction ERP
-            </span>
-            <h1 className="text-xl font-black text-white tracking-tight uppercase">
+            <div className="flex items-center gap-2">
+              <span
+                className={`text-[10px] font-black tracking-widest font-mono uppercase px-2 py-0.5 rounded-md ${
+                  isRoad
+                    ? 'bg-blue-950 text-blue-400 border border-blue-800'
+                    : 'bg-emerald-950 text-emerald-400 border border-emerald-800'
+                }`}
+              >
+                {isRoad ? 'Road Construction Mode' : 'Building Construction Mode'}
+              </span>
+            </div>
+            <h1 className="text-xl font-black text-white tracking-tight uppercase mt-0.5">
               CONSTRUCTION PRO
             </h1>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
+          {onBackToDomainSelect ? (
+            <button
+              onClick={onBackToDomainSelect}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#121927] hover:bg-[#1c273d] border border-[#1E293B] text-slate-300 text-xs font-semibold transition-all cursor-pointer"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Switch Domain</span>
+            </button>
+          ) : (
+            <div className="flex items-center bg-[#121927] border border-[#1E293B] p-1 rounded-xl gap-1">
+              <button
+                onClick={() => setActiveDomain('ROAD')}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                  isRoad ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Roads
+              </button>
+              <button
+                onClick={() => setActiveDomain('BUILDING')}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                  !isRoad ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Buildings
+              </button>
+            </div>
+          )}
+
           <div className="hidden sm:block text-right">
             <div className="text-xs font-bold text-white">{currentUser?.name || 'Habibulla Bilgi'}</div>
             <div className="text-[11px] text-blue-400 font-mono">{currentUser?.role || 'Admin'}</div>
@@ -85,23 +134,25 @@ export const SiteSelectionPage: React.FC<Props> = ({ onSelectSite }) => {
       <div className="max-w-5xl w-full mx-auto my-auto py-8 space-y-8">
         <div className="text-center space-y-2">
           <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-            Select Active Construction Site
+            {isRoad ? 'Select Active Road Corridor' : 'Select Active Building Project'}
           </h2>
           <p className="text-xs sm:text-sm text-slate-400 max-w-xl mx-auto">
-            Choose an ongoing road package to access live material trippage, diesel bowsers, and telemetry.
+            {isRoad
+              ? 'Choose an ongoing road stretch to access material trippage, diesel bowsers, and yield meters.'
+              : 'Choose an active tower or campus construction site to track structural components, concrete, and site expenses.'}
           </p>
         </div>
 
         {siteSheets.length === 0 ? (
-          /* Empty State: Prompt to create the first site */
+          /* Empty State */
           <div className="p-10 rounded-3xl bg-[#0c1427] border border-[#182643] text-center max-w-lg mx-auto shadow-2xl space-y-5">
             <div className="w-16 h-16 rounded-2xl bg-blue-600/15 border border-blue-500/30 mx-auto flex items-center justify-center text-blue-400 shadow-md">
-              <Building2 className="w-8 h-8" />
+              {isRoad ? <Milestone className="w-8 h-8" /> : <Building2 className="w-8 h-8" />}
             </div>
             <div className="space-y-1">
-              <h3 className="text-lg font-black text-white">No Sites Configured</h3>
+              <h3 className="text-lg font-black text-white">No Sites Registered</h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                There are no active road stretches or site packages registered in the system yet.
+                There are no active {isRoad ? 'road stretches' : 'building projects'} registered in the system yet.
               </p>
             </div>
             <button
@@ -109,7 +160,7 @@ export const SiteSelectionPage: React.FC<Props> = ({ onSelectSite }) => {
               className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2 cursor-pointer"
             >
               <Plus className="w-4 h-4" />
-              <span>+ Add First Site Stretch</span>
+              <span>+ Add First {isRoad ? 'Road Site' : 'Building Site'}</span>
             </button>
           </div>
         ) : (
@@ -137,7 +188,7 @@ export const SiteSelectionPage: React.FC<Props> = ({ onSelectSite }) => {
                   <div className="pt-3 border-t border-[#182643] flex items-center justify-between text-xs text-slate-400">
                     <span className="flex items-center gap-1 font-medium">
                       <Truck className="w-3.5 h-3.5 text-blue-400" />
-                      {site.vehicles?.length || 0} Tippers
+                      {site.vehicles?.length || 0} Assigned Units
                     </span>
                     <span className="text-blue-400 font-bold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
                       <span>Launch Site</span>
@@ -157,7 +208,7 @@ export const SiteSelectionPage: React.FC<Props> = ({ onSelectSite }) => {
                     <Plus className="w-5 h-5" />
                   </div>
                   <div className="text-xs font-bold text-slate-300 group-hover:text-white">
-                    + Add New Site Section
+                    + Add New {isRoad ? 'Site Stretch' : 'Building Site'}
                   </div>
                 </button>
               )}
@@ -168,17 +219,21 @@ export const SiteSelectionPage: React.FC<Props> = ({ onSelectSite }) => {
 
       {/* Footer */}
       <div className="border-t border-[#1E293B] pt-4 text-center text-[11px] text-slate-500 font-mono">
-        Secured Road Project Dispatch & Asset Management
+        Secured Project Dispatch & Asset Management
       </div>
 
-      {/* Add Road Site Modal */}
+      {/* Add Road/Building Site Modal */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
           <div className="bg-[#121927] border border-[#1E293B] rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4 text-slate-100 max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
               <div className="flex items-center gap-2 text-white font-bold text-base">
-                <Building2 className="w-5 h-5 text-blue-400" />
-                <span>Create Road Construction Site</span>
+                {isRoad ? (
+                  <Milestone className="w-5 h-5 text-blue-400" />
+                ) : (
+                  <Building2 className="w-5 h-5 text-emerald-400" />
+                )}
+                <span>{isRoad ? 'Create Road Construction Site' : 'Create Building Construction Project'}</span>
               </div>
               <button
                 type="button"
@@ -192,12 +247,12 @@ export const SiteSelectionPage: React.FC<Props> = ({ onSelectSite }) => {
             <form onSubmit={handleCreateSite} className="space-y-3.5 text-xs">
               <div>
                 <label className="block text-slate-300 font-bold mb-1">
-                  Site Name / Package Description *
+                  {isRoad ? 'Road Name / Package Description *' : 'Building / Tower Project Name *'}
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. SINDAGI - ALMEL ROAD"
+                  placeholder={isRoad ? 'e.g. SINDAGI - ALMEL ROAD' : 'e.g. BILGI HEIGHTS TOWER-A'}
                   value={newSiteName}
                   onChange={(e) => setNewSiteName(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-blue-500 uppercase font-bold"
@@ -210,37 +265,52 @@ export const SiteSelectionPage: React.FC<Props> = ({ onSelectSite }) => {
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. State Highway 128 Stretch"
+                  placeholder={isRoad ? 'e.g. State Highway 128 Stretch' : 'e.g. Commercial Area Sector 4'}
                   value={newLocation}
                   onChange={(e) => setNewLocation(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-blue-500"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              {isRoad ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-300 font-bold mb-1">
+                      Start Chainage (Km)
+                    </label>
+                    <input
+                      type="number"
+                      value={startChainage}
+                      onChange={(e) => setStartChainage(Number(e.target.value))}
+                      className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 font-bold mb-1">
+                      End Chainage (Km)
+                    </label>
+                    <input
+                      type="number"
+                      value={endChainage}
+                      onChange={(e) => setEndChainage(Number(e.target.value))}
+                      className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+              ) : (
                 <div>
                   <label className="block text-slate-300 font-bold mb-1">
-                    Start Chainage (Km)
+                    Building Structure / Floor Scope
                   </label>
                   <input
-                    type="number"
-                    value={startChainage}
-                    onChange={(e) => setStartChainage(Number(e.target.value))}
-                    className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono outline-none focus:border-blue-500"
+                    type="text"
+                    value={buildingFloors}
+                    onChange={(e) => setBuildingFloors(e.target.value)}
+                    placeholder="e.g. Basement + Ground + 12 Floors"
+                    className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-emerald-500"
                   />
                 </div>
-                <div>
-                  <label className="block text-slate-300 font-bold mb-1">
-                    End Chainage (Km)
-                  </label>
-                  <input
-                    type="number"
-                    value={endChainage}
-                    onChange={(e) => setEndChainage(Number(e.target.value))}
-                    className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono outline-none focus:border-blue-500"
-                  />
-                </div>
-              </div>
+              )}
 
               <div>
                 <label className="block text-slate-300 font-bold mb-1">

@@ -9,28 +9,49 @@ import {
   HardHat,
   LogOut,
   Milestone,
-  Users
+  Users,
+  Package,
+  ArrowLeftRight,
+  ScanLine,
+  FileText,
+  Bell,
+  ShoppingCart,
+  Cpu,
+  CalendarCheck,
+  Tag,
+  MapPin,
+  Archive,
+  Building2
 } from 'lucide-react';
 
 interface Props {
   activeTab: string;
   setActiveTab: (tab: string) => void;
-  onOpenArchitecture?: () => void;
+  projectType?: 'ROAD' | 'BUILDING';
+  onSwitchDomain?: () => void;
 }
 
 interface NavItem {
   id: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
-  badge?: string;
+  badge?: string | number;
   badgeStyle?: string;
 }
 
-export const Sidebar: React.FC<Props> = ({ activeTab, setActiveTab }) => {
+export const Sidebar: React.FC<Props> = ({
+  activeTab,
+  setActiveTab,
+  projectType = 'ROAD',
+  onSwitchDomain
+}) => {
   const { currentUser, logout } = useERP();
+  const isBuilding = projectType === 'BUILDING';
 
-  // 1. SITE OPERATIONS
-  const operationsItems: NavItem[] = [
+  // ==========================================
+  // ROAD CONSTRUCTION NAVIGATION ITEMS
+  // ==========================================
+  const roadOperationsItems: NavItem[] = [
     { id: 'dashboard', label: 'Site Overview', icon: LayoutDashboard },
     {
       id: 'road-sites',
@@ -62,8 +83,7 @@ export const Sidebar: React.FC<Props> = ({ activeTab, setActiveTab }) => {
     }
   ];
 
-  // 2. ENGINEERING (DPR removed)
-  const engineeringItems: NavItem[] = [
+  const roadEngineeringItems: NavItem[] = [
     {
       id: 'yield_calculator',
       label: 'Road Trip Calculator',
@@ -78,8 +98,7 @@ export const Sidebar: React.FC<Props> = ({ activeTab, setActiveTab }) => {
     }
   ];
 
-  // 3. ADMINISTRATION
-  const administrationItems: NavItem[] = [
+  const roadAdminItems: NavItem[] = [
     {
       id: 'users',
       label: 'User Management',
@@ -89,11 +108,44 @@ export const Sidebar: React.FC<Props> = ({ activeTab, setActiveTab }) => {
     }
   ];
 
-  const renderNavGroup = (title: string, items: NavItem[]) => (
+  // ==========================================
+  // BUILDING CONSTRUCTION NAVIGATION ITEMS
+  // ==========================================
+  const buildingCoreItems: NavItem[] = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'products', label: 'Products', icon: Package },
+    { id: 'transactions', label: 'Transactions', icon: ArrowLeftRight },
+    { id: 'scan-barcode', label: 'Scan Barcode', icon: ScanLine }
+  ];
+
+  const buildingAnalysisItems: NavItem[] = [
+    { id: 'reports', label: 'Reports', icon: FileText },
+    {
+      id: 'alerts',
+      label: 'Alerts',
+      icon: Bell,
+      badge: 3,
+      badgeStyle: 'bg-rose-600 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-black'
+    },
+    { id: 'reorder-suggestions', label: 'Reorder Suggestions', icon: ShoppingCart },
+    { id: 'equipment-register', label: 'Equipment Register', icon: Cpu },
+    { id: 'attendance-salary', label: 'Attendance & Salary', icon: CalendarCheck }
+  ];
+
+  const buildingConfigItems: NavItem[] = [
+    { id: 'categories', label: 'Categories', icon: Tag },
+    { id: 'locations', label: 'Locations', icon: MapPin },
+    { id: 'users', label: 'User Management', icon: Users },
+    { id: 'yearly-archive', label: 'Yearly Archive', icon: Archive }
+  ];
+
+  const renderNavGroup = (title: string | null, items: NavItem[]) => (
     <div className="space-y-1">
-      <div className="px-3 text-[10px] font-extrabold uppercase tracking-widest text-[#94A3B8] mb-1">
-        {title}
-      </div>
+      {title && (
+        <div className="px-3 text-[10px] font-extrabold uppercase tracking-widest text-[#94A3B8] mb-1">
+          {title}
+        </div>
+      )}
       <nav className="space-y-0.5">
         {items.map((item) => {
           const Icon = item.icon;
@@ -113,11 +165,14 @@ export const Sidebar: React.FC<Props> = ({ activeTab, setActiveTab }) => {
                 <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-[#94A3B8]'}`} />
                 <span>{item.label}</span>
               </div>
-              {item.badge && (
+              {item.badge !== undefined && (
                 <span
-                  className={`text-[9px] px-1.5 py-0.5 rounded font-black ${
-                    isActive ? 'bg-white/20 text-white' : item.badgeStyle
-                  }`}
+                  className={
+                    item.badgeStyle ||
+                    `text-[9px] px-1.5 py-0.5 rounded font-black ${
+                      isActive ? 'bg-white/20 text-white' : 'bg-blue-900/40 text-blue-300 border border-blue-500/40'
+                    }`
+                  }
                 >
                   {item.badge}
                 </span>
@@ -135,32 +190,53 @@ export const Sidebar: React.FC<Props> = ({ activeTab, setActiveTab }) => {
         {/* Brand Card */}
         <div className="p-3 bg-[#121927] border border-[#1E293B] rounded-2xl flex items-center justify-between shadow-sm">
           <div className="flex items-center gap-2.5 overflow-hidden">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white font-black shrink-0 shadow-md shadow-blue-600/30">
-              <HardHat className="w-4 h-4" />
+            <div
+              className={`w-8 h-8 rounded-xl flex items-center justify-center text-white font-black shrink-0 shadow-md ${
+                isBuilding
+                  ? 'bg-gradient-to-br from-emerald-600 to-teal-700 shadow-emerald-600/30'
+                  : 'bg-gradient-to-br from-blue-600 to-indigo-700 shadow-blue-600/30'
+              }`}
+            >
+              {isBuilding ? <Building2 className="w-4 h-4" /> : <HardHat className="w-4 h-4" />}
             </div>
             <div className="truncate">
               <div className="text-xs font-black text-white uppercase tracking-wider truncate">
                 CONSTRUCTION PRO
               </div>
               <div className="text-[10px] text-blue-400 font-mono truncate">
-                Road Construction ERP
+                {isBuilding ? 'Building Construction ERP' : 'Road Construction ERP'}
               </div>
             </div>
           </div>
         </div>
 
-        {/* Section 1: SITE OPERATIONS */}
-        {renderNavGroup('SITE OPERATIONS', operationsItems)}
-
-        {/* Section 2: ENGINEERING */}
-        {renderNavGroup('ENGINEERING', engineeringItems)}
-
-        {/* Section 3: ADMINISTRATION */}
-        {renderNavGroup('ADMINISTRATION', administrationItems)}
+        {/* Dynamic Nav Groups */}
+        {isBuilding ? (
+          <>
+            {renderNavGroup(null, buildingCoreItems)}
+            {renderNavGroup('ANALYSIS', buildingAnalysisItems)}
+            {renderNavGroup('CONFIGURATION', buildingConfigItems)}
+          </>
+        ) : (
+          <>
+            {renderNavGroup('SITE OPERATIONS', roadOperationsItems)}
+            {renderNavGroup('ENGINEERING', roadEngineeringItems)}
+            {renderNavGroup('ADMINISTRATION', roadAdminItems)}
+          </>
+        )}
       </div>
 
       {/* User Profile Card at Bottom */}
-      <div className="p-3 border-t border-[#1E293B] bg-[#080C14]">
+      <div className="p-3 border-t border-[#1E293B] bg-[#080C14] space-y-2">
+        {onSwitchDomain && (
+          <button
+            onClick={onSwitchDomain}
+            className="w-full py-1.5 px-2 bg-[#121927] hover:bg-[#1b263b] border border-[#1E293B] rounded-xl text-[11px] font-bold text-slate-300 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <span>Switch to {isBuilding ? 'Roads' : 'Buildings'}</span>
+          </button>
+        )}
+
         <div className="p-2 rounded-xl bg-[#121927] border border-[#1E293B] flex items-center justify-between">
           <div className="flex items-center gap-2.5 overflow-hidden">
             <div className="w-8 h-8 rounded-full bg-blue-600/20 border border-blue-500/30 flex items-center justify-center font-bold text-xs text-blue-400 shrink-0">

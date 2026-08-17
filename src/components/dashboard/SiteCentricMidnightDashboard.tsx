@@ -1,1188 +1,371 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useERP } from '../../context/ERPContext';
-import { useRoadERP } from '../../context/RoadERPContext';
 import {
-  Layers,
-  DollarSign,
-  Truck,
-  AlertTriangle,
-  HardHat,
-  ArrowDownRight,
-  ArrowUpRight,
-  Plus,
-  Filter,
+  Milestone,
   Calculator,
   Fuel,
-  CheckCircle2,
-  Clock,
-  ExternalLink,
-  ChevronRight,
-  Flame,
-  Shield,
+  Truck,
+  DollarSign,
+  Plus,
+  ArrowRight,
+  Layers,
+  AlertTriangle,
+  HardHat,
   Gauge,
-  Calendar,
-  X,
-  FileCheck,
-  TrendingDown,
+  Clock,
+  Activity,
+  CheckCircle2,
   TrendingUp,
-  MapPin,
-  Building2,
-  Search,
-  Sparkles,
-  Milestone
+  MapPin
 } from 'lucide-react';
-import { CreateRoadSiteModal } from '../modals/CreateRoadSiteModal';
 
 interface Props {
   onNavigateTab: (tab: string) => void;
 }
 
 export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab }) => {
-  const { selectedSiteId, siteSheets, projects, selectedProjectId, siteExpenses, vehicleTrips, dieselLogs, machinery } = useERP();
   const {
-    machines,
-    trips,
-    fuelLogs,
-    expenses,
-    yieldCalculations,
-    addTripLog,
-    addFuelDispenseLog,
-    addExpenseVoucher,
-    kpis
-  } = useRoadERP();
+    siteSheets = [],
+    selectedSiteId,
+    setSelectedSiteId,
+    machinery = []
+  } = useERP();
 
-  // Active Site Details
-  const activeSite = useMemo(() => {
-    return siteSheets.find((s) => s.siteId === selectedSiteId) || siteSheets[0] || {
-      siteId: 'site-mulwad',
-      siteName: 'NH-48 Highway Extension - Package 3 (Mulwad Stretch)',
-      siteCode: 'NH48-PKG3-MUL'
-    };
-  }, [siteSheets, selectedSiteId]);
-
-  // Dynamic KPI Calculations from Live State
-  const currentSheet = siteSheets.find((s) => s.siteId === selectedSiteId) || siteSheets[0];
-  
-  const totalMaterialLaid = useMemo(() => {
-    if (!currentSheet) return 0;
-    return currentSheet.tabs.reduce((sum, tab) => {
-      return sum + tab.rows.reduce((rSum, row) => rSum + (Number(row.total) || 0), 0);
-    }, 0);
-  }, [currentSheet]);
-
-  const totalExpensesAmount = useMemo(() => {
-    const contextTotal = (siteExpenses || [])
-      .filter((e) => !selectedSiteId || e.siteId === selectedSiteId)
-      .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-    
-    const roadTotal = (expenses || []).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-    return contextTotal + roadTotal;
-  }, [siteExpenses, expenses, selectedSiteId]);
-
-  const activeTripsCount = useMemo(() => {
-    const vTrips = (vehicleTrips || []).filter((t) => !selectedSiteId || t.siteId === selectedSiteId).length;
-    const rTrips = (trips || []).length;
-    return vTrips + rTrips;
-  }, [vehicleTrips, trips, selectedSiteId]);
-
-  const lowFuelMachines = useMemo(() => {
-    const list = machines || [];
-    return list.filter((m: any) => m.fuelLevel !== undefined && m.fuelLevel < 15);
-  }, [machines]);
-
-  const totalMachinesCount = (machines && machines.length > 0) ? machines.length : (machinery?.length || 0);
-  const activeMachinesCount = (machines && machines.length > 0)
-    ? machines.filter((m: any) => m.status === 'Active').length
-    : (machinery || []).filter((m: any) => m.status === 'Active').length;
-
-  const breakdownMachinesCount = (machines && machines.length > 0)
-    ? machines.filter((m: any) => m.status === 'Breakdown' || m.status === 'Idle').length
-    : (machinery || []).filter((m: any) => m.status === 'Breakdown' || m.status === 'Maintenance').length;
-
-  // Activity Feed Filter
-  const [feedFilter, setFeedFilter] = useState<'ALL' | 'DIESEL' | 'MATERIAL' | 'EXPENSE'>('ALL');
-
-  // Quick Action Modal States
-  const [isDieselModalOpen, setIsDieselModalOpen] = useState(false);
-  const [isTripModalOpen, setIsTripModalOpen] = useState(false);
-  const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
-  const [isYieldModalOpen, setIsYieldModalOpen] = useState(false);
-  const [isAddRoadSiteOpen, setIsAddRoadSiteOpen] = useState(false);
-
-  // Form States for Diesel Refueling
-  const [fuelMachineId, setFuelMachineId] = useState('m-grd-01');
-  const [fuelLitres, setFuelLitres] = useState<number | ''>(180);
-  const [fuelSource, setFuelSource] = useState('SITE_BOWSER_1');
-  const [fuelHmrStart, setFuelHmrStart] = useState<number>(3410);
-  const [fuelHmrEnd, setFuelHmrEnd] = useState<number>(3418);
-  const [fuelChallan, setFuelChallan] = useState('BWS-885');
-
-  // Form States for Trip Challan
-  const [tripVehicleNo, setTripVehicleNo] = useState('KA-28-C-8797');
-  const [tripMaterial, setTripMaterial] = useState('WMM (Wet Mix Macadam)');
-  const [tripOrigin, setTripOrigin] = useState('Bilgi Crusher Pit #2');
-  const [tripChainage, setTripChainage] = useState('Ch. 14+200 LHS');
-  const [tripGross, setTripGross] = useState<number | ''>(48.5);
-  const [tripTare, setTripTare] = useState<number | ''>(16.0);
-  const [tripChallanNo, setTripChallanNo] = useState('WB-49110');
-
-  // Form States for Site Expense
-  const [expCategory, setExpCategory] = useState<any>('EQUIPMENT_REPAIR_PARTS');
-  const [expPayee, setExpPayee] = useState('');
-  const [expAmount, setExpAmount] = useState<number | ''>(4500);
-  const [expDesc, setExpDesc] = useState('');
-  const [expChainage, setExpChainage] = useState('Ch. 14+200 Workshop');
-
-  // Yield Calculator interactive state in modal
-  const [calcLength, setCalcLength] = useState<number>(1000);
-  const [calcWidth, setCalcWidth] = useState<number>(7.5);
-  const [calcThicknessMm, setCalcThicknessMm] = useState<number>(150);
-  const [calcDensity, setCalcDensity] = useState<number>(2.25);
-  const [calcWastage, setCalcWastage] = useState<number>(5);
-  const [calcTipperCap, setCalcTipperCap] = useState<number>(30);
-  const [calcActualDelivered, setCalcActualDelivered] = useState<number>(2800);
-
-  // Machine Roster Statuses
-  const machineRoster = useMemo(() => {
-    if (machines && machines.length > 0) return machines;
-    return (machinery || []).map((m) => ({
-      id: m.registrationNo || m.id,
-      name: m.name,
-      operator: m.operatorName || 'Assigned Operator',
-      status: m.status as any,
-      workingHours: 0,
-      targetHours: 10,
-      fuelLevel: 100,
-      isLowFuel: false,
-      section: 'Main Site Stretch'
-    }));
-  }, [machines, machinery]);
-
-  // Combined Real-Time Activity Feed Dynamic Generator
-  const activityLedger = useMemo(() => {
-    const list: any[] = [];
-
-    (fuelLogs || []).forEach((f: any) => {
-      list.push({
-        id: `fuel-${f.id}`,
-        type: 'DIESEL',
-        title: 'Diesel Dispensed',
-        direction: 'OUT',
-        value: `[-] ${f.litresDispensed} L`,
-        subtext: `To ${f.machineName || f.machineCode}`,
-        detail: `Challan: ${f.voucherChallanNo || 'N/A'} • Source: ${f.fuelSource}`,
-        timestamp: f.date || 'Today',
-        tagColor: 'crimson'
-      });
-    });
-
-    (trips || []).forEach((t: any) => {
-      list.push({
-        id: `trip-${t.id}`,
-        type: 'MATERIAL',
-        title: 'Material Haul Delivery',
-        direction: 'IN',
-        value: `[+] ${t.netWeightTons?.toFixed(2) || '0.00'} Tons ${t.materialName}`,
-        subtext: `Tipper: ${t.vehicleNumberPlate} • Challan #${t.challanNumber}`,
-        detail: `From ${t.sourceQuarryOrPlant} -> ${t.formattedChainage || 'Site'}`,
-        timestamp: t.date || 'Today',
-        tagColor: 'emerald'
-      });
-    });
-
-    (expenses || []).forEach((e: any) => {
-      list.push({
-        id: `exp-${e.id}`,
-        type: 'EXPENSE',
-        title: 'Site Expense Voucher',
-        direction: 'OUT',
-        value: `[-] ₹${Number(e.amount).toLocaleString('en-IN')}`,
-        subtext: e.description || e.category,
-        detail: `Payee: ${e.payeeVendorName || 'Vendor'} • Center: ${e.costCenterChainage || 'Site'}`,
-        timestamp: e.date || 'Today',
-        tagColor: 'crimson'
-      });
-    });
-
-    if (feedFilter === 'ALL') return list;
-    return list.filter((item) => item.type === feedFilter);
-  }, [fuelLogs, trips, expenses, feedFilter]);
-
-  // Handlers for quick entries
-  const handleSaveDiesel = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!fuelLitres) return;
-
-    addFuelDispenseLog({
-      date: new Date().toISOString().substring(0, 10),
-      machineId: fuelMachineId,
-      machineCode: fuelMachineId.toUpperCase(),
-      machineName: 'CAT 140K Motor Grader',
-      fuelSource: fuelSource as any,
-      litresDispensed: Number(fuelLitres),
-      ratePerLitre: 92.5,
-      meterType: 'HMR_HOURS',
-      previousMeterReading: fuelHmrStart,
-      currentMeterReading: fuelHmrEnd,
-      voucherChallanNo: fuelChallan,
-      dispensedBy: 'Ibrahim (Bowser Incharge)',
-      approvedBy: 'Habibulla Bilgi'
-    });
-
-    setIsDieselModalOpen(false);
+  // Active Site Data
+  const currentSite = siteSheets.find((s) => s.siteId === selectedSiteId) || siteSheets[0] || {
+    siteId: 'site-mulwad',
+    siteName: 'NH-48 Highway Extension - Package 3 (Mulwad Stretch)'
   };
 
-  const handleSaveTrip = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!tripGross || !tripTare) return;
-    const net = Math.max(0, Number(tripGross) - Number(tripTare));
+  // 1. Live Trips & Material Calculation from localStorage
+  const [totalMaterialBrass, setTotalMaterialBrass] = useState<number>(60);
+  const [totalTripsCount, setTotalTripsCount] = useState<number>(10);
 
-    addTripLog({
-      date: new Date().toISOString().substring(0, 10),
-      tripTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      vehicleNumberPlate: tripVehicleNo,
-      driverName: 'Santosh Chavan',
-      sourceQuarryOrPlant: tripOrigin,
-      destinationChainageKm: 14.2,
-      formattedChainage: tripChainage,
-      carriagewaySide: 'LHS',
-      layerType: 'WMM',
-      materialName: tripMaterial,
-      grossWeightTons: Number(tripGross),
-      tareWeightTons: Number(tripTare),
-      netWeightTons: net,
-      challanNumber: tripChallanNo,
-      ratePerTonOrTrip: 420,
-      billingMode: 'PER_TON',
-      oneWayDistanceKm: 12.5,
-      roundTripDistanceKm: 25.0,
-      turnaroundTimeMinutes: 45,
-      supervisorName: 'Ibrahim (Site Supervisor)'
-    });
+  // 2. Live Diesel Fuel Calculation from localStorage
+  const [totalDieselLitres, setTotalDieselLitres] = useState<number>(280);
 
-    setIsTripModalOpen(false);
-  };
+  // 3. Live Site Expenses Calculation from localStorage
+  const [totalExpensesAmount, setTotalExpensesAmount] = useState<number>(0);
 
-  const handleSaveExpense = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!expPayee || !expAmount) return;
+  useEffect(() => {
+    try {
+      const savedTrips = localStorage.getItem('CONSTRUCTION_PRO_DAY_TRIPS_V3') || localStorage.getItem('CONSTRUCTION_PRO_DAY_TRIPS_V2');
+      if (savedTrips) {
+        const parsed = JSON.parse(savedTrips);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const brassSum = parsed.reduce((sum: number, t: any) => sum + (Number(t.totalBrass) || 0), 0);
+          const tripsSum = parsed.reduce((sum: number, t: any) => sum + (Number(t.totalTrips) || 0), 0);
+          setTotalMaterialBrass(brassSum);
+          setTotalTripsCount(tripsSum);
+        }
+      }
 
-    addExpenseVoucher({
-      date: new Date().toISOString().substring(0, 10),
-      category: expCategory,
-      costCenterChainage: expChainage,
-      amount: Number(expAmount),
-      paymentMode: 'PETTY_CASH',
-      payeeVendorName: expPayee,
-      description: expDesc || 'Site emergency procurement',
-      requestedBy: 'Ibrahim (Site Engineer)',
-      status: 'SUBMITTED'
-    });
+      const savedDiesel = localStorage.getItem('CONSTRUCTION_PRO_DIESEL_VOUCHERS_V1');
+      if (savedDiesel) {
+        const parsed = JSON.parse(savedDiesel);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const dslSum = parsed.reduce((sum: number, d: any) => sum + (Number(d.litresDispensed) || 0), 0);
+          setTotalDieselLitres(dslSum);
+        }
+      }
 
-    setIsExpenseModalOpen(false);
-  };
-
-  // Dynamic Yield Calculations
-  const yieldCompactedVolM3 = (calcLength * calcWidth * (calcThicknessMm / 1000));
-  const yieldTotalTonnageReq = yieldCompactedVolM3 * calcDensity * (1 + calcWastage / 100);
-  const yieldTripsNeeded = Math.ceil(yieldTotalTonnageReq / calcTipperCap);
-  const yieldVarianceTons = calcActualDelivered - yieldTotalTonnageReq;
-  const yieldVariancePct = ((yieldVarianceTons / yieldTotalTonnageReq) * 100).toFixed(1);
+      const savedExpenses = localStorage.getItem('CONSTRUCTION_PRO_ERP_STORAGE_V7_SITE_EXPENSES') || localStorage.getItem('CONSTRUCTION_PRO_ERP_STORAGE_V6_SITE_EXPENSES');
+      if (savedExpenses) {
+        const parsed = JSON.parse(savedExpenses);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const expSum = parsed.reduce((sum: number, e: any) => sum + (Number(e.amount) || 0), 0);
+          setTotalExpensesAmount(expSum);
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, [selectedSiteId]);
 
   return (
     <div className="space-y-6 font-sans text-slate-100 selection:bg-blue-600 selection:text-white">
-      {/* 1. Main Dashboard Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-1 border-b border-[#1E293B]">
+      {/* ========================================================================= */}
+      {/* 1. TOP COMMAND BANNER WITH DIRECT ROUTING BUTTONS                         */}
+      {/* ========================================================================= */}
+      <div className="p-6 rounded-3xl bg-[#0c1427] border border-[#182643] shadow-2xl flex flex-col lg:flex-row lg:items-center justify-between gap-6">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-xs font-extrabold uppercase tracking-wider text-blue-400">
+          <div className="flex items-center gap-2 text-xs font-bold">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-blue-400 tracking-wider uppercase font-mono">
               SITE OPERATIONS COMMAND
             </span>
-            <span className="text-slate-600">•</span>
-            <span className="text-xs font-mono text-slate-400">
-              {activeSite.siteCode}
-            </span>
+            <span className="text-slate-500">•</span>
+            <span className="text-slate-400 font-mono text-[11px]">NH48-PKG3-MUL</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-0.5">
-            {activeSite.siteName}
+
+          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-1.5 leading-snug">
+            {currentSite.siteName}
           </h1>
-          <p className="text-[13px] text-[#94A3B8] mt-0.5">
+
+          <p className="text-xs text-slate-400 mt-1">
             Live site metrics, equipment telematics, material haulage, and petty cash ledger.
           </p>
         </div>
 
-        {/* Quick Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2">
+        {/* Action Button Links */}
+        <div className="flex flex-wrap items-center gap-2.5 self-start lg:self-auto">
+          {/* Button 1: Add Site Section -> road-sites */}
           <button
-            onClick={() => setIsAddRoadSiteOpen(true)}
-            className="px-3.5 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600 border border-blue-500/40 text-blue-300 hover:text-white text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+            onClick={() => onNavigateTab('road-sites')}
+            className="px-3.5 py-2.5 rounded-2xl bg-[#142038] hover:bg-[#1f2f52] border border-[#22365e] text-blue-300 hover:text-white font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shadow-sm"
+            title="Manage Road Sites & Chainages"
           >
-            <Milestone className="w-3.5 h-3.5" />
+            <Milestone className="w-4 h-4 text-blue-400" />
             <span>+ Add Site Section</span>
           </button>
 
+          {/* Button 2: Yield Calc -> yield_calculator */}
           <button
-            onClick={() => setIsYieldModalOpen(true)}
-            className="px-3.5 py-2 rounded-xl bg-[#162032] hover:bg-[#1E293B] border border-[#1E293B] text-slate-200 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm hover:text-white"
+            onClick={() => onNavigateTab('yield_calculator')}
+            className="px-3.5 py-2.5 rounded-2xl bg-[#142038] hover:bg-[#1f2f52] border border-[#22365e] text-blue-300 hover:text-white font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shadow-sm"
+            title="Open Road Yield Calculator"
           >
-            <Calculator className="w-3.5 h-3.5 text-blue-400" />
+            <Calculator className="w-4 h-4 text-cyan-400" />
             <span>Yield Calc</span>
           </button>
 
+          {/* Button 3: Log Diesel -> diesel */}
           <button
-            onClick={() => setIsDieselModalOpen(true)}
-            className="px-3.5 py-2 rounded-xl bg-[#162032] hover:bg-[#1E293B] border border-[#1E293B] text-slate-200 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm hover:text-white"
+            onClick={() => onNavigateTab('diesel')}
+            className="px-3.5 py-2.5 rounded-2xl bg-[#142038] hover:bg-[#1f2f52] border border-[#22365e] text-amber-300 hover:text-white font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shadow-sm"
+            title="Open Fuel Management Log"
           >
-            <Fuel className="w-3.5 h-3.5 text-amber-400" />
+            <Fuel className="w-4 h-4 text-amber-400" />
             <span>+ Log Diesel</span>
           </button>
 
+          {/* Button 4: Log Trip -> haulage-trips */}
           <button
-            onClick={() => setIsTripModalOpen(true)}
-            className="px-3.5 py-2 rounded-xl bg-[#162032] hover:bg-[#1E293B] border border-[#1E293B] text-slate-200 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm hover:text-white"
+            onClick={() => onNavigateTab('haulage-trips')}
+            className="px-3.5 py-2.5 rounded-2xl bg-[#142038] hover:bg-[#1f2f52] border border-[#22365e] text-emerald-300 hover:text-white font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shadow-sm"
+            title="Record Day Material Trips"
           >
-            <Truck className="w-3.5 h-3.5 text-emerald-400" />
+            <Truck className="w-4 h-4 text-emerald-400" />
             <span>+ Log Trip</span>
           </button>
 
+          {/* Button 5: + Expense -> site-expenses */}
           <button
-            onClick={() => setIsExpenseModalOpen(true)}
-            className="px-4 py-2 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs font-black flex items-center gap-1.5 shadow-lg shadow-blue-600/30 transition-all cursor-pointer"
+            onClick={() => onNavigateTab('site-expenses')}
+            className="px-4 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs flex items-center gap-2 transition-all shadow-lg shadow-blue-600/30 cursor-pointer"
+            title="Add Site Expense Voucher"
           >
-            <Plus className="w-3.5 h-3.5" />
+            <Plus className="w-4 h-4" />
             <span>+ Expense</span>
           </button>
         </div>
       </div>
 
-      {/* 2. Top KPI Metric Cards (Dynamic Values) */}
+      {/* ========================================================================= */}
+      {/* 2. TOP 4 LIVE TELEMETRY CARDS (Clickable to jump to modules)             */}
+      {/* ========================================================================= */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Total Material Laid (Today) */}
-        <div className="p-5 rounded-2xl bg-[#121927] border border-[#1E293B] shadow-xl hover:border-slate-700 transition-all space-y-2 group">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-[#94A3B8] uppercase tracking-wider">
-              Total Material Laid (Today)
-            </span>
-            <div className="w-9 h-9 rounded-xl bg-[#162032] border border-[#1E293B] flex items-center justify-center text-blue-400 group-hover:scale-110 transition-transform">
+        {/* Card 1: Material Laid -> haulage-trips */}
+        <div
+          onClick={() => onNavigateTab('haulage-trips')}
+          className="p-5 rounded-3xl bg-[#0c1427] border border-[#182643] hover:border-blue-500/50 transition-all cursor-pointer group shadow-xl flex flex-col justify-between"
+        >
+          <div className="flex items-center justify-between text-xs font-bold text-slate-400">
+            <span>TOTAL MATERIAL LAID (TODAY)</span>
+            <div className="w-8 h-8 rounded-xl bg-blue-600/15 border border-blue-500/30 flex items-center justify-center text-blue-400 group-hover:scale-110 transition-transform">
               <Layers className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-3xl font-black text-white tracking-tight">
-            {totalMaterialLaid.toLocaleString()} <span className="text-lg font-bold text-slate-400">Tons</span>
+          <div className="my-3">
+            <div className="text-3xl font-black text-white">
+              {totalMaterialBrass.toFixed(1)}{' '}
+              <span className="text-sm font-normal text-slate-400">Brass</span>
+            </div>
+            <div className="text-xs text-blue-400 font-medium mt-1 flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+              <span>Murum, GSB & WMM deliveries</span>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5 text-xs text-[#94A3B8]">
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400" />
-            <span>{totalMaterialLaid > 0 ? 'Active layer haulage' : 'No material logged'}</span>
+          <div className="text-[11px] text-slate-500 group-hover:text-blue-400 transition-colors flex items-center gap-1">
+            <span>View haulage logs</span>
+            <ArrowRight className="w-3 h-3" />
           </div>
         </div>
 
-        {/* Card 2: Total Site Expense */}
-        <div className="p-5 rounded-2xl bg-[#121927] border border-[#1E293B] shadow-xl hover:border-slate-700 transition-all space-y-2 group">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-[#94A3B8] uppercase tracking-wider">
-              Total Site Expense
-            </span>
-            <div className="w-9 h-9 rounded-xl bg-[#162032] border border-[#1E293B] flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform">
+        {/* Card 2: Site Expense -> site-expenses */}
+        <div
+          onClick={() => onNavigateTab('site-expenses')}
+          className="p-5 rounded-3xl bg-[#0c1427] border border-[#182643] hover:border-emerald-500/50 transition-all cursor-pointer group shadow-xl flex flex-col justify-between"
+        >
+          <div className="flex items-center justify-between text-xs font-bold text-slate-400">
+            <span>TOTAL SITE EXPENSE</span>
+            <div className="w-8 h-8 rounded-xl bg-emerald-600/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform">
               <DollarSign className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-3xl font-black text-emerald-400 font-mono tracking-tight">
-            ₹{totalExpensesAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          <div className="my-3">
+            <div className="text-3xl font-black text-emerald-400">
+              ₹{totalExpensesAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            <div className="text-xs text-slate-400 font-medium mt-1">
+              Petty cash, machine maintenance & repairs
+            </div>
           </div>
-          <div className="flex items-center gap-1.5 text-xs text-[#94A3B8]">
-            <TrendingDown className="w-3.5 h-3.5 text-rose-400" />
-            <span>{totalExpensesAmount > 0 ? 'Fuel, vendor spares & petty cash' : 'No expenses recorded'}</span>
+          <div className="text-[11px] text-slate-500 group-hover:text-emerald-400 transition-colors flex items-center gap-1">
+            <span>Open expenses ledger</span>
+            <ArrowRight className="w-3 h-3" />
           </div>
         </div>
 
-        {/* Card 3: Active Trips Today */}
-        <div className="p-5 rounded-2xl bg-[#121927] border border-[#1E293B] shadow-xl hover:border-slate-700 transition-all space-y-2 group">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-[#94A3B8] uppercase tracking-wider">
-              Active Trips Today
-            </span>
-            <div className="w-9 h-9 rounded-xl bg-[#162032] border border-[#1E293B] flex items-center justify-center text-blue-400 group-hover:scale-110 transition-transform">
+        {/* Card 3: Active Trips -> haulage-trips */}
+        <div
+          onClick={() => onNavigateTab('haulage-trips')}
+          className="p-5 rounded-3xl bg-[#0c1427] border border-[#182643] hover:border-cyan-500/50 transition-all cursor-pointer group shadow-xl flex flex-col justify-between"
+        >
+          <div className="flex items-center justify-between text-xs font-bold text-slate-400">
+            <span>ACTIVE TRIPS TODAY</span>
+            <div className="w-8 h-8 rounded-xl bg-cyan-600/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 group-hover:scale-110 transition-transform">
               <Truck className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-3xl font-black text-white tracking-tight">
-            {activeTripsCount} <span className="text-lg font-bold text-slate-400">Trips</span>
+          <div className="my-3">
+            <div className="text-3xl font-black text-white">
+              {totalTripsCount}{' '}
+              <span className="text-sm font-normal text-slate-400">Trips</span>
+            </div>
+            <div className="text-xs text-cyan-400 font-medium mt-1">
+              Active multi-axle tipper cycle
+            </div>
           </div>
-          <div className="flex items-center gap-1.5 text-xs text-[#94A3B8]">
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-400 animate-ping" />
-            <span>{activeTripsCount > 0 ? `${activeTripsCount} Tippers recorded` : '0 tippers active'}</span>
+          <div className="text-[11px] text-slate-500 group-hover:text-cyan-400 transition-colors flex items-center gap-1">
+            <span>Check trip records</span>
+            <ArrowRight className="w-3 h-3" />
           </div>
         </div>
 
-        {/* Card 4: Fuel Alert / Critical Stock */}
-        <div className="p-5 rounded-2xl bg-[#121927] border border-[#7F1D1D]/50 shadow-xl hover:border-rose-700 transition-all space-y-2 group bg-gradient-to-br from-[#121927] to-[#250808]/40">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-rose-400 uppercase tracking-wider flex items-center gap-1">
-              <Flame className="w-3.5 h-3.5 text-rose-500 animate-pulse" />
-              <span>Fuel Alert / Critical</span>
-            </span>
-            <div className="w-9 h-9 rounded-xl bg-[#450A0A] border border-[#7F1D1D] flex items-center justify-center text-rose-400 group-hover:scale-110 transition-transform">
-              <AlertTriangle className="w-4 h-4" />
+        {/* Card 4: Diesel & Fuel Status -> diesel */}
+        <div
+          onClick={() => onNavigateTab('diesel')}
+          className="p-5 rounded-3xl bg-[#0c1427] border border-[#182643] hover:border-amber-500/50 transition-all cursor-pointer group shadow-xl flex flex-col justify-between"
+        >
+          <div className="flex items-center justify-between text-xs font-bold text-slate-400">
+            <span>DIESEL DISPENSED</span>
+            <div className="w-8 h-8 rounded-xl bg-amber-600/15 border border-amber-500/30 flex items-center justify-center text-amber-400 group-hover:scale-110 transition-transform">
+              <Fuel className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-3xl font-black text-rose-400 tracking-tight">
-            {lowFuelMachines.length} Machines <span className="text-lg font-bold text-rose-300/80">Low</span>
+          <div className="my-3">
+            <div className="text-3xl font-black text-amber-400">
+              {totalDieselLitres.toLocaleString('en-IN')}{' '}
+              <span className="text-sm font-normal text-slate-400">Litres</span>
+            </div>
+            <div className="text-xs text-slate-400 font-medium mt-1">
+              Field fuel voucher logs
+            </div>
           </div>
-          <div className="flex items-center gap-1.5 text-xs text-rose-300">
-            <span>{lowFuelMachines.length > 0 ? `${lowFuelMachines.length} machine(s) < 15% fuel` : 'All equipment fuel levels normal'}</span>
+          <div className="text-[11px] text-slate-500 group-hover:text-amber-400 transition-colors flex items-center gap-1">
+            <span>Manage diesel log</span>
+            <ArrowRight className="w-3 h-3" />
           </div>
         </div>
       </div>
 
-      {/* 3. Secondary Status Cards (3-Column Grid) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Status 1: Active Machines */}
-        <div className="p-4 rounded-2xl bg-[#121927] border border-[#1E293B] flex items-center justify-between">
-          <div className="space-y-0.5">
-            <div className="text-xs text-[#94A3B8] font-bold">Active Machines</div>
-            <div className="text-xl font-black text-white">
-              {activeMachinesCount} <span className="text-xs text-[#94A3B8] font-normal">of {totalMachinesCount} deployed</span>
-            </div>
-          </div>
-          <div className="px-3 py-1.5 rounded-xl bg-[#064E3B] text-[#34D399] border border-[#065F46] text-xs font-black flex items-center gap-1.5 shadow-sm">
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            <span>{totalMachinesCount > 0 ? `${Math.round((activeMachinesCount / totalMachinesCount) * 100)}% Online` : '0% Online'}</span>
-          </div>
-        </div>
-
-        {/* Status 2: Breakdown / Idle */}
-        <div className="p-4 rounded-2xl bg-[#121927] border border-[#1E293B] flex items-center justify-between">
-          <div className="space-y-0.5">
-            <div className="text-xs text-[#94A3B8] font-bold">Breakdown / Idle</div>
-            <div className="text-xl font-black text-white">
-              {breakdownMachinesCount} <span className="text-xs text-[#94A3B8] font-normal">machines stopped</span>
-            </div>
-          </div>
-          <div className="px-3 py-1.5 rounded-xl bg-[#450A0A] text-[#F87171] border border-[#7F1D1D] text-xs font-black flex items-center gap-1.5 shadow-sm">
-            <AlertTriangle className="w-3.5 h-3.5" />
-            <span>{breakdownMachinesCount > 0 ? 'Action Req.' : 'Optimal'}</span>
-          </div>
-        </div>
-
-        {/* Status 3: Maintenance Scheduled */}
-        <div className="p-4 rounded-2xl bg-[#121927] border border-[#1E293B] flex items-center justify-between">
-          <div className="space-y-0.5">
-            <div className="text-xs text-[#94A3B8] font-bold">Maintenance Scheduled</div>
-            <div className="text-xl font-black text-white">
-              0 <span className="text-xs text-[#94A3B8] font-normal">machines due</span>
-            </div>
-          </div>
-          <div className="px-3 py-1.5 rounded-xl bg-[#451A03] text-[#FBBF24] border border-[#78350F] text-xs font-black flex items-center gap-1.5 shadow-sm">
-            <Clock className="w-3.5 h-3.5" />
-            <span>Up to date</span>
-          </div>
-        </div>
-      </div>
-
-      {/* 4. Main Analytics & Activity Feeds */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* LEFT PANEL: Machine & Operator Status */}
-        <div className="lg:col-span-5 rounded-2xl bg-[#121927] border border-[#1E293B] p-5 shadow-xl space-y-4">
-          <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
-            <div className="flex items-center gap-2">
-              <HardHat className="w-4 h-4 text-blue-400" />
-              <h3 className="text-sm font-black text-white uppercase tracking-wider">
-                Machine & Operator Status
-              </h3>
+      {/* ========================================================================= */}
+      {/* 3. MIDDLE ROW: MACHINERY FLEET STATUS + RECENT ACTIONS                    */}
+      {/* ========================================================================= */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Left: Machine & Operator Status (7 cols) */}
+        <div className="lg:col-span-7 bg-[#0c1427] border border-[#182643] rounded-3xl p-6 shadow-xl space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-[#182643]">
+            <div className="flex items-center gap-2 font-bold text-white text-sm">
+              <HardHat className="w-4 h-4 text-amber-400" />
+              <span>Machine & Operator Deployment</span>
             </div>
             <button
-              onClick={() => onNavigateTab('machinery')}
-              className="text-xs font-bold text-blue-400 hover:text-blue-300 flex items-center gap-1 cursor-pointer transition-colors"
+              onClick={() => onNavigateTab('machinery_fleet')}
+              className="text-xs font-bold text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors cursor-pointer"
             >
-              <span>View Full Fleet ↗</span>
+              <span>View Full Fleet</span>
+              <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
 
-          {/* Roster List */}
-          <div className="space-y-3">
-            {machineRoster.length === 0 ? (
-              <div className="p-4 text-center text-xs text-slate-500">No machinery logged.</div>
-            ) : (
-              machineRoster.map((m: any) => {
-                const isActive = m.status === 'Active';
-                const isIdle = m.status === 'Idle';
-                const isBreakdown = m.status === 'Breakdown';
+          {/* Quick Fleet Tiles */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div
+              onClick={() => onNavigateTab('machinery_fleet')}
+              className="p-3.5 rounded-2xl bg-[#080d19] border border-[#182643] hover:border-slate-600 transition-all cursor-pointer"
+            >
+              <div className="text-[11px] text-slate-400 font-semibold">Active Excavators</div>
+              <div className="text-xl font-extrabold text-white mt-1">2 Units</div>
+              <div className="text-[10px] text-emerald-400 font-bold mt-1">CAT & Hitachi ZX210</div>
+            </div>
 
-                return (
-                  <div
-                    key={m.id}
-                    className="p-3 rounded-xl bg-[#162032] border border-[#1E293B] hover:border-slate-700 transition-all space-y-2"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs font-bold text-white">
-                          {m.id}
-                        </span>
-                        {m.isLowFuel && (
-                          <span className="px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-400 border border-rose-500/30 text-[9px] font-black animate-pulse">
-                            LOW FUEL ({m.fuelLevel}%)
-                          </span>
-                        )}
-                      </div>
+            <div
+              onClick={() => onNavigateTab('machinery_fleet')}
+              className="p-3.5 rounded-2xl bg-[#080d19] border border-[#182643] hover:border-slate-600 transition-all cursor-pointer"
+            >
+              <div className="text-[11px] text-slate-400 font-semibold">Backhoe Loaders</div>
+              <div className="text-xl font-extrabold text-white mt-1">3 Units</div>
+              <div className="text-[10px] text-blue-400 font-bold mt-1">JCB 3DX Super</div>
+            </div>
 
-                      <span
-                        className={`text-[10px] font-black px-2 py-0.5 rounded-md uppercase ${
-                          isActive
-                            ? 'bg-[#064E3B] text-[#34D399] border border-[#065F46]'
-                            : isIdle
-                            ? 'bg-[#451A03] text-[#FBBF24] border border-[#78350F]'
-                            : 'bg-[#450A0A] text-[#F87171] border border-[#7F1D1D]'
-                        }`}
-                      >
-                        {m.status || 'Active'}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-slate-300 font-semibold truncate max-w-[180px]">
-                        {m.name}
-                      </span>
-                      <span className="text-[#94A3B8] font-mono text-[11px]">
-                        Op: <strong className="text-slate-200">{m.operator}</strong>
-                      </span>
-                    </div>
-
-                    <div className="text-[10px] text-[#94A3B8] truncate">
-                      {m.section || 'Main Road Project Section'}
-                    </div>
-
-                    <div className="space-y-1 pt-1 border-t border-[#1E293B]/60">
-                      <div className="flex justify-between text-[10px] text-[#94A3B8] font-mono">
-                        <span>Working: {m.workingHours || 0} hrs</span>
-                        <span>Target: {m.targetHours || 10} hrs</span>
-                      </div>
-                      <div className="w-full h-1.5 rounded-full bg-[#0D111D] overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${
-                            isBreakdown
-                              ? 'bg-rose-500'
-                              : isIdle
-                              ? 'bg-amber-500'
-                              : 'bg-blue-500'
-                          }`}
-                          style={{ width: `${Math.min(100, ((m.workingHours || 0) / (m.targetHours || 10)) * 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
+            <div
+              onClick={() => onNavigateTab('machinery_fleet')}
+              className="p-3.5 rounded-2xl bg-[#080d19] border border-[#182643] hover:border-slate-600 transition-all cursor-pointer"
+            >
+              <div className="text-[11px] text-slate-400 font-semibold">Tipper Dumpers</div>
+              <div className="text-xl font-extrabold text-amber-400 mt-1">6 Units</div>
+              <div className="text-[10px] text-slate-400 font-bold mt-1">16T & 25T Capacity</div>
+            </div>
           </div>
         </div>
 
-        {/* RIGHT PANEL: Recent Transactions & Material/Fuel Logs */}
-        <div className="lg:col-span-7 rounded-2xl bg-[#121927] border border-[#1E293B] p-5 shadow-xl space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#1E293B] pb-3">
-            <div>
-              <h3 className="text-sm font-black text-white uppercase tracking-wider">
-                Recent Transactions & Material/Fuel Logs
-              </h3>
-              <p className="text-[11px] text-[#94A3B8]">
-                Real-time site inflows, diesel dispensing, and contractor petty cash
-              </p>
+        {/* Right: Quick Engineering Tools (5 cols) */}
+        <div className="lg:col-span-5 bg-[#0c1427] border border-[#182643] rounded-3xl p-6 shadow-xl space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-[#182643]">
+            <div className="flex items-center gap-2 font-bold text-white text-sm">
+              <Calculator className="w-4 h-4 text-cyan-400" />
+              <span>Engineering Shortcuts</span>
             </div>
-
-            {/* Filter Pills */}
-            <div className="flex items-center gap-1 bg-[#162032] p-1 rounded-xl border border-[#1E293B]">
-              {(['ALL', 'DIESEL', 'MATERIAL', 'EXPENSE'] as const).map((filter) => (
-                <button
-                  key={filter}
-                  onClick={() => setFeedFilter(filter)}
-                  className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold transition-all cursor-pointer ${
-                    feedFilter === filter
-                      ? 'bg-[#2563EB] text-white shadow-sm'
-                      : 'text-[#94A3B8] hover:text-white'
-                  }`}
-                >
-                  {filter === 'ALL' ? 'All Activity' : filter}
-                </button>
-              ))}
-            </div>
+            <span className="text-[11px] text-slate-400 font-mono">MoRTH 5th Rev</span>
           </div>
 
-          {/* Activity Ledger Feed */}
           <div className="space-y-2.5">
-            {activityLedger.length === 0 ? (
-              <div className="p-8 text-center text-xs text-slate-500 bg-[#162032]/40 rounded-xl border border-[#1E293B]">
-                No recent transactions or logs recorded. Use the action buttons above to log trips, diesel, or expenses.
+            <button
+              onClick={() => onNavigateTab('yield_calculator')}
+              className="w-full p-3 bg-[#080d19] hover:bg-[#121c33] border border-[#182643] hover:border-blue-500/40 rounded-2xl flex items-center justify-between text-left transition-all cursor-pointer group"
+            >
+              <div>
+                <div className="text-xs font-bold text-white group-hover:text-blue-300">
+                  Road Layer Yield & Thickness Calc
+                </div>
+                <div className="text-[11px] text-slate-400">
+                  Calculate GSB, WMM, DBM, BC tonnage & brass yield
+                </div>
               </div>
-            ) : (
-              activityLedger.map((item) => {
-                const isOut = item.direction === 'OUT';
+              <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-blue-400 group-hover:translate-x-0.5 transition-all" />
+            </button>
 
-                return (
-                  <div
-                    key={item.id}
-                    className="p-3.5 rounded-xl bg-[#162032] border border-[#1E293B] hover:border-slate-700 transition-all flex items-start justify-between gap-3"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div
-                        className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
-                          isOut
-                            ? 'bg-[#450A0A] text-[#F87171] border border-[#7F1D1D]'
-                            : 'bg-[#064E3B] text-[#34D399] border border-[#065F46]'
-                        }`}
-                      >
-                        {isOut ? (
-                          <ArrowDownRight className="w-4 h-4" />
-                        ) : (
-                          <ArrowUpRight className="w-4 h-4" />
-                        )}
-                      </div>
-
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-white">
-                            {item.title}
-                          </span>
-                          <span className="text-[10px] text-[#94A3B8] font-mono">
-                            • {item.timestamp}
-                          </span>
-                        </div>
-                        <div className="text-xs text-slate-300 font-medium">
-                          {item.subtext}
-                        </div>
-                        <div className="text-[11px] text-[#94A3B8]">
-                          {item.detail}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="text-right shrink-0">
-                      <span
-                        className={`text-sm font-black font-mono px-2.5 py-1 rounded-lg ${
-                          isOut
-                            ? 'bg-[#450A0A]/70 text-[#F87171] border border-[#7F1D1D]'
-                            : 'bg-[#064E3B]/70 text-[#34D399] border border-[#065F46]'
-                        }`}
-                      >
-                        {item.value}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-
-          <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-[#1E293B] text-xs">
-            <span className="text-[#94A3B8] text-[11px]">
-              Showing real-time site events (Auto-refreshed via local ledger)
-            </span>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => onNavigateTab('haulage-trips')}
-                className="text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 cursor-pointer"
-              >
-                <span>Material Trips Log ↗</span>
-              </button>
-              <span className="text-slate-600">•</span>
-              <button
-                onClick={() => onNavigateTab('diesel')}
-                className="text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 cursor-pointer"
-              >
-                <span>Diesel & Fuel Log ↗</span>
-              </button>
-            </div>
+            <button
+              onClick={() => onNavigateTab('dpr')}
+              className="w-full p-3 bg-[#080d19] hover:bg-[#121c33] border border-[#182643] hover:border-blue-500/40 rounded-2xl flex items-center justify-between text-left transition-all cursor-pointer group"
+            >
+              <div>
+                <div className="text-xs font-bold text-white group-hover:text-blue-300">
+                  Daily Progress Report (DPR)
+                </div>
+                <div className="text-[11px] text-slate-400">
+                  Generate daily physical & financial site telemetry
+                </div>
+              </div>
+              <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-blue-400 group-hover:translate-x-0.5 transition-all" />
+            </button>
           </div>
         </div>
       </div>
-
-      {/* MODAL 1: YIELD CALCULATOR */}
-      {isYieldModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="bg-[#121927] border border-[#1E293B] rounded-3xl w-full max-w-2xl p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-[#2563EB] flex items-center justify-center text-white">
-                  <Calculator className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-base font-black text-white">
-                    Road Pavement Quantity & Yield Calculator
-                  </h3>
-                  <p className="text-[11px] text-[#94A3B8]">
-                    MoRTH Section 500 Formula: Volume = L × W × T; Tonnage = V × ρ × (1 + Wastage%)
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsYieldModalOpen(false)}
-                className="text-slate-400 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
-              <div>
-                <label className="block text-[#94A3B8] font-bold mb-1">Stretch Length (m)</label>
-                <input
-                  type="number"
-                  value={calcLength}
-                  onChange={(e) => setCalcLength(Number(e.target.value) || 0)}
-                  className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono font-bold outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[#94A3B8] font-bold mb-1">Width (m)</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={calcWidth}
-                  onChange={(e) => setCalcWidth(Number(e.target.value) || 0)}
-                  className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono font-bold outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[#94A3B8] font-bold mb-1">Compacted Thickness (mm)</label>
-                <input
-                  type="number"
-                  value={calcThicknessMm}
-                  onChange={(e) => setCalcThicknessMm(Number(e.target.value) || 0)}
-                  className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono font-bold outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[#94A3B8] font-bold mb-1">Bulk Density (t/m³)</label>
-                <input
-                  type="number"
-                  step="0.05"
-                  value={calcDensity}
-                  onChange={(e) => setCalcDensity(Number(e.target.value) || 0)}
-                  className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono font-bold outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[#94A3B8] font-bold mb-1">Wastage Factor (%)</label>
-                <input
-                  type="number"
-                  value={calcWastage}
-                  onChange={(e) => setCalcWastage(Number(e.target.value) || 0)}
-                  className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono font-bold outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[#94A3B8] font-bold mb-1">Avg Tipper Payload (T)</label>
-                <input
-                  type="number"
-                  value={calcTipperCap}
-                  onChange={(e) => setCalcTipperCap(Number(e.target.value) || 0)}
-                  className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono font-bold outline-none"
-                />
-              </div>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-[#0D111D] border border-[#1E293B] space-y-3">
-              <div className="text-xs font-black uppercase text-blue-400 tracking-wider">
-                Theoretical Requirements Output
-              </div>
-
-              <div className="grid grid-cols-3 gap-3 text-center">
-                <div className="p-3 bg-[#121927] rounded-xl border border-[#1E293B]">
-                  <div className="text-[10px] text-[#94A3B8]">Compacted Volume</div>
-                  <div className="text-lg font-black text-white font-mono">
-                    {yieldCompactedVolM3.toLocaleString(undefined, { maximumFractionDigits: 1 })} m³
-                  </div>
-                </div>
-
-                <div className="p-3 bg-[#121927] rounded-xl border border-[#1E293B]">
-                  <div className="text-[10px] text-[#94A3B8]">Required Aggregate</div>
-                  <div className="text-lg font-black text-blue-400 font-mono">
-                    {yieldTotalTonnageReq.toLocaleString(undefined, { maximumFractionDigits: 1 })} Tons
-                  </div>
-                </div>
-
-                <div className="p-3 bg-[#121927] rounded-xl border border-[#1E293B]">
-                  <div className="text-[10px] text-[#94A3B8]">Trips Required</div>
-                  <div className="text-lg font-black text-emerald-400 font-mono">
-                    {yieldTripsNeeded} Tipper Trips
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-3 border-t border-[#1E293B] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="text-xs">
-                  <label className="text-[#94A3B8] font-semibold block">
-                    Actual Aggregate Delivered from Weighbridge (Tons):
-                  </label>
-                  <input
-                    type="number"
-                    value={calcActualDelivered}
-                    onChange={(e) => setCalcActualDelivered(Number(e.target.value) || 0)}
-                    className="mt-1 px-3 py-1.5 bg-[#162032] border border-[#1E293B] rounded-lg text-white font-mono font-bold w-48 outline-none"
-                  />
-                </div>
-
-                <div className="p-2.5 rounded-xl bg-[#162032] border border-[#1E293B] text-xs font-mono">
-                  <span className="text-[#94A3B8]">Yield Variance: </span>
-                  <strong className={yieldVarianceTons > 0 ? 'text-[#F87171]' : 'text-[#34D399]'}>
-                    {yieldVarianceTons > 0 ? `+${yieldVarianceTons.toFixed(1)}` : yieldVarianceTons.toFixed(1)} Tons ({yieldVariancePct}%)
-                  </strong>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setIsYieldModalOpen(false)}
-                className="px-4 py-2 rounded-xl bg-[#2563EB] text-white text-xs font-bold"
-              >
-                Close Calculator
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 2: DIESEL ENTRY */}
-      {isDieselModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="bg-[#121927] border border-[#1E293B] rounded-3xl w-full max-w-lg p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
-              <div className="flex items-center gap-2">
-                <Fuel className="w-5 h-5 text-amber-400" />
-                <h3 className="text-base font-black text-white">Log Diesel Bowser Dispensing</h3>
-              </div>
-              <button onClick={() => setIsDieselModalOpen(false)} className="text-slate-400 hover:text-white">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveDiesel} className="space-y-3.5 text-xs">
-              <div>
-                <label className="block text-[#94A3B8] font-bold mb-1">Target Machine *</label>
-                <select
-                  value={fuelMachineId}
-                  onChange={(e) => setFuelMachineId(e.target.value)}
-                  className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none"
-                >
-                  <option value="m-grd-01">CAT-GRD-01 (CAT 140K Grader)</option>
-                  <option value="m-ex-210">EX-HITACHI-210 (ZX210 Excavator)</option>
-                  <option value="m-jcb-04">JCB-3DX-04 (Backhoe Loader)</option>
-                  <option value="m-rol-01">VIB-ROLLER-01 (HAMM 311D Compactor)</option>
-                  <option value="m-tip-8797">TIP-8797 (BharatBenz 2828C Tipper)</option>
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[#94A3B8] font-bold mb-1">Litres Issued (L) *</label>
-                  <input
-                    type="number"
-                    required
-                    value={fuelLitres}
-                    onChange={(e) => setFuelLitres(e.target.value === '' ? '' : Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-amber-400 font-mono font-bold outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[#94A3B8] font-bold mb-1">Bowser / Fuel Source *</label>
-                  <select
-                    value={fuelSource}
-                    onChange={(e) => setFuelSource(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none"
-                  >
-                    <option value="SITE_BOWSER_1">Site Mobile Bowser #1 (6KL)</option>
-                    <option value="SITE_BOWSER_2">Site Mobile Bowser #2 (9KL)</option>
-                    <option value="SITE_STATIC_TANK_20KL">Base Camp Static Tank (20KL)</option>
-                    <option value="IOCL_HIGHWAY_PUMP">IOCL Highway Commercial Pump</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[#94A3B8] font-bold mb-1">Start Hour-Meter (HMR) *</label>
-                  <input
-                    type="number"
-                    value={fuelHmrStart}
-                    onChange={(e) => setFuelHmrStart(Number(e.target.value) || 0)}
-                    className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[#94A3B8] font-bold mb-1">End Hour-Meter (HMR) *</label>
-                  <input
-                    type="number"
-                    value={fuelHmrEnd}
-                    onChange={(e) => setFuelHmrEnd(Number(e.target.value) || 0)}
-                    className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono outline-none"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[#94A3B8] font-bold mb-1">Bowser Challan / Slip #</label>
-                <input
-                  type="text"
-                  value={fuelChallan}
-                  onChange={(e) => setFuelChallan(e.target.value)}
-                  className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono outline-none"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2 border-t border-[#1E293B]">
-                <button
-                  type="button"
-                  onClick={() => setIsDieselModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black"
-                >
-                  Save Diesel Log
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 3: TRIP CHALLAN */}
-      {isTripModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="bg-[#121927] border border-[#1E293B] rounded-3xl w-full max-w-lg p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
-              <div className="flex items-center gap-2">
-                <Truck className="w-5 h-5 text-emerald-400" />
-                <h3 className="text-base font-black text-white">Log Material Haulage Trip</h3>
-              </div>
-              <button onClick={() => setIsTripModalOpen(false)} className="text-slate-400 hover:text-white">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveTrip} className="space-y-3.5 text-xs">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[#94A3B8] font-bold mb-1">Tipper Vehicle Plate *</label>
-                  <input
-                    type="text"
-                    required
-                    value={tripVehicleNo}
-                    onChange={(e) => setTripVehicleNo(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[#94A3B8] font-bold mb-1">Material Name *</label>
-                  <select
-                    value={tripMaterial}
-                    onChange={(e) => setTripMaterial(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none"
-                  >
-                    <option value="WMM (Wet Mix Macadam)">WMM (Wet Mix Macadam)</option>
-                    <option value="GSB (Granular Sub-Base)">GSB (Granular Sub-Base)</option>
-                    <option value="DBM (Dense Bituminous)">DBM (Dense Bituminous)</option>
-                    <option value="Murum / Borrow Soil">Murum / Borrow Soil</option>
-                    <option value="Crushed Aggregate 20mm">Crushed Aggregate 20mm</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[#94A3B8] font-bold mb-1">Origin (Quarry/Plant) *</label>
-                  <input
-                    type="text"
-                    value={tripOrigin}
-                    onChange={(e) => setTripOrigin(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[#94A3B8] font-bold mb-1">Destination (Chainage) *</label>
-                  <input
-                    type="text"
-                    value={tripChainage}
-                    onChange={(e) => setTripChainage(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-[#94A3B8] font-bold mb-1">Gross (Tons) *</label>
-                  <input
-                    type="number"
-                    step="0.05"
-                    value={tripGross}
-                    onChange={(e) => setTripGross(e.target.value === '' ? '' : Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[#94A3B8] font-bold mb-1">Tare (Tons) *</label>
-                  <input
-                    type="number"
-                    step="0.05"
-                    value={tripTare}
-                    onChange={(e) => setTripTare(e.target.value === '' ? '' : Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[#94A3B8] font-bold mb-1">Net (Tons)</label>
-                  <div className="px-3 py-2 bg-[#0D111D] border border-[#1E293B] rounded-xl text-emerald-400 font-mono font-bold">
-                    {tripGross && tripTare ? (Number(tripGross) - Number(tripTare)).toFixed(2) : '0.00'} T
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[#94A3B8] font-bold mb-1">Weighbridge Slip / Challan #</label>
-                <input
-                  type="text"
-                  value={tripChallanNo}
-                  onChange={(e) => setTripChallanNo(e.target.value)}
-                  className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono outline-none"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2 border-t border-[#1E293B]">
-                <button
-                  type="button"
-                  onClick={() => setIsTripModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black"
-                >
-                  Submit Trip Challan
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 4: SITE EXPENSE */}
-      {isExpenseModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="bg-[#121927] border border-[#1E293B] rounded-3xl w-full max-w-lg p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
-              <div className="flex items-center gap-2">
-                <DollarSign className="w-5 h-5 text-emerald-400" />
-                <h3 className="text-base font-black text-white">Raise Site Expense Voucher</h3>
-              </div>
-              <button onClick={() => setIsExpenseModalOpen(false)} className="text-slate-400 hover:text-white">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveExpense} className="space-y-3.5 text-xs">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[#94A3B8] font-bold mb-1">Expense Category *</label>
-                  <select
-                    value={expCategory}
-                    onChange={(e) => setExpCategory(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none"
-                  >
-                    <option value="EQUIPMENT_REPAIR_PARTS">Equipment Repair & Spares</option>
-                    <option value="DAILY_SITE_OPERATIONS">Daily Site Operations</option>
-                    <option value="WATER_TANKER_HIRING">Water Tanker (Compaction)</option>
-                    <option value="OPERATOR_WAGES_BATTA">Driver & Operator Batta</option>
-                    <option value="TOLL_TAX_PERMITS">Tolls & Quarry Royalty</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-[#94A3B8] font-bold mb-1">Amount (INR ₹) *</label>
-                  <input
-                    type="number"
-                    required
-                    value={expAmount}
-                    onChange={(e) => setExpAmount(e.target.value === '' ? '' : Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-emerald-400 font-mono font-bold outline-none"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[#94A3B8] font-bold mb-1">Payee / Vendor Name *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Mahaveer Hydraulic Works"
-                  value={expPayee}
-                  onChange={(e) => setExpPayee(e.target.value)}
-                  className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[#94A3B8] font-bold mb-1">Cost Center (Chainage Stretch) *</label>
-                <input
-                  type="text"
-                  value={expChainage}
-                  onChange={(e) => setExpChainage(e.target.value)}
-                  className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[#94A3B8] font-bold mb-1">Description</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Hydraulic hose replacement"
-                  value={expDesc}
-                  onChange={(e) => setExpDesc(e.target.value)}
-                  className="w-full px-3 py-2 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2 border-t border-[#1E293B]">
-                <button
-                  type="button"
-                  onClick={() => setIsExpenseModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold"
-                >
-                  Submit Voucher
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Add Road Site Modal */}
-      <CreateRoadSiteModal
-        isOpen={isAddRoadSiteOpen}
-        onClose={() => setIsAddRoadSiteOpen(false)}
-      />
     </div>
   );
 };
+
+export default SiteCentricMidnightDashboard;

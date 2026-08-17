@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useERP } from '../../context/ERPContext';
 import {
   Building2,
@@ -8,19 +8,18 @@ import {
   Truck,
   HardHat,
   LogOut,
-  Layers,
   ArrowLeft,
   X
 } from 'lucide-react';
 
 interface Props {
-  projectType?: 'ROAD' | 'BUILDING';
+  projectType: 'ROAD' | 'BUILDING';
   onSelectSite: (siteId: string) => void;
   onBackToDomainSelect?: () => void;
 }
 
 export const SiteSelectionPage: React.FC<Props> = ({
-  projectType = 'ROAD',
+  projectType,
   onSelectSite,
   onBackToDomainSelect
 }) => {
@@ -28,9 +27,6 @@ export const SiteSelectionPage: React.FC<Props> = ({
 
   const currentRoleStr = String(currentUser?.role || userRole || '').toLowerCase();
   const isAdmin = currentRoleStr.includes('admin');
-
-  // Internal domain switch support if not passed from top-level state
-  const [activeDomain, setActiveDomain] = useState<'ROAD' | 'BUILDING'>(projectType);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newSiteName, setNewSiteName] = useState('');
@@ -40,7 +36,32 @@ export const SiteSelectionPage: React.FC<Props> = ({
   const [endChainage, setEndChainage] = useState<number>(10);
   const [buildingFloors, setBuildingFloors] = useState<string>('G + 12 Floors');
 
-  const isRoad = activeDomain === 'ROAD';
+  const isRoad = projectType === 'ROAD';
+
+  // Strict Category Filter: Only allow sites belonging to the selected domain
+  const filteredSites = useMemo(() => {
+    return siteSheets.filter((site: any) => {
+      // If site explicitly has projectType/category property
+      if (site.projectType || site.category) {
+        const cat = (site.projectType || site.category).toUpperCase();
+        return cat === projectType;
+      }
+
+      // Smart fallback for existing legacy sites
+      const name = (site.siteName || '').toLowerCase();
+      const isLegacyRoad =
+        name.includes('road') ||
+        name.includes('stretch') ||
+        name.includes('highway') ||
+        name.includes('nh-') ||
+        name.includes('sh-') ||
+        name.includes('mulwad') ||
+        name.includes('sindagi') ||
+        name.includes('almel');
+
+      return isRoad ? isLegacyRoad : !isLegacyRoad;
+    });
+  }, [siteSheets, projectType, isRoad]);
 
   const handleCreateSite = (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,7 +72,10 @@ export const SiteSelectionPage: React.FC<Props> = ({
       location: newLocation.trim() || (isRoad ? 'Highway Project Stretch' : 'Building Site Campus'),
       supervisor: newSupervisor.trim(),
       startChainageKm: isRoad ? Number(startChainage) : 0,
-      endChainageKm: isRoad ? Number(endChainage) : 0
+      endChainageKm: isRoad ? Number(endChainage) : 0,
+      projectType: projectType,
+      category: projectType,
+      buildingFloors: !isRoad ? buildingFloors : undefined
     });
 
     setIsAddModalOpen(false);
@@ -87,7 +111,7 @@ export const SiteSelectionPage: React.FC<Props> = ({
         </div>
 
         <div className="flex items-center gap-3">
-          {onBackToDomainSelect ? (
+          {onBackToDomainSelect && (
             <button
               onClick={onBackToDomainSelect}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#121927] hover:bg-[#1c273d] border border-[#1E293B] text-slate-300 text-xs font-semibold transition-all cursor-pointer"
@@ -95,31 +119,13 @@ export const SiteSelectionPage: React.FC<Props> = ({
               <ArrowLeft className="w-3.5 h-3.5" />
               <span>Switch Domain</span>
             </button>
-          ) : (
-            <div className="flex items-center bg-[#121927] border border-[#1E293B] p-1 rounded-xl gap-1">
-              <button
-                onClick={() => setActiveDomain('ROAD')}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
-                  isRoad ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                Roads
-              </button>
-              <button
-                onClick={() => setActiveDomain('BUILDING')}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
-                  !isRoad ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                Buildings
-              </button>
-            </div>
           )}
 
           <div className="hidden sm:block text-right">
             <div className="text-xs font-bold text-white">{currentUser?.name || 'Habibulla Bilgi'}</div>
             <div className="text-[11px] text-blue-400 font-mono">{currentUser?.role || 'Admin'}</div>
           </div>
+
           <button
             onClick={logout}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#121927] hover:bg-rose-950/40 border border-[#1E293B] text-slate-400 hover:text-rose-400 text-xs font-semibold transition-all cursor-pointer"
@@ -130,7 +136,7 @@ export const SiteSelectionPage: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* Main Content Area */}
+      {/* Main Selection Area */}
       <div className="max-w-5xl w-full mx-auto my-auto py-8 space-y-8">
         <div className="text-center space-y-2">
           <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
@@ -143,16 +149,18 @@ export const SiteSelectionPage: React.FC<Props> = ({
           </p>
         </div>
 
-        {siteSheets.length === 0 ? (
-          /* Empty State */
+        {filteredSites.length === 0 ? (
+          /* Empty State for the Specific Category */
           <div className="p-10 rounded-3xl bg-[#0c1427] border border-[#182643] text-center max-w-lg mx-auto shadow-2xl space-y-5">
             <div className="w-16 h-16 rounded-2xl bg-blue-600/15 border border-blue-500/30 mx-auto flex items-center justify-center text-blue-400 shadow-md">
               {isRoad ? <Milestone className="w-8 h-8" /> : <Building2 className="w-8 h-8" />}
             </div>
             <div className="space-y-1">
-              <h3 className="text-lg font-black text-white">No Sites Registered</h3>
+              <h3 className="text-lg font-black text-white">
+                No {isRoad ? 'Road Stretches' : 'Building Projects'} Found
+              </h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                There are no active {isRoad ? 'road stretches' : 'building projects'} registered in the system yet.
+                There are no active {isRoad ? 'highway packages' : 'building/tower sites'} registered in this category.
               </p>
             </div>
             <button
@@ -164,65 +172,68 @@ export const SiteSelectionPage: React.FC<Props> = ({
             </button>
           </div>
         ) : (
-          /* Site Cards Grid */
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {siteSheets.map((site) => (
-                <div
-                  key={site.siteId}
-                  onClick={() => onSelectSite(site.siteId)}
-                  className="p-5 rounded-3xl bg-[#0c1427] border border-[#182643] hover:border-blue-500/60 hover:bg-[#111c36] transition-all cursor-pointer group shadow-xl flex flex-col justify-between space-y-4"
-                >
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
+          /* Filtered Site Cards Grid */
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredSites.map((site) => (
+              <div
+                key={site.siteId}
+                onClick={() => onSelectSite(site.siteId)}
+                className="p-5 rounded-3xl bg-[#0c1427] border border-[#182643] hover:border-blue-500/60 hover:bg-[#111c36] transition-all cursor-pointer group shadow-xl flex flex-col justify-between space-y-4"
+              >
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
                       <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                      <span className="text-[10px] font-mono font-bold text-slate-400 bg-[#080d19] px-2 py-0.5 rounded-md border border-[#182643]">
-                        {site.siteId}
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
+                        {isRoad ? 'Highway Package' : 'Building Site'}
                       </span>
                     </div>
-                    <h3 className="text-base font-black text-white group-hover:text-blue-300 transition-colors line-clamp-2">
-                      {site.siteName}
-                    </h3>
-                  </div>
-
-                  <div className="pt-3 border-t border-[#182643] flex items-center justify-between text-xs text-slate-400">
-                    <span className="flex items-center gap-1 font-medium">
-                      <Truck className="w-3.5 h-3.5 text-blue-400" />
-                      {site.vehicles?.length || 0} Assigned Units
-                    </span>
-                    <span className="text-blue-400 font-bold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-                      <span>Launch Site</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
+                    <span className="text-[10px] font-mono font-bold text-slate-400 bg-[#080d19] px-2 py-0.5 rounded-md border border-[#182643]">
+                      {site.siteId}
                     </span>
                   </div>
+                  <h3 className="text-base font-black text-white group-hover:text-blue-300 transition-colors line-clamp-2">
+                    {site.siteName}
+                  </h3>
                 </div>
-              ))}
 
-              {/* Add Site Stretch Card (Admin Access) */}
-              {isAdmin && (
-                <button
-                  onClick={() => setIsAddModalOpen(true)}
-                  className="p-5 rounded-3xl border-2 border-dashed border-[#1E293B] hover:border-blue-500/50 bg-[#0c1427]/30 hover:bg-[#0c1427] transition-all cursor-pointer flex flex-col items-center justify-center text-center space-y-2 min-h-[140px] group"
-                >
-                  <div className="w-10 h-10 rounded-xl bg-blue-600/10 group-hover:bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 transition-colors">
-                    <Plus className="w-5 h-5" />
-                  </div>
-                  <div className="text-xs font-bold text-slate-300 group-hover:text-white">
-                    + Add New {isRoad ? 'Site Stretch' : 'Building Site'}
-                  </div>
-                </button>
-              )}
-            </div>
+                <div className="pt-3 border-t border-[#182643] flex items-center justify-between text-xs text-slate-400">
+                  <span className="flex items-center gap-1 font-medium">
+                    <Truck className="w-3.5 h-3.5 text-blue-400" />
+                    {site.vehicles?.length || 0} Assigned Units
+                  </span>
+                  <span className="text-blue-400 font-bold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+                    <span>Launch Site</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </span>
+                </div>
+              </div>
+            ))}
+
+            {/* Add New Site Card (Admin Only) */}
+            {isAdmin && (
+              <button
+                onClick={() => setIsAddModalOpen(true)}
+                className="p-5 rounded-3xl border-2 border-dashed border-[#1E293B] hover:border-blue-500/50 bg-[#0c1427]/30 hover:bg-[#0c1427] transition-all cursor-pointer flex flex-col items-center justify-center text-center space-y-2 min-h-[140px] group"
+              >
+                <div className="w-10 h-10 rounded-xl bg-blue-600/10 group-hover:bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 transition-colors">
+                  <Plus className="w-5 h-5" />
+                </div>
+                <div className="text-xs font-bold text-slate-300 group-hover:text-white">
+                  + Add New {isRoad ? 'Road Stretch' : 'Building Site'}
+                </div>
+              </button>
+            )}
           </div>
         )}
       </div>
 
       {/* Footer */}
       <div className="border-t border-[#1E293B] pt-4 text-center text-[11px] text-slate-500 font-mono">
-        Secured Project Dispatch & Asset Management
+        Secured {isRoad ? 'Highway Corridor' : 'Building Infrastructure'} Telematics
       </div>
 
-      {/* Add Road/Building Site Modal */}
+      {/* Create Site Modal */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
           <div className="bg-[#121927] border border-[#1E293B] rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4 text-slate-100 max-h-[92vh] overflow-y-auto">
@@ -233,7 +244,7 @@ export const SiteSelectionPage: React.FC<Props> = ({
                 ) : (
                   <Building2 className="w-5 h-5 text-emerald-400" />
                 )}
-                <span>{isRoad ? 'Create Road Construction Site' : 'Create Building Construction Project'}</span>
+                <span>{isRoad ? 'Create Road Site Section' : 'Create Building Construction Project'}</span>
               </div>
               <button
                 type="button"
@@ -247,7 +258,7 @@ export const SiteSelectionPage: React.FC<Props> = ({
             <form onSubmit={handleCreateSite} className="space-y-3.5 text-xs">
               <div>
                 <label className="block text-slate-300 font-bold mb-1">
-                  {isRoad ? 'Road Name / Package Description *' : 'Building / Tower Project Name *'}
+                  {isRoad ? 'Road Name / Package Stretch *' : 'Building / Tower Project Name *'}
                 </label>
                 <input
                   type="text"

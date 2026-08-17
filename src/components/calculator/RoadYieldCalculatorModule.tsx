@@ -1,3 +1,4 @@
+```tsx
 import React, { useState, useEffect } from 'react';
 import { useERP } from '../../context/ERPContext';
 import {
@@ -7,10 +8,7 @@ import {
   Building2,
   Plus,
   Trash2,
-  Ruler,
-  Hash,
-  CheckCircle2,
-  ArrowRight
+  Ruler
 } from 'lucide-react';
 
 interface SavedYieldCalculation {
@@ -28,7 +26,7 @@ interface SavedYieldCalculation {
 }
 
 const MATERIAL_PRESETS = [
-  { name: 'Wet Mix Macadam (WMM Base)', brassConversionFactor: 0.35315 }, // 1 m3 ~ 0.35315 Brass (1 Brass = 2.8317 m3 = 100 cu ft)
+  { name: 'Wet Mix Macadam (WMM Base)', brassConversionFactor: 0.35315 },
   { name: 'Granular Sub-Base (GSB)', brassConversionFactor: 0.35315 },
   { name: 'Murum Subgrade Fill', brassConversionFactor: 0.35315 },
   { name: 'M-Sand / Crushed Sand', brassConversionFactor: 0.35315 },
@@ -39,19 +37,30 @@ const MATERIAL_PRESETS = [
 const STORAGE_CALCULATIONS_KEY = 'CONSTRUCTION_PRO_ROAD_YIELD_CALCS_V1';
 
 export const RoadYieldCalculatorModule: React.FC = () => {
-  const { siteSheets, selectedSiteId } = useERP();
+  const { siteSheets, selectedSiteId, currentUser, userRole } = useERP();
+
+  const currentRoleStr = String(currentUser?.role || userRole || '').toLowerCase();
+  const isAdmin = currentRoleStr.includes('admin');
 
   const siteList = siteSheets && siteSheets.length > 0
     ? siteSheets.map((s) => s.siteName)
-    : ['Mulwad Ongoing Stretch', 'NH-50 Flexible Pavement Section', 'Main Highway Package-3'];
+    : ['SINDAGI - ALMEL ROAD', 'Mulwad Ongoing Stretch', 'NH-50 Flexible Pavement Section'];
 
-  // Input states
-  const [siteName, setSiteName] = useState<string>(siteList[0] || 'Mulwad Ongoing Stretch');
+  const defaultSiteName = siteSheets.find((s) => s.siteId === selectedSiteId)?.siteName || siteList[0];
+
+  // Default input states to empty so nothing calculates until user enters dimensions
+  const [siteName, setSiteName] = useState<string>(defaultSiteName);
   const [materialName, setMaterialName] = useState<string>(MATERIAL_PRESETS[0].name);
-  const [lengthMeters, setLengthMeters] = useState<number | ''>(2500); // 2500 meters
-  const [widthMeters, setWidthMeters] = useState<number | ''>(9); // 9.0 meters
-  const [thicknessMm, setThicknessMm] = useState<number | ''>(250); // 250 mm
-  const [tipperCapacityBrass, setTipperCapacityBrass] = useState<number | ''>(6); // 6 Brass per truck
+  const [lengthMeters, setLengthMeters] = useState<number | ''>('');
+  const [widthMeters, setWidthMeters] = useState<number | ''>('');
+  const [thicknessMm, setThicknessMm] = useState<number | ''>('');
+  const [tipperCapacityBrass, setTipperCapacityBrass] = useState<number | ''>('');
+
+  useEffect(() => {
+    if (defaultSiteName) {
+      setSiteName(defaultSiteName);
+    }
+  }, [defaultSiteName]);
 
   // Saved calculations state
   const [savedRecords, setSavedRecords] = useState<SavedYieldCalculation[]>(() => {
@@ -66,26 +75,22 @@ export const RoadYieldCalculatorModule: React.FC = () => {
     localStorage.setItem(STORAGE_CALCULATIONS_KEY, JSON.stringify(savedRecords));
   }, [savedRecords]);
 
-  // ==========================================
-  // REAL-TIME AUTO CALCULATIONS
-  // ==========================================
-  const L = Number(lengthMeters || 0);
-  const W = Number(widthMeters || 0);
-  const T = Number(thicknessMm || 0) / 1000; // Convert mm to meters
+  // Real-time calculation: 0 if any dimension is unentered
+  const L = typeof lengthMeters === 'number' && lengthMeters > 0 ? lengthMeters : 0;
+  const W = typeof widthMeters === 'number' && widthMeters > 0 ? widthMeters : 0;
+  const T_meters = typeof thicknessMm === 'number' && thicknessMm > 0 ? thicknessMm / 1000 : 0;
+  const cap = typeof tipperCapacityBrass === 'number' && tipperCapacityBrass > 0 ? tipperCapacityBrass : 0;
 
-  // Volume in Cubic Meters (m³) = L * W * T
-  const volumeCubicMeters = L * W * T;
-
-  // 1 m³ = 35.3147 cu.ft | 1 Brass = 100 cu.ft => 1 m³ ≈ 0.35315 Brass
-  const totalBrass = volumeCubicMeters * 0.35315;
-
-  // Trips Required = Total Brass / Tipper Capacity (Brass)
-  const cap = Number(tipperCapacityBrass) > 0 ? Number(tipperCapacityBrass) : 6;
-  const tripsRequired = totalBrass > 0 ? Math.ceil(totalBrass / cap) : 0;
+  const volumeCubicMeters = L > 0 && W > 0 && T_meters > 0 ? L * W * T_meters : 0;
+  const totalBrass = volumeCubicMeters > 0 ? volumeCubicMeters * 0.35315 : 0;
+  const tripsRequired = totalBrass > 0 && cap > 0 ? Math.ceil(totalBrass / cap) : 0;
 
   const handleSaveCalculation = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!L || !W || !T) return;
+    if (L <= 0 || W <= 0 || T_meters <= 0 || cap <= 0) {
+      alert('Please fill in road length, width, thickness, and tipper capacity.');
+      return;
+    }
 
     const newRecord: SavedYieldCalculation = {
       id: `calc-${Date.now()}`,
@@ -105,7 +110,13 @@ export const RoadYieldCalculatorModule: React.FC = () => {
   };
 
   const handleDeleteRecord = (id: string) => {
-    setSavedRecords(savedRecords.filter((r) => r.id !== id));
+    if (!isAdmin) {
+      alert('Action Restricted: Only Administrators are authorized to delete calculation records.');
+      return;
+    }
+    if (window.confirm('Delete this section calculation?')) {
+      setSavedRecords(savedRecords.filter((r) => r.id !== id));
+    }
   };
 
   return (
@@ -132,7 +143,7 @@ export const RoadYieldCalculatorModule: React.FC = () => {
         </div>
       </div>
 
-      {/* 2. Top 3 Auto-Calculation Output Cards */}
+      {/* 2. Top 3 Auto-Calculation Output Cards (Strict 0 when no values entered) */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {/* Compacted Volume */}
         <div className="p-5 rounded-3xl bg-[#0c1427] border border-[#182643] shadow-xl flex flex-col justify-between">
@@ -142,16 +153,20 @@ export const RoadYieldCalculatorModule: React.FC = () => {
           </div>
           <div className="my-2">
             <div className="text-3xl font-black text-cyan-400 font-mono">
-              {volumeCubicMeters.toLocaleString('en-IN', { maximumFractionDigits: 1 })}{' '}
+              {volumeCubicMeters > 0
+                ? volumeCubicMeters.toLocaleString('en-IN', { maximumFractionDigits: 1 })
+                : '0'}{' '}
               <span className="text-sm font-normal text-slate-400">m³</span>
             </div>
             <div className="text-[11px] text-slate-400 mt-1 font-mono">
-              V = {L}m × {W}m × {T.toFixed(3)}m
+              {volumeCubicMeters > 0
+                ? `V = ${L}m × ${W}m × ${T_meters.toFixed(3)}m`
+                : 'V = L × W × Thickness'}
             </div>
           </div>
         </div>
 
-        {/* Total Material Required (Brass) */}
+        {/* Total Material Volume (Brass) */}
         <div className="p-5 rounded-3xl bg-[#0c1427] border border-[#182643] shadow-xl flex flex-col justify-between">
           <div className="flex items-center justify-between text-xs font-bold text-slate-400">
             <span>Total Material Volume</span>
@@ -159,16 +174,18 @@ export const RoadYieldCalculatorModule: React.FC = () => {
           </div>
           <div className="my-2">
             <div className="text-3xl font-black text-amber-400 font-mono">
-              {totalBrass.toLocaleString('en-IN', { maximumFractionDigits: 1 })}{' '}
+              {totalBrass > 0 ? totalBrass.toLocaleString('en-IN', { maximumFractionDigits: 1 }) : '0.0'}{' '}
               <span className="text-sm font-normal text-slate-400">Brass</span>
             </div>
             <div className="text-[11px] text-slate-400 mt-1 font-mono">
-              ~ {(totalBrass * 100).toLocaleString('en-IN')} Cubic Feet
+              {totalBrass > 0
+                ? `~ ${(totalBrass * 100).toLocaleString('en-IN')} Cubic Feet`
+                : 'Enter dimensions below'}
             </div>
           </div>
         </div>
 
-        {/* Auto-Calculated Dump Truck Trips */}
+        {/* Dump Truck Trips Needed */}
         <div className="p-5 rounded-3xl bg-[#141b12] border border-emerald-900/60 shadow-xl flex flex-col justify-between">
           <div className="flex items-center justify-between text-xs font-bold text-slate-400">
             <span>Dump Truck Trips Needed</span>
@@ -176,19 +193,19 @@ export const RoadYieldCalculatorModule: React.FC = () => {
           </div>
           <div className="my-2">
             <div className="text-3xl font-black text-emerald-400 font-mono">
-              {tripsRequired.toLocaleString('en-IN')}{' '}
+              {tripsRequired > 0 ? tripsRequired.toLocaleString('en-IN') : '0'}{' '}
               <span className="text-sm font-normal text-slate-400">Trips</span>
             </div>
             <div className="text-[11px] text-emerald-400/80 mt-1">
-              Based on {cap} Brass payload per tipper
+              {cap > 0 ? `Based on ${cap} Brass payload per tipper` : 'Specify tipper capacity'}
             </div>
           </div>
         </div>
       </div>
 
-      {/* 3. Main Grid: Parameter Inputs & Calculations History */}
+      {/* 3. Main Grid: Parameter Inputs & Ledger */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Form: Clean Simple Inputs (5 Cols) */}
+        {/* Left Form (5 Cols) */}
         <div className="lg:col-span-5 bg-[#0C1427] border border-[#182643] rounded-3xl p-6 shadow-xl space-y-4">
           <div className="flex items-center gap-2 pb-3 border-b border-[#182643] text-sm font-bold text-white">
             <Ruler className="w-4 h-4 text-cyan-400" />
@@ -196,7 +213,7 @@ export const RoadYieldCalculatorModule: React.FC = () => {
           </div>
 
           <form onSubmit={handleSaveCalculation} className="space-y-3.5 text-xs">
-            {/* 1. Site Name */}
+            {/* Site Name */}
             <div>
               <label className="block text-slate-300 font-bold mb-1.5 flex items-center gap-1">
                 <Building2 className="w-3.5 h-3.5 text-blue-400" />
@@ -215,7 +232,7 @@ export const RoadYieldCalculatorModule: React.FC = () => {
               </select>
             </div>
 
-            {/* 2. Material Name */}
+            {/* Material Name */}
             <div>
               <label className="block text-slate-300 font-bold mb-1.5 flex items-center gap-1">
                 <Layers className="w-3.5 h-3.5 text-amber-400" />
@@ -234,7 +251,7 @@ export const RoadYieldCalculatorModule: React.FC = () => {
               </select>
             </div>
 
-            {/* 3. Road Length & Road Width */}
+            {/* Road Length & Road Width */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-slate-300 font-bold mb-1.5">
@@ -242,15 +259,14 @@ export const RoadYieldCalculatorModule: React.FC = () => {
                 </label>
                 <input
                   type="number"
-                  min="1"
-                  required
+                  min="0"
                   placeholder="e.g. 2500"
                   value={lengthMeters}
                   onChange={(e) => setLengthMeters(e.target.value === '' ? '' : Number(e.target.value))}
                   className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono font-bold outline-none focus:border-cyan-500"
                 />
                 <span className="text-[10px] text-slate-500 mt-0.5 block font-mono">
-                  = {(Number(lengthMeters || 0) / 1000).toFixed(2)} KM
+                  {L > 0 ? `= ${(L / 1000).toFixed(2)} KM` : '= 0.00 KM'}
                 </span>
               </div>
 
@@ -261,8 +277,7 @@ export const RoadYieldCalculatorModule: React.FC = () => {
                 <input
                   type="number"
                   step="0.1"
-                  min="0.5"
-                  required
+                  min="0"
                   placeholder="e.g. 9.0"
                   value={widthMeters}
                   onChange={(e) => setWidthMeters(e.target.value === '' ? '' : Number(e.target.value))}
@@ -274,7 +289,7 @@ export const RoadYieldCalculatorModule: React.FC = () => {
               </div>
             </div>
 
-            {/* 4. Compacted Thickness & Tipper Capacity */}
+            {/* Thickness & Tipper Capacity */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-slate-300 font-bold mb-1.5">
@@ -282,15 +297,14 @@ export const RoadYieldCalculatorModule: React.FC = () => {
                 </label>
                 <input
                   type="number"
-                  min="1"
-                  required
+                  min="0"
                   placeholder="e.g. 250"
                   value={thicknessMm}
                   onChange={(e) => setThicknessMm(e.target.value === '' ? '' : Number(e.target.value))}
                   className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-cyan-400 font-mono font-bold outline-none focus:border-cyan-500"
                 />
                 <span className="text-[10px] text-slate-500 mt-0.5 block font-mono">
-                  = {(Number(thicknessMm || 0) / 1000).toFixed(3)} Meters
+                  {T_meters > 0 ? `= ${T_meters.toFixed(3)} Meters` : '= 0.000 Meters'}
                 </span>
               </div>
 
@@ -301,8 +315,7 @@ export const RoadYieldCalculatorModule: React.FC = () => {
                 <input
                   type="number"
                   step="0.5"
-                  min="1"
-                  required
+                  min="0"
                   placeholder="e.g. 6"
                   value={tipperCapacityBrass}
                   onChange={(e) => setTipperCapacityBrass(e.target.value === '' ? '' : Number(e.target.value))}
@@ -314,7 +327,7 @@ export const RoadYieldCalculatorModule: React.FC = () => {
               </div>
             </div>
 
-            {/* Submit Button */}
+            {/* Save Button */}
             <button
               type="submit"
               className="w-full py-3 bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-black rounded-xl transition-all shadow-lg shadow-cyan-600/30 flex items-center justify-center gap-1.5 cursor-pointer text-xs uppercase tracking-wider mt-2"
@@ -325,7 +338,7 @@ export const RoadYieldCalculatorModule: React.FC = () => {
           </form>
         </div>
 
-        {/* Right Table: Saved Sections Reconciliation Ledger (7 Cols) */}
+        {/* Right Table: Calculations Ledger (7 Cols) */}
         <div className="lg:col-span-7 bg-[#0B1220] border border-[#1E293B] rounded-3xl overflow-hidden shadow-2xl flex flex-col justify-between">
           <div>
             <div className="p-4 border-b border-[#1E293B] bg-[#0d1527]/50 flex items-center justify-between">
@@ -342,14 +355,14 @@ export const RoadYieldCalculatorModule: React.FC = () => {
                     <th className="py-3 px-4 text-right">Volume (m³)</th>
                     <th className="py-3 px-4 text-right">Total Brass</th>
                     <th className="py-3 px-4 text-center">Trips Req.</th>
-                    <th className="py-3 px-4 text-center">Action</th>
+                    {isAdmin && <th className="py-3 px-4 text-center">Action</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#1E293B]/60 text-slate-200">
                   {savedRecords.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="py-12 text-center text-slate-500 text-xs">
-                        No saved road calculations yet. Enter dimensions and click "Save Section Calculation".
+                      <td colSpan={isAdmin ? 6 : 5} className="py-12 text-center text-slate-500 text-xs">
+                        No active pavement sections saved yet.
                       </td>
                     </tr>
                   ) : (
@@ -373,16 +386,18 @@ export const RoadYieldCalculatorModule: React.FC = () => {
                             {rec.tripsRequired} Trips
                           </span>
                         </td>
-                        <td className="py-3.5 px-4 text-center">
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteRecord(rec.id)}
-                            className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 transition-colors cursor-pointer"
-                            title="Delete Record"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </td>
+                        {isAdmin && (
+                          <td className="py-3.5 px-4 text-center">
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteRecord(rec.id)}
+                              className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 transition-colors cursor-pointer"
+                              title="Delete Record (Admin Only)"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     ))
                   )}
@@ -397,3 +412,5 @@ export const RoadYieldCalculatorModule: React.FC = () => {
 };
 
 export default RoadYieldCalculatorModule;
+
+```

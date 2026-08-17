@@ -36,7 +36,10 @@ import {
   Tag,
   Archive,
   TrendingUp,
-  TrendingDown
+  TrendingDown,
+  AlertTriangle,
+  AlertOctagon,
+  ArrowUpRight
 } from 'lucide-react';
 
 // ==========================================
@@ -513,7 +516,7 @@ export const UserManagementModule: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black transition-all shadow-lg shadow-blue-600/30 cursor-pointer"
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black transition-all shadow-lg shadow-blue-600/30 cursor-pointer"
                 >
                   {editingUser ? 'Update User' : 'Create User'}
                 </button>
@@ -1111,7 +1114,7 @@ export const ProductsMasterModule: React.FC = () => {
 };
 
 // ==========================================
-// Stock Transactions Module (With Ongoing Site Dropdown & Table Column)
+// Stock Transactions Module (With Site Selector)
 // ==========================================
 export interface StockTransaction {
   id: string;
@@ -1180,7 +1183,7 @@ export const StockTransactionsModule: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Form State (Includes Ongoing Site Dropdown)
+  // Form State (Includes Site Name)
   const [productName, setProductName] = useState('');
   const [siteName, setSiteName] = useState(defaultOngoingSiteName);
   const [type, setType] = useState<'Stock In' | 'Stock Out'>('Stock Out');
@@ -1359,7 +1362,7 @@ export const StockTransactionsModule: React.FC = () => {
         </div>
       </div>
 
-      {/* Transactions Table with Ongoing Site */}
+      {/* Transactions Table with Site Column */}
       <div className="bg-[#0B1220] border border-[#1E293B] rounded-3xl overflow-hidden shadow-2xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
@@ -1434,7 +1437,7 @@ export const StockTransactionsModule: React.FC = () => {
         </div>
       </div>
 
-      {/* New Transaction Modal */}
+      {/* New Transaction Modal (With Ongoing Site Dropdown) */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
           <div className="bg-[#121927] border border-[#1E293B] rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto text-slate-100">
@@ -1458,7 +1461,7 @@ export const StockTransactionsModule: React.FC = () => {
                 />
               </div>
 
-              {/* Ongoing Site Selector */}
+              {/* Ongoing Site Dropdown Selector */}
               <div>
                 <label className="block text-slate-300 font-bold mb-1 flex items-center justify-between">
                   <span>Site / Ongoing Package *</span>
@@ -1813,6 +1816,267 @@ export const ReportsAnalyticsModule: React.FC = () => {
 };
 
 // ==========================================
+// Low Stock Alerts Module (LINKED TO TRANSACTIONS & PRODUCTS)
+// ==========================================
+export const LowStockAlertsModule: React.FC = () => {
+  const { siteSheets = [], selectedSiteId } = useERP();
+  const currentActiveSite = siteSheets.find((s: any) => s.siteId === selectedSiteId);
+  const defaultOngoingSiteName = currentActiveSite?.siteName || siteSheets[0]?.siteName || 'Ongoing Site';
+
+  const [products] = useState<BuildingProduct[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_PRODUCTS_KEY);
+      return saved ? JSON.parse(saved) : INITIAL_BUILDING_PRODUCTS;
+    } catch {
+      return INITIAL_BUILDING_PRODUCTS;
+    }
+  });
+
+  const [transactions, setTransactions] = useState<StockTransaction[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_TXNS_KEY);
+      return saved ? JSON.parse(saved) : INITIAL_STOCK_TXNS;
+    } catch {
+      return INITIAL_STOCK_TXNS;
+    }
+  });
+
+  const [restockModalItem, setRestockModalItem] = useState<BuildingProduct | null>(null);
+  const [restockQty, setRestockQty] = useState<number | ''>(50);
+
+  // Compute live available stock per product
+  const alertItems = useMemo(() => {
+    return products.map((prod) => {
+      const totalIn = transactions
+        .filter((t) => t.productName.toLowerCase() === prod.name.toLowerCase() && t.type === 'Stock In')
+        .reduce((sum, t) => sum + t.quantity, 0);
+
+      const totalOut = transactions
+        .filter((t) => t.productName.toLowerCase() === prod.name.toLowerCase() && t.type === 'Stock Out')
+        .reduce((sum, t) => sum + t.quantity, 0);
+
+      const calculatedCurrentStock = Math.max(0, prod.currentStock + totalIn - totalOut);
+      const isCritical = calculatedCurrentStock <= prod.minStock;
+      const isLow = calculatedCurrentStock <= prod.reorderLevel;
+
+      return {
+        ...prod,
+        liveStock: calculatedCurrentStock,
+        isCritical,
+        isLow,
+        deficit: Math.max(0, prod.reorderLevel - calculatedCurrentStock)
+      };
+    });
+  }, [products, transactions]);
+
+  const activeAlerts = alertItems.filter((i) => i.isLow || i.isCritical);
+  const criticalCount = alertItems.filter((i) => i.isCritical).length;
+  const warningCount = alertItems.filter((i) => i.isLow && !i.isCritical).length;
+
+  const handleQuickRestock = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!restockModalItem || !restockQty || Number(restockQty) <= 0) return;
+
+    const newTxn: StockTransaction = {
+      id: `TXN-RESTOCK-${Date.now().toString().slice(-4)}`,
+      productName: restockModalItem.name,
+      siteName: defaultOngoingSiteName,
+      type: 'Stock In',
+      quantity: Number(restockQty),
+      date: new Date().toISOString().substring(0, 10),
+      department: 'Procurement Replenish',
+      issuedTo: 'Direct Restock'
+    };
+
+    const updated = [newTxn, ...transactions];
+    setTransactions(updated);
+    localStorage.setItem(STORAGE_TXNS_KEY, JSON.stringify(updated));
+    setRestockModalItem(null);
+  };
+
+  return (
+    <div className="space-y-6 font-sans text-slate-100">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-rose-600/20 border border-rose-500/30 flex items-center justify-center text-rose-400">
+            <Bell className="w-5 h-5" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-black text-white tracking-tight">Low Stock Alerts</h1>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Automated reorder buffer warnings and deficit notifications computed from live transactions.
+            </p>
+          </div>
+        </div>
+
+        <span className="px-3.5 py-2 rounded-xl bg-rose-950/40 text-rose-400 border border-rose-800 text-xs font-bold font-mono">
+          {activeAlerts.length} Active Alerts
+        </span>
+      </div>
+
+      {/* 3 Metric Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="p-4 rounded-2xl bg-[#0c1427] border border-rose-900/50">
+          <div className="text-[11px] font-semibold text-slate-400 flex items-center justify-between">
+            <span>Critical Shortages</span>
+            <AlertOctagon className="w-4 h-4 text-rose-400" />
+          </div>
+          <div className="text-3xl font-black text-rose-400 font-mono mt-1">{criticalCount}</div>
+          <div className="text-[10px] text-slate-500">Stock at or below minimum limit</div>
+        </div>
+
+        <div className="p-4 rounded-2xl bg-[#0c1427] border border-amber-900/50">
+          <div className="text-[11px] font-semibold text-slate-400 flex items-center justify-between">
+            <span>Reorder Warnings</span>
+            <AlertTriangle className="w-4 h-4 text-amber-400" />
+          </div>
+          <div className="text-3xl font-black text-amber-400 font-mono mt-1">{warningCount}</div>
+          <div className="text-[10px] text-slate-500">Approaching minimum threshold</div>
+        </div>
+
+        <div className="p-4 rounded-2xl bg-[#0c1427] border border-[#182643]">
+          <div className="text-[11px] font-semibold text-slate-400 flex items-center justify-between">
+            <span>Total Catalog Tracked</span>
+            <Package className="w-4 h-4 text-blue-400" />
+          </div>
+          <div className="text-3xl font-black text-white font-mono mt-1">{products.length}</div>
+          <div className="text-[10px] text-slate-500">Live monitored across ongoing sites</div>
+        </div>
+      </div>
+
+      {/* Active Alerts Table */}
+      <div className="bg-[#0B1220] border border-[#1E293B] rounded-3xl overflow-hidden shadow-2xl">
+        <div className="px-6 py-4 border-b border-[#1E293B] bg-[#0d1527]/50 flex items-center justify-between">
+          <h2 className="text-base font-bold text-white">Actionable Deficit Items</h2>
+          <span className="text-xs font-mono text-slate-400">Auto-calculated</span>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr className="border-b border-[#1E293B] text-[10px] font-extrabold uppercase tracking-wider text-slate-400 bg-[#080d19]/80">
+                <th className="py-3.5 px-6">PRODUCT</th>
+                <th className="py-3.5 px-4">SEVERITY</th>
+                <th className="py-3.5 px-4 text-right">AVAILABLE STOCK</th>
+                <th className="py-3.5 px-4 text-right">REORDER BUFFER</th>
+                <th className="py-3.5 px-4 text-right">SUGGESTED REORDER</th>
+                <th className="py-3.5 px-6 text-right">RESTOCK ACTION</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#1E293B]/60 text-slate-200">
+              {activeAlerts.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-10 text-center text-emerald-400 font-semibold text-xs">
+                    ✓ All products are currently above their reorder buffers.
+                  </td>
+                </tr>
+              ) : (
+                activeAlerts.map((item) => (
+                  <tr key={item.id} className="hover:bg-[#121c33]/50 transition-colors">
+                    <td className="py-4 px-6">
+                      <div className="font-bold text-white text-xs">{item.name}</div>
+                      <div className="text-[10px] text-slate-500 font-mono">
+                        {item.category} • SKU: {item.skuPartNo}
+                      </div>
+                    </td>
+                    <td className="py-4 px-4">
+                      {item.isCritical ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-black uppercase bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                          <AlertOctagon className="w-3 h-3" />
+                          Critical Shortage
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-black uppercase bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                          <AlertTriangle className="w-3 h-3" />
+                          Reorder Threshold
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-4 px-4 text-right font-mono font-black text-rose-400 text-sm">
+                      {item.liveStock} <span className="text-[10px] text-slate-500">{item.unit}</span>
+                    </td>
+                    <td className="py-4 px-4 text-right font-mono text-slate-400">
+                      {item.reorderLevel} {item.unit}
+                    </td>
+                    <td className="py-4 px-4 text-right font-mono font-bold text-cyan-400">
+                      +{item.deficit + 20} {item.unit}
+                    </td>
+                    <td className="py-4 px-6 text-right">
+                      <button
+                        onClick={() => {
+                          setRestockModalItem(item);
+                          setRestockQty(item.deficit + 20);
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-[11px] flex items-center gap-1 ml-auto cursor-pointer transition-all shadow-md shadow-blue-600/30"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>+ Stock In</span>
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Restock Transaction Modal */}
+      {restockModalItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-[#121927] border border-[#1E293B] rounded-3xl w-full max-w-sm p-6 shadow-2xl space-y-4 text-slate-100">
+            <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
+              <h3 className="text-sm font-bold text-white">Record Replenishment Inward</h3>
+              <button onClick={() => setRestockModalItem(null)} className="text-slate-400 hover:text-white p-1">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleQuickRestock} className="space-y-3.5 text-xs">
+              <div className="p-3 rounded-2xl bg-[#080d19] border border-[#182643] space-y-1">
+                <div className="text-xs font-bold text-white">{restockModalItem.name}</div>
+                <div className="text-[10px] text-slate-400 font-mono">
+                  Current Stock: {restockModalItem.currentStock} {restockModalItem.unit}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">Inward Quantity ({restockModalItem.unit}) *</label>
+                <input
+                  type="number"
+                  min="1"
+                  required
+                  value={restockQty}
+                  onChange={(e) => setRestockQty(e.target.value === '' ? '' : Number(e.target.value))}
+                  className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-emerald-400 font-mono font-bold outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-[#1E293B]">
+                <button
+                  type="button"
+                  onClick={() => setRestockModalItem(null)}
+                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-all shadow-lg shadow-emerald-600/30 cursor-pointer"
+                >
+                  Confirm Inward
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ==========================================
 // Generic Scaffold Views for Remaining Tabs
 // ==========================================
 const BuildingGenericView: React.FC<{
@@ -1943,6 +2207,7 @@ export const AppContent: React.FC = () => {
                 {activeTab === 'products' && <ProductsMasterModule />}
                 {activeTab === 'transactions' && <StockTransactionsModule />}
                 {activeTab === 'reports' && <ReportsAnalyticsModule />}
+                {activeTab === 'alerts' && <LowStockAlertsModule />}
                 {activeTab === 'attendance-salary' && (
                   <BuildingGenericView
                     title="Attendance & Payroll"
@@ -1951,13 +2216,6 @@ export const AppContent: React.FC = () => {
                   />
                 )}
                 {activeTab === 'equipment-register' && <MachineryFleetModule />}
-                {activeTab === 'alerts' && (
-                  <BuildingGenericView
-                    title="Low Stock Alerts"
-                    subtitle="Reorder buffer warnings and deficit notifications."
-                    icon={Bell}
-                  />
-                )}
                 {activeTab === 'reorder-suggestions' && (
                   <BuildingGenericView
                     title="Reorder Suggestions"

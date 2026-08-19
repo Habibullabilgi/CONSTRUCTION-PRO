@@ -2,10 +2,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useERP } from '../../context/ERPContext';
 import {
   Plus,
-  Download,
   Search,
   X,
   Trash2,
+  Edit2,
   Truck
 } from 'lucide-react';
 
@@ -79,6 +79,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   // Form States
   const [tripDate, setTripDate] = useState('2026-08-19');
@@ -108,7 +109,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
 
   // Re-fetch categories when modal opens in case user added new ones in Categories Tab
   useEffect(() => {
-    if (isModalOpen) {
+    if (isModalOpen && !editingId) {
       try {
         const saved = localStorage.getItem(STORAGE_ROAD_CATS_KEY);
         if (saved) {
@@ -125,7 +126,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
         console.error("Failed to load categories", error);
       }
     }
-  }, [isModalOpen, materialName]);
+  }, [isModalOpen, materialName, editingId]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_HAULAGE_KEY, JSON.stringify(trips));
@@ -151,18 +152,42 @@ export const MaterialHaulageTripsModule: React.FC = () => {
     });
   }, [trips, searchQuery]);
 
+  const handleOpenAdd = () => {
+    setEditingId(null);
+    setTripDate('2026-08-19'); // Reset to default/current date
+    setSiteName('SINDAGI - ALMEL ROAD');
+    setVehicleNumber('TOTAL TRIPS');
+    setMaterialName(defaultCategory);
+    setDayTrips(10);
+    setBrassPerTrip(6);
+    setRatePerBrass(categories[0]?.standardRate || 5000);
+    setIsModalOpen(true);
+  };
+
+  const handleEdit = (trip: HaulageTripRecord) => {
+    setEditingId(trip.id);
+    setTripDate(trip.tripDate);
+    setSiteName(trip.siteName);
+    setVehicleNumber(trip.vehicleNumber);
+    setMaterialName(trip.materialName);
+    setDayTrips(trip.dayTrips);
+    setBrassPerTrip(trip.brassPerTrip);
+    setRatePerBrass(trip.ratePerBrass);
+    setIsModalOpen(true);
+  };
+
   const handleDelete = (id: string) => {
     if (window.confirm('Are you sure you want to delete this trip record?')) {
       setTrips((prev) => prev.filter((t) => t.id !== id));
     }
   };
 
-  const handleCreate = (e: React.FormEvent) => {
+  const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!dayTrips || !brassPerTrip || !ratePerBrass) return;
 
-    const newRecord: HaulageTripRecord = {
-      id: `TRIP-${Date.now().toString().slice(-4)}`,
+    const record: HaulageTripRecord = {
+      id: editingId || `TRIP-${Date.now().toString().slice(-4)}`,
       tripDate,
       siteName: siteName.trim() || 'SINDAGI - ALMEL ROAD',
       vehicleNumber: vehicleNumber.trim() || 'TOTAL TRIPS',
@@ -173,8 +198,14 @@ export const MaterialHaulageTripsModule: React.FC = () => {
       totalAmount: computedTotalAmount
     };
 
-    setTrips([newRecord, ...trips]);
+    if (editingId) {
+      setTrips(trips.map((t) => (t.id === editingId ? record : t)));
+    } else {
+      setTrips([record, ...trips]);
+    }
+    
     setIsModalOpen(false);
+    setEditingId(null);
   };
 
   return (
@@ -192,7 +223,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
         </div>
 
         <button
-          onClick={() => setIsModalOpen(true)}
+          onClick={handleOpenAdd}
           className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-black flex items-center gap-1.5 transition-all shadow-lg shadow-blue-600/30 cursor-pointer w-fit"
         >
           <Plus className="w-4 h-4" />
@@ -255,13 +286,22 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                       ₹{t.totalAmount.toLocaleString()}
                     </td>
                     <td className="py-3.5 px-6 text-right">
-                      <button
-                        onClick={() => handleDelete(t.id)}
-                        title="Delete Record"
-                        className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 transition-colors cursor-pointer"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => handleEdit(t)}
+                          title="Edit Record"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-blue-400 hover:bg-blue-950/40 transition-colors cursor-pointer"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(t.id)}
+                          title="Delete Record"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -278,14 +318,14 @@ export const MaterialHaulageTripsModule: React.FC = () => {
             <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
                 <Truck className="w-4 h-4 text-blue-400" />
-                <span>Log Total Day Haulage Trips</span>
+                <span>{editingId ? 'Edit Haulage Trip' : 'Log Total Day Haulage Trips'}</span>
               </h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-white p-1">
+              <button onClick={() => { setIsModalOpen(false); setEditingId(null); }} className="text-slate-400 hover:text-white p-1">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleCreate} className="space-y-4 text-xs">
+            <form onSubmit={handleSave} className="space-y-4 text-xs">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-300 font-bold mb-1">Trip Date *</label>
@@ -358,6 +398,11 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                       </option>
                     );
                   })}
+                  
+                  {/* Keep current selection available even if category was removed */}
+                  {!categories.some((c) => `${c.name} (₹${c.standardRate}/${c.unit})` === materialName) && materialName && (
+                    <option value={materialName}>{materialName}</option>
+                  )}
                 </select>
               </div>
 
@@ -408,7 +453,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
               <div className="flex justify-end gap-2 pt-3 border-t border-[#1E293B]">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={() => { setIsModalOpen(false); setEditingId(null); }}
                   className="px-4 py-2 rounded-xl text-slate-400 hover:text-white cursor-pointer"
                 >
                   Cancel
@@ -417,7 +462,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                   type="submit"
                   className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black shadow-lg shadow-blue-600/30 cursor-pointer"
                 >
-                  Save Record
+                  {editingId ? 'Update Record' : 'Save Record'}
                 </button>
               </div>
             </form>

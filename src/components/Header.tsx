@@ -38,7 +38,7 @@ export const Header: React.FC<Props> = ({
   const [isAddRoadSiteOpen, setIsAddRoadSiteOpen] = useState(false);
   const [siteToDelete, setSiteToDelete] = useState<{ id: string; name: string } | null>(null);
 
-  const isSuperAdmin = userRole === 'SUPER_ADMIN' || userRole === 'OWNER';
+  const isSuperAdmin = userRole === 'SUPER_ADMIN' || userRole === 'OWNER' || userRole === 'Admin';
   const currentSiteSheet = siteSheets.find((s) => s.siteId === selectedSiteId) || siteSheets[0];
 
   const handleExecuteDeleteSite = () => {
@@ -131,7 +131,7 @@ export const Header: React.FC<Props> = ({
                         setSelectedSiteId(s.siteId);
                         setIsSiteOpen(false);
                       }}
-                      className="flex-1 text-left"
+                      className="flex-1 text-left cursor-pointer"
                     >
                       <div
                         className={`font-semibold truncate max-w-[160px] sm:max-w-[200px] ${
@@ -194,7 +194,6 @@ export const Header: React.FC<Props> = ({
           className="px-2 sm:px-3 py-1.5 sm:py-2 rounded-xl bg-[#121927] hover:bg-rose-950/40 border border-[#1E293B] hover:border-rose-700/50 text-slate-400 hover:text-rose-400 transition-colors cursor-pointer flex items-center gap-1.5"
         >
           <LogOut className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
-          {/* Hide the word "Logout" on small screens to save space */}
           <span className="hidden sm:inline text-[11px] font-semibold">Logout</span>
         </button>
       </div>
@@ -211,7 +210,7 @@ export const Header: React.FC<Props> = ({
               <button
                 type="button"
                 onClick={() => setSiteToDelete(null)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800"
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>

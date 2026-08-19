@@ -1,430 +1,326 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useERP } from '../../context/ERPContext';
 import {
-  Milestone,
-  Calculator,
-  Fuel,
-  Truck,
+  Layers,
   DollarSign,
+  Truck,
+  Fuel,
+  Calculator,
   Plus,
   ArrowRight,
-  Layers,
   HardHat,
-  ChevronRight
+  ChevronRight,
+  MapPin,
+  Activity
 } from 'lucide-react';
 
 interface Props {
-  onNavigateTab: (tab: string) => void;
+  onNavigateTab: (tabId: string) => void;
 }
 
 export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab }) => {
-  const {
-    siteSheets = [],
-    selectedSiteId
-  } = useERP();
+  const { siteSheets = [], selectedSiteId } = useERP();
 
-  // Active Site Data
-  const currentSite = siteSheets.find((s) => s.siteId === selectedSiteId) || siteSheets[0] || {
-    siteId: 'site-default',
+  // 1. Identify the currently active site
+  const activeSite = siteSheets.find((s: any) => s.siteId === selectedSiteId) || {
+    siteId: 'default-001',
     siteName: 'SINDAGI - ALMEL ROAD'
   };
 
-  // 1. Live Trips & Material Calculation (Defaults to 0 if no entries exist)
-  const [totalMaterialBrass, setTotalMaterialBrass] = useState<number>(0);
-  const [totalTripsCount, setTotalTripsCount] = useState<number>(0);
-
-  // 2. Live Diesel Fuel Calculation (Defaults to 0)
-  const [totalDieselLitres, setTotalDieselLitres] = useState<number>(0);
-
-  // 3. Live Site Expenses Calculation (Defaults to 0)
-  const [totalExpensesAmount, setTotalExpensesAmount] = useState<number>(0);
+  // 2. Load Live Data from LocalStorage
+  const [trips, setTrips] = useState<any[]>([]);
+  const [diesel, setDiesel] = useState<any[]>([]);
+  const [expenses, setExpenses] = useState<any[]>([]);
 
   useEffect(() => {
     try {
-      const siteQuery = (currentSite.siteName || '').trim().toLowerCase();
+      const savedTrips = localStorage.getItem('CONSTRUCTION_PRO_HAULAGE_TRIPS_V2');
+      if (savedTrips) setTrips(JSON.parse(savedTrips));
 
-      // Read Trips data for THIS specific site only
-      const savedTrips =
-        localStorage.getItem('CONSTRUCTION_PRO_DAY_TRIPS_V3') ||
-        localStorage.getItem('CONSTRUCTION_PRO_DAY_TRIPS_V2');
-      if (savedTrips) {
-        const parsed = JSON.parse(savedTrips);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const matchingTrips = parsed.filter(
-            (t: any) =>
-              t.siteName &&
-              (t.siteName.toLowerCase().includes(siteQuery) ||
-                siteQuery.includes(t.siteName.toLowerCase()))
-          );
-          const brassSum = matchingTrips.reduce(
-            (sum: number, t: any) => sum + (Number(t.totalBrass) || 0),
-            0
-          );
-          const tripsSum = matchingTrips.reduce(
-            (sum: number, t: any) => sum + (Number(t.totalTrips) || 0),
-            0
-          );
-          setTotalMaterialBrass(brassSum);
-          setTotalTripsCount(tripsSum);
-        } else {
-          setTotalMaterialBrass(0);
-          setTotalTripsCount(0);
-        }
-      } else {
-        setTotalMaterialBrass(0);
-        setTotalTripsCount(0);
-      }
+      const savedDiesel = localStorage.getItem('CONSTRUCTION_PRO_DIESEL_LOGS_V1');
+      if (savedDiesel) setDiesel(JSON.parse(savedDiesel));
 
-      // Read Diesel data for THIS specific site only
-      const savedDiesel = localStorage.getItem('CONSTRUCTION_PRO_DIESEL_VOUCHERS_V1');
-      if (savedDiesel) {
-        const parsed = JSON.parse(savedDiesel);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const matchingDiesel = parsed.filter(
-            (d: any) =>
-              d.siteName &&
-              (d.siteName.toLowerCase().includes(siteQuery) ||
-                siteQuery.includes(d.siteName.toLowerCase()))
-          );
-          const dslSum = matchingDiesel.reduce(
-            (sum: number, d: any) => sum + (Number(d.litresDispensed) || 0),
-            0
-          );
-          setTotalDieselLitres(dslSum);
-        } else {
-          setTotalDieselLitres(0);
-        }
-      } else {
-        setTotalDieselLitres(0);
-      }
-
-      // Read Expenses data for THIS specific site only
-      const savedExpenses =
-        localStorage.getItem('CONSTRUCTION_PRO_SITE_EXPENSES_V2') ||
-        localStorage.getItem('CONSTRUCTION_PRO_ERP_STORAGE_V7_SITE_EXPENSES');
-      if (savedExpenses) {
-        const parsed = JSON.parse(savedExpenses);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const matchingExpenses = parsed.filter(
-            (e: any) =>
-              (e.siteId && e.siteId === currentSite.siteId) ||
-              (e.siteName &&
-                (e.siteName.toLowerCase().includes(siteQuery) ||
-                  siteQuery.includes(e.siteName.toLowerCase())))
-          );
-          const expSum = matchingExpenses.reduce(
-            (sum: number, e: any) => sum + (Number(e.amount) || 0),
-            0
-          );
-          setTotalExpensesAmount(expSum);
-        } else {
-          setTotalExpensesAmount(0);
-        }
-      } else {
-        setTotalExpensesAmount(0);
-      }
+      // Assuming a generic key for expenses, update if yours differs
+      const savedExpenses = localStorage.getItem('CONSTRUCTION_PRO_SITE_EXPENSES_V1');
+      if (savedExpenses) setExpenses(JSON.parse(savedExpenses));
     } catch (e) {
-      console.error(e);
-      setTotalMaterialBrass(0);
-      setTotalTripsCount(0);
-      setTotalDieselLitres(0);
-      setTotalExpensesAmount(0);
+      console.error('Error loading dashboard data', e);
     }
-  }, [currentSite.siteId, currentSite.siteName, selectedSiteId]);
+  }, []);
+
+  // 3. Compute Live Metrics for the Active Site
+  const today = new Date().toISOString().substring(0, 10);
+
+  const siteTrips = useMemo(() => trips.filter((t) => t.siteName === activeSite.siteName), [trips, activeSite.siteName]);
+  const todayTrips = useMemo(() => siteTrips.filter((t) => t.tripDate === today), [siteTrips, today]);
+
+  const siteDiesel = useMemo(() => diesel.filter((d) => d.siteName === activeSite.siteName), [diesel, activeSite.siteName]);
+  const siteExpenses = useMemo(() => expenses.filter((e) => e.siteName === activeSite.siteName), [expenses, activeSite.siteName]);
+
+  // KPIs
+  const totalBrassToday = todayTrips.reduce((sum, t) => sum + (Number(t.dayTrips) * Number(t.brassPerTrip)), 0);
+  const activeTripsCount = todayTrips.reduce((sum, t) => sum + Number(t.dayTrips), 0);
+  const totalDieselDispensed = siteDiesel.reduce((sum, d) => sum + Number(d.litres), 0);
+  const totalSiteExpense = siteExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
 
   return (
-    <div className="space-y-6 font-sans text-slate-100 selection:bg-blue-600 selection:text-white">
-      {/* 1. TOP COMMAND BANNER */}
-      <div className="p-6 rounded-3xl bg-[#0c1427] border border-[#182643] shadow-2xl flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-bold">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-blue-400 tracking-wider uppercase font-mono">
-              SITE OPERATIONS COMMAND
-            </span>
-            <span className="text-slate-500">•</span>
-            <span className="text-slate-400 font-mono text-[11px]">
-              {currentSite.siteId || 'ACTIVE-CORRIDOR'}
-            </span>
+    <div className="space-y-6 font-sans text-slate-100 animate-in fade-in duration-300">
+      
+      {/* Top Command Banner */}
+      <div className="p-6 md:p-8 rounded-[2rem] bg-[#0B1220] border border-[#1E293B] shadow-2xl relative overflow-hidden">
+        {/* Abstract Background Elements */}
+        <div className="absolute top-0 right-0 w-96 h-96 bg-blue-600/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none" />
+        
+        <div className="relative z-10 flex flex-col xl:flex-row xl:items-start justify-between gap-6">
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-[10px] font-black tracking-widest uppercase text-blue-400">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Site Operations Command</span>
+              <span className="text-slate-600">•</span>
+              <span className="text-slate-500 font-mono lowercase tracking-normal">{activeSite.siteId}</span>
+            </div>
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight uppercase">
+              {activeSite.siteName}
+            </h1>
+            <p className="text-sm text-slate-400 max-w-xl leading-relaxed">
+              Live site metrics, equipment telematics, material haulage, and petty cash ledger.
+            </p>
           </div>
 
-          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-1.5 leading-snug">
-            {currentSite.siteName}
-          </h1>
-
-          <p className="text-xs text-slate-400 mt-1">
-            Live site metrics, equipment telematics, material haulage, and petty cash ledger.
-          </p>
-        </div>
-
-        {/* Action Button Links */}
-        <div className="flex flex-wrap items-center gap-2.5 self-start lg:self-auto">
-          <button
-            onClick={() => onNavigateTab('road-sites')}
-            className="px-3.5 py-2.5 rounded-2xl bg-[#142038] hover:bg-[#1f2f52] border border-[#22365e] text-blue-300 hover:text-white font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shadow-sm"
-          >
-            <Milestone className="w-4 h-4 text-blue-400" />
-            <span>+ Add Site Section</span>
-          </button>
-
-          <button
-            onClick={() => onNavigateTab('yield_calculator')}
-            className="px-3.5 py-2.5 rounded-2xl bg-[#142038] hover:bg-[#1f2f52] border border-[#22365e] text-blue-300 hover:text-white font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shadow-sm"
-          >
-            <Calculator className="w-4 h-4 text-cyan-400" />
-            <span>Yield Calc</span>
-          </button>
-
-          <button
-            onClick={() => onNavigateTab('diesel')}
-            className="px-3.5 py-2.5 rounded-2xl bg-[#142038] hover:bg-[#1f2f52] border border-[#22365e] text-amber-300 hover:text-white font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shadow-sm"
-          >
-            <Fuel className="w-4 h-4 text-amber-400" />
-            <span>+ Log Diesel</span>
-          </button>
-
-          <button
-            onClick={() => onNavigateTab('haulage-trips')}
-            className="px-3.5 py-2.5 rounded-2xl bg-[#142038] hover:bg-[#1f2f52] border border-[#22365e] text-emerald-300 hover:text-white font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shadow-sm"
-          >
-            <Truck className="w-4 h-4 text-emerald-400" />
-            <span>+ Log Trip</span>
-          </button>
-
-          <button
-            onClick={() => onNavigateTab('site-expenses')}
-            className="px-4 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs flex items-center gap-2 transition-all shadow-lg shadow-blue-600/30 cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>+ Expense</span>
-          </button>
+          {/* Action Buttons (Wired to Navigation) */}
+          <div className="flex flex-wrap items-center gap-3 shrink-0">
+            <button 
+              onClick={() => onNavigateTab('road-sites')}
+              className="px-4 py-2.5 rounded-xl bg-[#121927] hover:bg-[#1b263b] border border-[#1E293B] text-slate-300 text-xs font-bold flex items-center gap-2 transition-all"
+            >
+              <MapPin className="w-3.5 h-3.5 text-blue-400" />
+              <span>+ Add Site Section</span>
+            </button>
+            <button 
+              onClick={() => onNavigateTab('yield_calculator')}
+              className="px-4 py-2.5 rounded-xl bg-[#121927] hover:bg-[#1b263b] border border-[#1E293B] text-slate-300 text-xs font-bold flex items-center gap-2 transition-all"
+            >
+              <Calculator className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Yield Calc</span>
+            </button>
+            <button 
+              onClick={() => onNavigateTab('diesel')}
+              className="px-4 py-2.5 rounded-xl bg-[#121927] hover:bg-[#1b263b] border border-[#1E293B] text-slate-300 text-xs font-bold flex items-center gap-2 transition-all"
+            >
+              <Fuel className="w-3.5 h-3.5 text-amber-400" />
+              <span>+ Log Diesel</span>
+            </button>
+            <button 
+              onClick={() => onNavigateTab('haulage-trips')}
+              className="px-4 py-2.5 rounded-xl bg-[#121927] hover:bg-[#1b263b] border border-[#1E293B] text-slate-300 text-xs font-bold flex items-center gap-2 transition-all"
+            >
+              <Truck className="w-3.5 h-3.5 text-emerald-400" />
+              <span>+ Log Trip</span>
+            </button>
+            <button 
+              onClick={() => onNavigateTab('site-expenses')}
+              className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-black flex items-center gap-2 transition-all shadow-lg shadow-blue-600/30"
+            >
+              <Plus className="w-4 h-4" />
+              <span>+ Expense</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* 2. TOP 4 LIVE TELEMETRY CARDS (Shows 0 if no entries exist) */}
+      {/* 4 KPI Metric Cards (Wired to Navigation) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        
         {/* Card 1: Material Laid */}
-        <div
+        <div 
           onClick={() => onNavigateTab('haulage-trips')}
-          className="p-5 rounded-3xl bg-[#0c1427] border border-[#182643] hover:border-blue-500/50 transition-all cursor-pointer group shadow-xl flex flex-col justify-between"
+          className="p-5 rounded-[1.5rem] bg-[#0B1220] border border-[#1E293B] shadow-xl hover:border-blue-500/50 transition-all cursor-pointer group flex flex-col justify-between"
         >
-          <div className="flex items-center justify-between text-xs font-bold text-slate-400">
-            <span>TOTAL MATERIAL LAID (TODAY)</span>
-            <div className="w-8 h-8 rounded-xl bg-blue-600/15 border border-blue-500/30 flex items-center justify-center text-blue-400 group-hover:scale-110 transition-transform">
-              <Layers className="w-4 h-4" />
+          <div className="space-y-4">
+            <div className="flex justify-between items-start">
+              <div className="text-[11px] font-bold text-slate-400 tracking-wider">TOTAL MATERIAL LAID<br/>(TODAY)</div>
+              <div className="w-8 h-8 rounded-lg bg-blue-900/30 flex items-center justify-center border border-blue-800/50">
+                <Layers className="w-4 h-4 text-blue-400" />
+              </div>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-4xl font-black text-white font-mono tracking-tight">{totalBrassToday}</span>
+              <span className="text-sm font-medium text-slate-500">Brass</span>
             </div>
           </div>
-          <div className="my-3">
-            <div className="text-3xl font-black text-white font-mono">
-              {totalMaterialBrass > 0 ? totalMaterialBrass.toFixed(1) : '0'}{' '}
-              <span className="text-sm font-normal text-slate-400">Brass</span>
+          <div className="mt-4 pt-4 border-t border-[#1E293B] space-y-3">
+            <div className="flex items-center gap-1.5 text-[11px] font-medium text-blue-400">
+              <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+              {totalBrassToday > 0 ? `${todayTrips.length} material batches logged` : 'No material logged yet'}
             </div>
-            <div className="text-xs text-blue-400 font-medium mt-1 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
-              <span>
-                {totalMaterialBrass > 0
-                  ? 'Murum, GSB & WMM deliveries'
-                  : 'No material logged yet'}
-              </span>
+            <div className="flex items-center gap-1 text-[11px] font-bold text-slate-400 group-hover:text-blue-400 transition-colors">
+              <span>View haulage logs</span>
+              <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
             </div>
-          </div>
-          <div className="text-[11px] text-slate-500 group-hover:text-blue-400 transition-colors flex items-center gap-1">
-            <span>View haulage logs</span>
-            <ArrowRight className="w-3 h-3" />
           </div>
         </div>
 
-        {/* Card 2: Site Direct Expense */}
-        <div
+        {/* Card 2: Site Expense */}
+        <div 
           onClick={() => onNavigateTab('site-expenses')}
-          className="p-5 rounded-3xl bg-[#0c1427] border border-[#182643] hover:border-emerald-500/50 transition-all cursor-pointer group shadow-xl flex flex-col justify-between"
+          className="p-5 rounded-[1.5rem] bg-[#0B1220] border border-[#1E293B] shadow-xl hover:border-emerald-500/50 transition-all cursor-pointer group flex flex-col justify-between"
         >
-          <div className="flex items-center justify-between text-xs font-bold text-slate-400">
-            <span>TOTAL SITE EXPENSE</span>
-            <div className="w-8 h-8 rounded-xl bg-emerald-600/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform">
-              <DollarSign className="w-4 h-4" />
+          <div className="space-y-4">
+            <div className="flex justify-between items-start">
+              <div className="text-[11px] font-bold text-slate-400 tracking-wider">TOTAL SITE EXPENSE</div>
+              <div className="w-8 h-8 rounded-lg bg-emerald-900/30 flex items-center justify-center border border-emerald-800/50">
+                <DollarSign className="w-4 h-4 text-emerald-400" />
+              </div>
+            </div>
+            <div className="flex items-baseline gap-1">
+              <span className="text-4xl font-black text-emerald-400 font-mono tracking-tight">
+                ₹{totalSiteExpense.toLocaleString()}
+              </span>
             </div>
           </div>
-          <div className="my-3">
-            <div className="text-3xl font-black text-emerald-400 font-mono">
-              ₹
-              {totalExpensesAmount.toLocaleString('en-IN', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-              })}
+          <div className="mt-4 pt-4 border-t border-[#1E293B] space-y-3">
+            <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-400">
+              {totalSiteExpense > 0 ? `${siteExpenses.length} expense vouchers` : 'No expenses recorded'}
             </div>
-            <div className="text-xs text-slate-400 font-medium mt-1">
-              {totalExpensesAmount > 0
-                ? 'Petty cash, machine maintenance & repairs'
-                : 'No expenses recorded'}
+            <div className="flex items-center gap-1 text-[11px] font-bold text-slate-400 group-hover:text-emerald-400 transition-colors">
+              <span>Open expenses ledger</span>
+              <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
             </div>
-          </div>
-          <div className="text-[11px] text-slate-500 group-hover:text-emerald-400 transition-colors flex items-center gap-1">
-            <span>Open expenses ledger</span>
-            <ArrowRight className="w-3 h-3" />
           </div>
         </div>
 
         {/* Card 3: Active Trips */}
-        <div
+        <div 
           onClick={() => onNavigateTab('haulage-trips')}
-          className="p-5 rounded-3xl bg-[#0c1427] border border-[#182643] hover:border-cyan-500/50 transition-all cursor-pointer group shadow-xl flex flex-col justify-between"
+          className="p-5 rounded-[1.5rem] bg-[#0B1220] border border-[#1E293B] shadow-xl hover:border-cyan-500/50 transition-all cursor-pointer group flex flex-col justify-between"
         >
-          <div className="flex items-center justify-between text-xs font-bold text-slate-400">
-            <span>ACTIVE TRIPS TODAY</span>
-            <div className="w-8 h-8 rounded-xl bg-cyan-600/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 group-hover:scale-110 transition-transform">
-              <Truck className="w-4 h-4" />
+          <div className="space-y-4">
+            <div className="flex justify-between items-start">
+              <div className="text-[11px] font-bold text-slate-400 tracking-wider">ACTIVE TRIPS TODAY</div>
+              <div className="w-8 h-8 rounded-lg bg-cyan-900/30 flex items-center justify-center border border-cyan-800/50">
+                <Truck className="w-4 h-4 text-cyan-400" />
+              </div>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-4xl font-black text-white font-mono tracking-tight">{activeTripsCount}</span>
+              <span className="text-sm font-medium text-slate-500">Trips</span>
             </div>
           </div>
-          <div className="my-3">
-            <div className="text-3xl font-black text-white font-mono">
-              {totalTripsCount}{' '}
-              <span className="text-sm font-normal text-slate-400">Trips</span>
+          <div className="mt-4 pt-4 border-t border-[#1E293B] space-y-3">
+            <div className="flex items-center gap-1.5 text-[11px] font-medium text-cyan-400">
+              {activeTripsCount > 0 ? `${todayTrips.length} vehicles active` : '0 tippers active'}
             </div>
-            <div className="text-xs text-cyan-400 font-medium mt-1">
-              {totalTripsCount > 0
-                ? 'Active multi-axle tipper cycle'
-                : '0 tippers active'}
+            <div className="flex items-center gap-1 text-[11px] font-bold text-slate-400 group-hover:text-cyan-400 transition-colors">
+              <span>Check trip records</span>
+              <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
             </div>
-          </div>
-          <div className="text-[11px] text-slate-500 group-hover:text-cyan-400 transition-colors flex items-center gap-1">
-            <span>Check trip records</span>
-            <ArrowRight className="w-3 h-3" />
           </div>
         </div>
 
         {/* Card 4: Diesel Dispensed */}
-        <div
+        <div 
           onClick={() => onNavigateTab('diesel')}
-          className="p-5 rounded-3xl bg-[#0c1427] border border-[#182643] hover:border-amber-500/50 transition-all cursor-pointer group shadow-xl flex flex-col justify-between"
+          className="p-5 rounded-[1.5rem] bg-[#0B1220] border border-[#1E293B] shadow-xl hover:border-amber-500/50 transition-all cursor-pointer group flex flex-col justify-between"
         >
-          <div className="flex items-center justify-between text-xs font-bold text-slate-400">
-            <span>DIESEL DISPENSED</span>
-            <div className="w-8 h-8 rounded-xl bg-amber-600/15 border border-amber-500/30 flex items-center justify-center text-amber-400 group-hover:scale-110 transition-transform">
-              <Fuel className="w-4 h-4" />
+          <div className="space-y-4">
+            <div className="flex justify-between items-start">
+              <div className="text-[11px] font-bold text-slate-400 tracking-wider">DIESEL DISPENSED</div>
+              <div className="w-8 h-8 rounded-lg bg-amber-900/30 flex items-center justify-center border border-amber-800/50">
+                <Fuel className="w-4 h-4 text-amber-400" />
+              </div>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-4xl font-black text-amber-400 font-mono tracking-tight">{totalDieselDispensed}</span>
+              <span className="text-sm font-medium text-slate-500">Litres</span>
             </div>
           </div>
-          <div className="my-3">
-            <div className="text-3xl font-black text-amber-400 font-mono">
-              {totalDieselLitres.toLocaleString('en-IN')}{' '}
-              <span className="text-sm font-normal text-slate-400">Litres</span>
+          <div className="mt-4 pt-4 border-t border-[#1E293B] space-y-3">
+            <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-400">
+              {siteDiesel.length} Field fuel voucher logs
             </div>
-            <div className="text-xs text-slate-400 font-medium mt-1">
-              {totalDieselLitres > 0
-                ? 'Field fuel voucher logs'
-                : 'No fuel dispensed today'}
+            <div className="flex items-center gap-1 text-[11px] font-bold text-slate-400 group-hover:text-amber-400 transition-colors">
+              <span>Manage diesel log</span>
+              <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
             </div>
-          </div>
-          <div className="text-[11px] text-slate-500 group-hover:text-amber-400 transition-colors flex items-center gap-1">
-            <span>Manage diesel log</span>
-            <ArrowRight className="w-3 h-3" />
           </div>
         </div>
+
       </div>
 
-      {/* 3. MIDDLE ROW: MACHINERY FLEET & ENGINEERING SHORTCUTS */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-7 bg-[#0c1427] border border-[#182643] rounded-3xl p-6 shadow-xl space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-[#182643]">
-            <div className="flex items-center gap-2 font-bold text-white text-sm">
-              <HardHat className="w-4 h-4 text-amber-400" />
-              <span>Machine & Operator Deployment</span>
+      {/* Bottom Shortcuts & Fleet Overview */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-2">
+        
+        {/* Fleet Deployment Panel */}
+        <div className="lg:col-span-2 p-6 rounded-[2rem] bg-[#0B1220] border border-[#1E293B] shadow-2xl flex flex-col">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <HardHat className="w-5 h-5 text-amber-400" />
+              <h2 className="text-base font-bold text-white">Machine & Operator Deployment</h2>
             </div>
-            <button
+            <button 
               onClick={() => onNavigateTab('machinery_fleet')}
-              className="text-xs font-bold text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors cursor-pointer"
+              className="text-xs font-bold text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors"
             >
               <span>View Full Fleet</span>
-              <ChevronRight className="w-3.5 h-3.5" />
+              <ChevronRight className="w-4 h-4" />
             </button>
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div
-              onClick={() => onNavigateTab('machinery_fleet')}
-              className="p-3.5 rounded-2xl bg-[#080d19] border border-[#182643] hover:border-slate-600 transition-all cursor-pointer"
-            >
-              <div className="text-[11px] text-slate-400 font-semibold">
-                Active Excavators
-              </div>
-              <div className="text-xl font-extrabold text-white mt-1">0 Units</div>
-              <div className="text-[10px] text-slate-500 font-bold mt-1">
-                No active machinery
-              </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 flex-1">
+            <div className="p-4 rounded-2xl bg-[#080C14] border border-[#1E293B] flex flex-col justify-center">
+              <div className="text-[10px] font-bold text-slate-500 mb-1">Active Excavators</div>
+              <div className="text-2xl font-black text-white mb-2">0 <span className="text-sm font-medium text-slate-500">Units</span></div>
+              <div className="text-[10px] text-slate-600">No active machinery</div>
             </div>
-
-            <div
-              onClick={() => onNavigateTab('machinery_fleet')}
-              className="p-3.5 rounded-2xl bg-[#080d19] border border-[#182643] hover:border-slate-600 transition-all cursor-pointer"
-            >
-              <div className="text-[11px] text-slate-400 font-semibold">
-                Backhoe Loaders
-              </div>
-              <div className="text-xl font-extrabold text-white mt-1">0 Units</div>
-              <div className="text-[10px] text-slate-500 font-bold mt-1">
-                No active machinery
-              </div>
+            <div className="p-4 rounded-2xl bg-[#080C14] border border-[#1E293B] flex flex-col justify-center">
+              <div className="text-[10px] font-bold text-slate-500 mb-1">Backhoe Loaders</div>
+              <div className="text-2xl font-black text-white mb-2">0 <span className="text-sm font-medium text-slate-500">Units</span></div>
+              <div className="text-[10px] text-slate-600">No active machinery</div>
             </div>
-
-            <div
-              onClick={() => onNavigateTab('machinery_fleet')}
-              className="p-3.5 rounded-2xl bg-[#080d19] border border-[#182643] hover:border-slate-600 transition-all cursor-pointer"
-            >
-              <div className="text-[11px] text-slate-400 font-semibold">
-                Tipper Dumpers
-              </div>
-              <div className="text-xl font-extrabold text-white mt-1">0 Units</div>
-              <div className="text-[10px] text-slate-500 font-bold mt-1">
-                No active tippers
-              </div>
+            <div className="p-4 rounded-2xl bg-[#080C14] border border-[#1E293B] flex flex-col justify-center">
+              <div className="text-[10px] font-bold text-slate-500 mb-1">Tipper Dumpers</div>
+              <div className="text-2xl font-black text-white mb-2">0 <span className="text-sm font-medium text-slate-500">Units</span></div>
+              <div className="text-[10px] text-slate-600">No active tippers</div>
             </div>
           </div>
         </div>
 
-        <div className="lg:col-span-5 bg-[#0c1427] border border-[#182643] rounded-3xl p-6 shadow-xl space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-[#182643]">
-            <div className="flex items-center gap-2 font-bold text-white text-sm">
-              <Calculator className="w-4 h-4 text-cyan-400" />
-              <span>Engineering Shortcuts</span>
+        {/* Engineering Shortcuts Panel */}
+        <div className="p-6 rounded-[2rem] bg-[#0B1220] border border-[#1E293B] shadow-2xl flex flex-col">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <Calculator className="w-5 h-5 text-cyan-400" />
+              <h2 className="text-base font-bold text-white">Engineering Shortcuts</h2>
             </div>
-            <span className="text-[11px] text-slate-400 font-mono">MoRTH 5th Rev</span>
+            <span className="text-[9px] font-mono text-slate-500 uppercase tracking-widest">MoRTH 5th Rev</span>
           </div>
 
-          <div className="space-y-2.5">
-            <button
+          <div className="space-y-3 flex-1 flex flex-col justify-center">
+            <button 
               onClick={() => onNavigateTab('yield_calculator')}
-              className="w-full p-3 bg-[#080d19] hover:bg-[#121c33] border border-[#182643] hover:border-blue-500/40 rounded-2xl flex items-center justify-between text-left transition-all cursor-pointer group"
+              className="w-full p-4 rounded-2xl bg-[#080C14] border border-[#1E293B] hover:border-cyan-500/50 hover:bg-[#121c33]/50 transition-all text-left group flex items-center justify-between"
             >
               <div>
-                <div className="text-xs font-bold text-white group-hover:text-blue-300">
-                  Road Layer Yield & Thickness Calc
-                </div>
-                <div className="text-[11px] text-slate-400">
-                  Calculate GSB, WMM, DBM, BC tonnage & brass yield
-                </div>
+                <div className="text-xs font-bold text-white mb-1 group-hover:text-cyan-400 transition-colors">Road Layer Yield & Thickness Calc</div>
+                <div className="text-[10px] text-slate-500">Calculate GSB, WMM, DBM, BC tonnage & brass yield</div>
               </div>
-              <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-blue-400 group-hover:translate-x-0.5 transition-all" />
+              <ArrowRight className="w-4 h-4 text-slate-600 group-hover:text-cyan-400 transition-transform group-hover:translate-x-1" />
             </button>
 
-            <button
-              onClick={() => onNavigateTab('dpr')}
-              className="w-full p-3 bg-[#080d19] hover:bg-[#121c33] border border-[#182643] hover:border-blue-500/40 rounded-2xl flex items-center justify-between text-left transition-all cursor-pointer group"
+            <button 
+              onClick={() => onNavigateTab('reports')}
+              className="w-full p-4 rounded-2xl bg-[#080C14] border border-[#1E293B] hover:border-blue-500/50 hover:bg-[#121c33]/50 transition-all text-left group flex items-center justify-between"
             >
               <div>
-                <div className="text-xs font-bold text-white group-hover:text-blue-300">
-                  Daily Progress Report (DPR)
-                </div>
-                <div className="text-[11px] text-slate-400">
-                  Generate daily physical & financial site telemetry
-                </div>
+                <div className="text-xs font-bold text-white mb-1 group-hover:text-blue-400 transition-colors">Daily Progress Report (DPR)</div>
+                <div className="text-[10px] text-slate-500">Auto-generate aggregate consumption summary</div>
               </div>
-              <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-blue-400 group-hover:translate-x-0.5 transition-all" />
+              <ArrowRight className="w-4 h-4 text-slate-600 group-hover:text-blue-400 transition-transform group-hover:translate-x-1" />
             </button>
           </div>
         </div>
+
       </div>
     </div>
   );
 };
-
-export default SiteCentricMidnightDashboard;

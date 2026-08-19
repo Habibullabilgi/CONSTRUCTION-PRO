@@ -1,341 +1,220 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useERP } from '../../context/ERPContext';
 import {
-  Truck,
   Plus,
-  Trash2,
-  Calendar,
-  Layers,
+  Download,
   Search,
   X,
-  Building2
+  Trash2,
+  Truck
 } from 'lucide-react';
 
-export interface DayTripLog {
+export interface HaulageTripRecord {
   id: string;
-  date: string;
-  dayNumber: number;
+  tripDate: string;
   siteName: string;
   vehicleNumber: string;
   materialName: string;
-  totalTrips: number;
+  dayTrips: number;
   brassPerTrip: number;
-  totalBrass: number;
   ratePerBrass: number;
   totalAmount: number;
 }
 
-export interface MaterialRateItem {
-  id: string;
-  name: string;
-  fixedRate: number;
-  defaultBrass: number;
-}
+const STORAGE_HAULAGE_KEY = 'CONSTRUCTION_PRO_HAULAGE_TRIPS_V2';
 
-const DEFAULT_MATERIALS: MaterialRateItem[] = [
-  { id: 'm-1', name: 'BM', fixedRate: 5000, defaultBrass: 6 },
-  { id: 'm-2', name: 'Murum Base Material', fixedRate: 1400, defaultBrass: 6 },
-  { id: 'm-3', name: 'Granular Sub-Base (GSB)', fixedRate: 1650, defaultBrass: 5.5 },
-  { id: 'm-4', name: 'Wet Mix Macadam (WMM)', fixedRate: 1850, defaultBrass: 5.5 },
-  { id: 'm-5', name: 'M-Sand / Crushed Sand', fixedRate: 2200, defaultBrass: 5 },
-  { id: 'm-6', name: '20mm Aggregate Metal', fixedRate: 2100, defaultBrass: 5 },
-  { id: 'm-7', name: '40mm Ballast Metal', fixedRate: 1950, defaultBrass: 6 }
+const INITIAL_HAULAGE_TRIPS: HaulageTripRecord[] = [
+  {
+    id: 'TRIP-101',
+    tripDate: '2026-08-19',
+    siteName: 'SINDAGI - ALMEL ROAD',
+    vehicleNumber: 'TOTAL TRIPS',
+    materialName: 'BM (₹5000/Brass)',
+    dayTrips: 10,
+    brassPerTrip: 6,
+    ratePerBrass: 5000,
+    totalAmount: 300000
+  }
 ];
 
-const STORAGE_TRIPS_KEY = 'CONSTRUCTION_PRO_DAY_TRIPS_V3';
-const STORAGE_FLEET_KEY = 'CONSTRUCTION_PRO_FLEET_VEHICLES_V1';
-const STORAGE_MATERIALS_KEY = 'CONSTRUCTION_PRO_MATERIAL_RATES_V1';
+const MATERIAL_PRESETS = [
+  { name: 'BM (₹5000/Brass)', defaultRate: 5000 },
+  { name: 'GSB (₹4200/Brass)', defaultRate: 4200 },
+  { name: 'WMM (₹4500/Brass)', defaultRate: 4500 },
+  { name: 'Wet Mix (₹4600/Brass)', defaultRate: 4600 },
+  { name: 'DBM (₹5500/Brass)', defaultRate: 5500 },
+  { name: 'BC (₹6000/Brass)', defaultRate: 6000 }
+];
 
 export const MaterialHaulageTripsModule: React.FC = () => {
-  const { siteSheets, selectedSiteId, currentUser, userRole } = useERP();
+  const { siteSheets = [] } = useERP();
 
-  // Strict Admin Check: Only Admin can delete entries
-  const currentRoleStr = String(currentUser?.role || userRole || '').toLowerCase();
-  const isAdmin = currentRoleStr.includes('admin');
-
-  const siteList = siteSheets && siteSheets.length > 0
-    ? siteSheets.map((s) => s.siteName)
-    : ['SINDAGI - ALMEL ROAD', 'Mulwad', 'NH-50 Site Stretch'];
-
-  const currentSiteName = siteSheets.find((s) => s.siteId === selectedSiteId)?.siteName || siteList[0];
-
-  // 1. Linked Vehicles from Fleet
-  const [fleetVehicles, setFleetVehicles] = useState<string[]>(() => {
+  const [trips, setTrips] = useState<HaulageTripRecord[]>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_FLEET_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map((item: any) => item.vehicleNumber || item.code || item);
-        }
-      }
-    } catch {}
-    return ['TOTAL TRIPS', 'KA28B8797', 'KA-28-EX-8901', 'MH-12-DT-5510', 'KA-28-TR-1092'];
-  });
-
-  // 2. Materials List
-  const [materialsList, setMaterialsList] = useState<MaterialRateItem[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_MATERIALS_KEY);
-      if (saved) return JSON.parse(saved);
-    } catch {}
-    return DEFAULT_MATERIALS;
-  });
-
-  // 3. Day Trips
-  const [tripLogs, setTripLogs] = useState<DayTripLog[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_TRIPS_KEY);
-      if (saved) return JSON.parse(saved);
-    } catch {}
-    return [];
-  });
-
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-
-  // Vehicle inline add state
-  const [isAddingNewVehicle, setIsAddingNewVehicle] = useState(false);
-  const [newVehicleInput, setNewVehicleInput] = useState('');
-
-  // Form State
-  const [formData, setFormData] = useState({
-    date: new Date().toISOString().split('T')[0],
-    siteName: currentSiteName,
-    vehicleNumber: fleetVehicles[0] || 'TOTAL TRIPS',
-    materialName: materialsList[0]?.name || 'BM',
-    totalTrips: 10,
-    brassPerTrip: materialsList[0]?.defaultBrass || 6,
-    ratePerBrass: materialsList[0]?.fixedRate || 5000
-  });
-
-  useEffect(() => {
-    setFormData((prev) => ({ ...prev, siteName: currentSiteName }));
-  }, [currentSiteName]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_TRIPS_KEY, JSON.stringify(tripLogs));
-  }, [tripLogs]);
-
-  const handleMaterialChange = (matName: string) => {
-    const matched = materialsList.find((m) => m.name === matName);
-    setFormData((prev) => ({
-      ...prev,
-      materialName: matName,
-      ratePerBrass: matched ? matched.fixedRate : prev.ratePerBrass,
-      brassPerTrip: matched ? matched.defaultBrass : prev.brassPerTrip
-    }));
-  };
-
-  const handleAddNewVehicle = (e: React.FormEvent) => {
-    e.preventDefault();
-    const cleanPlate = newVehicleInput.trim().toUpperCase();
-    if (!cleanPlate) return;
-
-    if (!fleetVehicles.includes(cleanPlate)) {
-      const updated = [cleanPlate, ...fleetVehicles];
-      setFleetVehicles(updated);
-      setFormData((prev) => ({ ...prev, vehicleNumber: cleanPlate }));
+      const saved = localStorage.getItem(STORAGE_HAULAGE_KEY);
+      return saved ? JSON.parse(saved) : INITIAL_HAULAGE_TRIPS;
+    } catch {
+      return INITIAL_HAULAGE_TRIPS;
     }
-    setNewVehicleInput('');
-    setIsAddingNewVehicle(false);
+  });
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Form States
+  const [tripDate, setTripDate] = useState('2026-08-19');
+  const [siteName, setSiteName] = useState('SINDAGI - ALMEL ROAD');
+  const [vehicleNumber, setVehicleNumber] = useState('TOTAL TRIPS');
+  const [materialName, setMaterialName] = useState(MATERIAL_PRESETS[0].name);
+  const [dayTrips, setDayTrips] = useState<number | ''>(10);
+  const [brassPerTrip, setBrassPerTrip] = useState<number | ''>(6);
+  const [ratePerBrass, setRatePerBrass] = useState<number | ''>(5000);
+
+  // Update default rate when material preset changes
+  const handleMaterialChange = (selectedName: string) => {
+    setMaterialName(selectedName);
+    const found = MATERIAL_PRESETS.find((m) => m.name === selectedName);
+    if (found) {
+      setRatePerBrass(found.defaultRate);
+    }
   };
 
-  const handleSaveDayTrip = (e: React.FormEvent) => {
+  useEffect(() => {
+    localStorage.setItem(STORAGE_HAULAGE_KEY, JSON.stringify(trips));
+  }, [trips]);
+
+  const computedTotalAmount = useMemo(() => {
+    const tripsNum = Number(dayTrips) || 0;
+    const brassNum = Number(brassPerTrip) || 0;
+    const rateNum = Number(ratePerBrass) || 0;
+    return tripsNum * brassNum * rateNum;
+  }, [dayTrips, brassPerTrip, ratePerBrass]);
+
+  const filtered = useMemo(() => {
+    return trips.filter((t) => {
+      const q = searchQuery.toLowerCase();
+      return (
+        !q ||
+        t.siteName.toLowerCase().includes(q) ||
+        t.vehicleNumber.toLowerCase().includes(q) ||
+        t.materialName.toLowerCase().includes(q) ||
+        t.id.toLowerCase().includes(q)
+      );
+    });
+  }, [trips, searchQuery]);
+
+  const handleDelete = (id: string) => {
+    if (window.confirm('Are you sure you want to delete this trip record?')) {
+      setTrips((prev) => prev.filter((t) => t.id !== id));
+    }
+  };
+
+  const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.totalTrips || formData.totalTrips <= 0) return;
+    if (!dayTrips || !brassPerTrip || !ratePerBrass) return;
 
-    const totalBrass = Number(formData.totalTrips) * Number(formData.brassPerTrip || 0);
-    const totalAmount = totalBrass * Number(formData.ratePerBrass || 0);
-
-    const newLog: DayTripLog = {
-      id: `trip-${Date.now()}`,
-      date: formData.date,
-      dayNumber: tripLogs.length + 1,
-      siteName: formData.siteName,
-      vehicleNumber: formData.vehicleNumber,
-      materialName: formData.materialName,
-      totalTrips: Number(formData.totalTrips),
-      brassPerTrip: Number(formData.brassPerTrip || 0),
-      totalBrass,
-      ratePerBrass: Number(formData.ratePerBrass || 0),
-      totalAmount
+    const newRecord: HaulageTripRecord = {
+      id: `TRIP-${Date.now().toString().slice(-4)}`,
+      tripDate,
+      siteName: siteName.trim() || 'SINDAGI - ALMEL ROAD',
+      vehicleNumber: vehicleNumber.trim() || 'TOTAL TRIPS',
+      materialName,
+      dayTrips: Number(dayTrips),
+      brassPerTrip: Number(brassPerTrip),
+      ratePerBrass: Number(ratePerBrass),
+      totalAmount: computedTotalAmount
     };
 
-    setTripLogs([newLog, ...tripLogs]);
+    setTrips([newRecord, ...trips]);
     setIsModalOpen(false);
   };
 
-  const handleDeleteTrip = (id: string) => {
-    if (!isAdmin) {
-      alert('Action Restricted: Only Administrators are authorized to delete trip records.');
-      return;
-    }
-    if (window.confirm('Delete this day trip record permanently?')) {
-      setTripLogs(tripLogs.filter((t) => t.id !== id));
-    }
-  };
-
-  // Site-specific Filtered Logs & KPIs
-  const siteLogs = tripLogs.filter(
-    (t) =>
-      !t.siteName ||
-      t.siteName.toLowerCase().includes(currentSiteName.toLowerCase()) ||
-      currentSiteName.toLowerCase().includes(t.siteName.toLowerCase())
-  );
-
-  const grandTotalTrips = siteLogs.reduce((acc, t) => acc + t.totalTrips, 0);
-  const grandTotalBrass = siteLogs.reduce((acc, t) => acc + t.totalBrass, 0);
-  const grandTotalValuation = siteLogs.reduce((acc, t) => acc + t.totalAmount, 0);
-
-  const filteredLogs = siteLogs.filter((t) => {
-    const q = searchQuery.toLowerCase();
-    return (
-      t.vehicleNumber.toLowerCase().includes(q) ||
-      t.materialName.toLowerCase().includes(q) ||
-      t.date.includes(q) ||
-      t.siteName.toLowerCase().includes(q)
-    );
-  });
-
   return (
-    <div className="h-full flex flex-col gap-2.5 font-sans text-slate-100">
-      {/* 1. Header Banner */}
-      <div className="flex items-center justify-between px-4 py-2.5 bg-[#121927] border border-[#1E293B] rounded-2xl shrink-0 shadow-md">
+    <div className="space-y-6 font-sans text-slate-100">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0">
-            <Truck className="w-4 h-4" />
+          <div className="w-10 h-10 rounded-2xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400">
+            <Truck className="w-5 h-5" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 rounded-md bg-blue-950/80 text-blue-400 border border-blue-800 text-[9px] font-black uppercase">
-                FLEET-LINKED HAULAGE
-              </span>
-              <span className="text-[11px] text-slate-400 font-semibold">
-                {fleetVehicles.length} Active Fleet Tippers
-              </span>
-            </div>
-            <h1 className="text-lg font-black text-white tracking-tight leading-none mt-0.5">
-              Material Haulage & Daily Trippage Ledger
-            </h1>
+            <h1 className="text-2xl font-black text-white tracking-tight">Material Haulage Trips</h1>
+            <p className="text-xs text-slate-400 mt-0.5">Track daily trip counts, material volumes, and haulage expenses.</p>
           </div>
         </div>
 
         <button
           onClick={() => setIsModalOpen(true)}
-          className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs flex items-center gap-1.5 transition-all shadow-md shadow-blue-600/30 cursor-pointer shrink-0"
+          className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-black flex items-center gap-1.5 transition-all shadow-lg shadow-blue-600/30 cursor-pointer w-fit"
         >
-          <Plus className="w-3.5 h-3.5" />
-          <span>+ Log Day Trips</span>
+          <Plus className="w-4 h-4" />
+          <span>+ Log Haulage Trips</span>
         </button>
       </div>
 
-      {/* 2. Top Metric Cards */}
-      <div className="grid grid-cols-3 gap-2.5 shrink-0">
-        <div className="bg-[#0c1427] border border-[#182643] px-3.5 py-2.5 rounded-xl">
-          <div className="text-slate-400 text-[11px] font-semibold">Total Cumulative Trips</div>
-          <div className="text-xl font-black text-white mt-0.5">
-            {grandTotalTrips}{' '}
-            <span className="text-xs font-normal text-slate-400">Trips</span>
-          </div>
-        </div>
-
-        <div className="bg-[#0c1427] border border-[#182643] px-3.5 py-2.5 rounded-xl">
-          <div className="text-slate-400 text-[11px] font-semibold">Total Material Volume</div>
-          <div className="text-xl font-black text-blue-400 mt-0.5">
-            {grandTotalBrass > 0 ? grandTotalBrass.toFixed(1) : '0.0'}{' '}
-            <span className="text-xs font-normal text-slate-400">Brass</span>
-          </div>
-        </div>
-
-        <div className="bg-[#0c1427] border border-[#182643] px-3.5 py-2.5 rounded-xl">
-          <div className="text-slate-400 text-[11px] font-semibold">Total Ledger Valuation</div>
-          <div className="text-xl font-black text-amber-400 mt-0.5">
-            ₹{grandTotalValuation.toLocaleString('en-IN')}
-          </div>
+      {/* Search & Filter Bar */}
+      <div className="p-4 rounded-3xl bg-[#0c1427] border border-[#182643] flex items-center gap-3 text-xs">
+        <div className="relative flex-1">
+          <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-500" />
+          <input
+            type="text"
+            placeholder="Search by site, vehicle, material name..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 bg-[#080d19] border border-[#1E293B] rounded-xl text-white outline-none placeholder-slate-500"
+          />
         </div>
       </div>
 
-      {/* 3. Search Filter */}
-      <div className="relative shrink-0">
-        <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5" />
-        <input
-          type="text"
-          placeholder="Filter by date (YYYY-MM-DD), vehicle plate, site name, or material..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-9 pr-3 py-1.5 bg-[#0D111D] border border-[#1E293B] rounded-xl text-xs text-white outline-none focus:border-blue-500 placeholder-slate-500"
-        />
-      </div>
-
-      {/* 4. Table Container */}
-      <div className="bg-[#0B1220] border border-[#1E293B] rounded-2xl flex-1 flex flex-col overflow-hidden shadow-xl min-h-0">
-        <div className="px-4 py-2 border-b border-[#1E293B] bg-[#0d1527]/50 flex items-center justify-between shrink-0">
-          <div className="font-bold text-xs text-white">Daily Trippage Reconciliation Log</div>
-          <div className="text-[11px] text-slate-400">{filteredLogs.length} Records Logged</div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto">
+      {/* Trips Table */}
+      <div className="bg-[#0B1220] border border-[#1E293B] rounded-3xl overflow-hidden shadow-2xl">
+        <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
-            <thead className="sticky top-0 z-10 bg-[#080d19] shadow-sm">
-              <tr className="border-b border-[#1E293B] text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-                <th className="py-2.5 px-3">Date</th>
-                <th className="py-2.5 px-3">Site Name</th>
-                <th className="py-2.5 px-3">Vehicle Number</th>
-                <th className="py-2.5 px-3">Material Name</th>
-                <th className="py-2.5 px-3 text-center">Day Trips</th>
-                <th className="py-2.5 px-3 text-center">Brass / Trip</th>
-                <th className="py-2.5 px-3 text-right">Total Brass</th>
-                <th className="py-2.5 px-3 text-right">Rate / Brass</th>
-                <th className="py-2.5 px-3 text-right">Total Amount (₹)</th>
-                {isAdmin && <th className="py-2.5 px-3 text-center">Action</th>}
+            <thead>
+              <tr className="border-b border-[#1E293B] text-[10px] font-extrabold uppercase tracking-wider text-slate-400 bg-[#080d19]/80">
+                <th className="py-3.5 px-6">TRIP ID & DATE</th>
+                <th className="py-3.5 px-6">SITE NAME</th>
+                <th className="py-3.5 px-6">VEHICLE / BATCH</th>
+                <th className="py-3.5 px-6">MATERIAL NAME</th>
+                <th className="py-3.5 px-4 text-center">TRIPS</th>
+                <th className="py-3.5 px-4 text-right">BRASS/TRIP</th>
+                <th className="py-3.5 px-4 text-right">RATE/BRASS</th>
+                <th className="py-3.5 px-6 text-right">TOTAL AMOUNT</th>
+                <th className="py-3.5 px-6 text-right">ACTION</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#1E293B]/60 text-slate-200">
-              {filteredLogs.length === 0 ? (
+              {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={isAdmin ? 10 : 9} className="py-12 text-center text-slate-500 text-xs">
-                    No haulage trips logged. Click "+ Log Day Trips" above to record daily entries.
+                  <td colSpan={9} className="py-8 text-center text-slate-500">
+                    No haulage trip records found.
                   </td>
                 </tr>
               ) : (
-                filteredLogs.map((log) => (
-                  <tr key={log.id} className="hover:bg-[#121c33]/50 transition-colors">
-                    <td className="py-2 px-3 font-mono text-slate-300 font-semibold">{log.date}</td>
-                    <td className="py-2 px-3 text-white font-medium">{log.siteName}</td>
-                    <td className="py-2 px-3">
-                      <span className="px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-400 font-mono font-black text-[10px] border border-amber-500/30">
-                        {log.vehicleNumber}
-                      </span>
+                filtered.map((t) => (
+                  <tr key={t.id} className="hover:bg-[#121c33]/50 transition-colors">
+                    <td className="py-3.5 px-6 font-mono">
+                      <div className="font-bold text-white">{t.id}</div>
+                      <div className="text-[10px] text-slate-400">{t.tripDate}</div>
                     </td>
-                    <td className="py-2 px-3 font-bold text-white">{log.materialName}</td>
-                    <td className="py-2 px-3 text-center font-mono font-extrabold text-blue-400">
-                      {log.totalTrips} Trips
+                    <td className="py-3.5 px-6 font-bold text-cyan-400">{t.siteName}</td>
+                    <td className="py-3.5 px-6 font-mono font-bold text-slate-300">{t.vehicleNumber}</td>
+                    <td className="py-3.5 px-6 font-bold text-amber-300">{t.materialName}</td>
+                    <td className="py-3.5 px-4 text-center font-mono font-bold">{t.dayTrips}</td>
+                    <td className="py-3.5 px-4 text-right font-mono">{t.brassPerTrip}</td>
+                    <td className="py-3.5 px-4 text-right font-mono text-emerald-400">₹{t.ratePerBrass.toLocaleString()}</td>
+                    <td className="py-3.5 px-6 text-right font-mono font-black text-amber-400 text-sm">
+                      ₹{t.totalAmount.toLocaleString()}
                     </td>
-                    <td className="py-2 px-3 text-center font-mono text-slate-300">
-                      {log.brassPerTrip} Brass
+                    <td className="py-3.5 px-6 text-right">
+                      <button
+                        onClick={() => handleDelete(t.id)}
+                        title="Delete Record"
+                        className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </td>
-                    <td className="py-2 px-3 text-right font-mono font-bold text-white">
-                      {log.totalBrass.toFixed(1)}
-                    </td>
-                    <td className="py-2 px-3 text-right font-mono text-slate-400">
-                      ₹{log.ratePerBrass.toLocaleString('en-IN')}
-                    </td>
-                    <td className="py-2 px-3 text-right font-mono font-black text-amber-400">
-                      ₹{log.totalAmount.toLocaleString('en-IN')}
-                    </td>
-                    {isAdmin && (
-                      <td className="py-2 px-3 text-center">
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteTrip(log.id)}
-                          className="p-1 rounded-md text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 transition-colors cursor-pointer"
-                          title="Delete Entry (Admin Only)"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </td>
-                    )}
                   </tr>
                 ))
               )}
@@ -344,179 +223,129 @@ export const MaterialHaulageTripsModule: React.FC = () => {
         </div>
       </div>
 
-      {/* 5. Modal: Log Day Trips */}
+      {/* Log Total Day Haulage Trips Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150 font-sans">
-          <div className="bg-[#121927] border border-[#1E293B] rounded-2xl w-full max-w-md p-5 shadow-2xl space-y-3 text-slate-100 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-[#1E293B] pb-2.5">
-              <div className="flex items-center gap-2 text-white font-bold text-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-[#121927] border border-[#1E293B] rounded-3xl w-full max-w-lg p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto text-slate-100">
+            <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
                 <Truck className="w-4 h-4 text-blue-400" />
                 <span>Log Total Day Haulage Trips</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="text-slate-400 hover:text-white"
-              >
-                <X className="w-4 h-4" />
+              </h3>
+              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-white p-1">
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveDayTrip} className="space-y-3 text-xs">
-              <div className="grid grid-cols-2 gap-2.5">
+            <form onSubmit={handleCreate} className="space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-300 font-bold mb-1 flex items-center gap-1">
-                    <Calendar className="w-3 h-3 text-blue-400" />
-                    <span>Trip Date *</span>
-                  </label>
+                  <label className="block text-slate-300 font-bold mb-1">Trip Date *</label>
                   <input
                     type="date"
                     required
-                    value={formData.date}
-                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                    className="w-full px-2.5 py-1.5 bg-[#162032] border border-[#1E293B] rounded-lg text-white outline-none focus:border-blue-500"
+                    value={tripDate}
+                    onChange={(e) => setTripDate(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono outline-none"
                   />
                 </div>
-
                 <div>
-                  <label className="block text-slate-300 font-bold mb-1 flex items-center gap-1">
-                    <Building2 className="w-3 h-3 text-blue-400" />
-                    <span>Site Name *</span>
-                  </label>
+                  <label className="block text-slate-300 font-bold mb-1">Site Name *</label>
                   <select
-                    value={formData.siteName}
-                    onChange={(e) => setFormData({ ...formData, siteName: e.target.value })}
-                    className="w-full px-2.5 py-1.5 bg-[#162032] border border-[#1E293B] rounded-lg text-white outline-none focus:border-blue-500 cursor-pointer"
+                    value={siteName}
+                    onChange={(e) => setSiteName(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-cyan-400 font-medium outline-none cursor-pointer"
                   >
-                    {siteList.map((site) => (
-                      <option key={site} value={site}>
-                        {site}
-                      </option>
-                    ))}
+                    <option value="SINDAGI - ALMEL ROAD">SINDAGI - ALMEL ROAD</option>
+                    <option value="TOWER-A BUILDING">TOWER-A BUILDING</option>
+                    <option value="CENTRAL CAMPUS">CENTRAL CAMPUS</option>
                   </select>
                 </div>
               </div>
 
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-slate-300 font-bold">Vehicle Number *</label>
-                  {isAdmin && (
-                    <button
-                      type="button"
-                      onClick={() => setIsAddingNewVehicle(!isAddingNewVehicle)}
-                      className="text-[10px] font-bold text-blue-400 hover:text-blue-300"
-                    >
-                      + Add Vehicle
-                    </button>
-                  )}
-                </div>
-
-                {isAddingNewVehicle ? (
-                  <div className="flex items-center gap-1.5 p-1.5 bg-[#162032] border border-blue-500/40 rounded-lg">
-                    <input
-                      type="text"
-                      placeholder="e.g. KA28B8797"
-                      value={newVehicleInput}
-                      onChange={(e) => setNewVehicleInput(e.target.value.toUpperCase())}
-                      className="flex-1 px-2 py-1 bg-[#0D111D] border border-[#1E293B] rounded text-white font-mono text-xs uppercase"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleAddNewVehicle}
-                      className="px-2 py-1 bg-blue-600 text-white rounded text-xs font-bold"
-                    >
-                      Save
-                    </button>
-                  </div>
-                ) : (
-                  <select
-                    value={formData.vehicleNumber}
-                    onChange={(e) => setFormData({ ...formData, vehicleNumber: e.target.value })}
-                    className="w-full px-2.5 py-1.5 bg-[#162032] border border-[#1E293B] rounded-lg text-white font-mono font-bold outline-none"
-                  >
-                    {fleetVehicles.map((v) => (
-                      <option key={v} value={v}>
-                        {v}
-                      </option>
-                    ))}
-                  </select>
-                )}
+                <label className="block text-slate-300 font-bold mb-1">Vehicle Number *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="TOTAL TRIPS or vehicle registration..."
+                  value={vehicleNumber}
+                  onChange={(e) => setVehicleNumber(e.target.value.toUpperCase())}
+                  className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono outline-none uppercase"
+                />
               </div>
 
+              {/* Material Name Selector */}
               <div>
                 <label className="block text-slate-300 font-bold mb-1">Material Name *</label>
                 <select
-                  value={formData.materialName}
+                  value={materialName}
                   onChange={(e) => handleMaterialChange(e.target.value)}
-                  className="w-full px-2.5 py-1.5 bg-[#162032] border border-[#1E293B] rounded-lg text-white outline-none"
+                  className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-amber-300 font-bold outline-none cursor-pointer"
                 >
-                  {materialsList.map((m) => (
-                    <option key={m.id} value={m.name}>
-                      {m.name} (₹{m.fixedRate}/Brass)
+                  {MATERIAL_PRESETS.map((m) => (
+                    <option key={m.name} value={m.name}>
+                      {m.name}
                     </option>
                   ))}
                 </select>
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-slate-300 font-bold mb-1">Day Trips *</label>
                   <input
                     type="number"
                     min="1"
                     required
-                    value={formData.totalTrips || ''}
-                    onChange={(e) => setFormData({ ...formData, totalTrips: Number(e.target.value) })}
-                    className="w-full px-2 py-1.5 bg-[#162032] border border-[#1E293B] rounded-lg text-blue-400 font-mono font-bold"
+                    value={dayTrips}
+                    onChange={(e) => setDayTrips(e.target.value === '' ? '' : Number(e.target.value))}
+                    className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono font-bold outline-none"
                   />
                 </div>
-
                 <div>
-                  <label className="block text-slate-300 font-bold mb-1">Brass/Trip</label>
+                  <label className="block text-slate-300 font-bold mb-1">Brass/Trip *</label>
                   <input
                     type="number"
-                    step="0.1"
+                    min="1"
                     required
-                    value={formData.brassPerTrip || ''}
-                    onChange={(e) => setFormData({ ...formData, brassPerTrip: Number(e.target.value) })}
-                    className="w-full px-2 py-1.5 bg-[#162032] border border-[#1E293B] rounded-lg text-white font-mono"
+                    value={brassPerTrip}
+                    onChange={(e) => setBrassPerTrip(e.target.value === '' ? '' : Number(e.target.value))}
+                    className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono font-bold outline-none"
                   />
                 </div>
-
                 <div>
-                  <label className="block text-slate-300 font-bold mb-1">Rate / Brass</label>
+                  <label className="block text-slate-300 font-bold mb-1">Rate / Brass *</label>
                   <input
                     type="number"
+                    min="1"
                     required
-                    value={formData.ratePerBrass || ''}
-                    onChange={(e) => setFormData({ ...formData, ratePerBrass: Number(e.target.value) })}
-                    className="w-full px-2 py-1.5 bg-[#162032] border border-[#1E293B] rounded-lg text-amber-400 font-mono font-bold"
+                    value={ratePerBrass}
+                    onChange={(e) => setRatePerBrass(e.target.value === '' ? '' : Number(e.target.value))}
+                    className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-emerald-400 font-mono font-bold outline-none"
                   />
                 </div>
               </div>
 
-              <div className="p-2.5 bg-[#080d19] border border-[#1E293B] rounded-xl flex items-center justify-between">
-                <span className="text-slate-400 text-xs">Total Day Amount:</span>
-                <span className="text-base font-black text-amber-400 font-mono">
-                  ₹{(
-                    Number(formData.totalTrips || 0) *
-                    Number(formData.brassPerTrip || 0) *
-                    Number(formData.ratePerBrass || 0)
-                  ).toLocaleString('en-IN')}
+              {/* Live Calculated Total Amount Display */}
+              <div className="p-4 rounded-2xl bg-[#080d19] border border-[#1E293B] flex items-center justify-between">
+                <span className="text-sm font-bold text-slate-300">Total Day Amount:</span>
+                <span className="text-xl font-black text-amber-400 font-mono">
+                  ₹{computedTotalAmount.toLocaleString()}
                 </span>
               </div>
 
-              <div className="flex justify-end gap-2 pt-1 border-t border-[#1E293B]">
+              <div className="flex justify-end gap-2 pt-3 border-t border-[#1E293B]">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-3 py-1.5 text-slate-400 hover:text-white"
+                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-lg shadow-md"
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black shadow-lg shadow-blue-600/30 cursor-pointer"
                 >
                   Save Record
                 </button>
@@ -528,5 +357,3 @@ export const MaterialHaulageTripsModule: React.FC = () => {
     </div>
   );
 };
-
-export default MaterialHaulageTripsModule;

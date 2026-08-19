@@ -8,7 +8,6 @@ import {
   Plus,
   Download,
   Search,
-  Building2,
   ChevronDown,
   X,
   Edit2,
@@ -34,16 +33,32 @@ const STORAGE_DIESEL_KEY = 'CONSTRUCTION_PRO_DIESEL_LOGS_V1';
 export const SiteCostExpensesModule: React.FC = () => {
   const { siteSheets = [], selectedSiteId } = useERP();
 
-  // Determine initial site
-  const globalActiveSite = siteSheets.find((s: any) => s.siteId === selectedSiteId);
-  const fallbackSite = siteSheets[0]?.siteName || 'SINDAGI - ALMEL ROAD';
-  const [activeSiteName, setActiveSiteName] = useState(globalActiveSite?.siteName || fallbackSite);
+  // Resolve active site based on global header selection
+  const currentActiveSite = siteSheets.find((s: any) => s.siteId === selectedSiteId);
+  const activeSiteName = currentActiveSite?.siteName || siteSheets[0]?.siteName || 'SINDAGI - ALMEL ROAD';
 
   // Storage States
   const [expenses, setExpenses] = useState<SiteExpenseVoucher[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_EXPENSES_KEY);
-      return saved ? JSON.parse(saved) : [];
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+      const initialSample: SiteExpenseVoucher[] = [
+        {
+          id: 'EXP-101',
+          date: '2026-08-19',
+          siteName: activeSiteName,
+          title: 'Weekly Labor Payout',
+          vendor: 'Local Contractor',
+          category: 'Labor/Wages',
+          amount: 45000,
+          status: 'Paid'
+        }
+      ];
+      localStorage.setItem(STORAGE_EXPENSES_KEY, JSON.stringify(initialSample));
+      return initialSample;
     } catch {
       return [];
     }
@@ -86,7 +101,7 @@ export const SiteCostExpensesModule: React.FC = () => {
   const [status, setStatus] = useState<'Paid' | 'Pending'>('Paid');
 
   // ==========================================
-  // CROSS-LINKED CALCULATIONS (Zero fallback applied)
+  // CROSS-LINKED CALCULATIONS (Scoped to Active Header Site)
   // ==========================================
   const activeSiteExpenses = useMemo(() => expenses.filter(e => e.siteName === activeSiteName), [expenses, activeSiteName]);
   const activeSiteTrips = useMemo(() => trips.filter(t => t.siteName === activeSiteName), [trips, activeSiteName]);
@@ -143,7 +158,7 @@ export const SiteCostExpensesModule: React.FC = () => {
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title || !amount) return;
+    if (!title || amount === '') return;
 
     const payload: SiteExpenseVoucher = {
       id: editingId || `EXP-${Date.now().toString().slice(-4)}`,
@@ -180,7 +195,7 @@ export const SiteCostExpensesModule: React.FC = () => {
   return (
     <div className="space-y-6 font-sans text-slate-100">
       
-      {/* Top Banner & Site Selector */}
+      {/* Top Banner & Site Display */}
       <div className="p-4 sm:p-6 lg:p-8 rounded-[1.5rem] lg:rounded-[2rem] bg-[#0c1427] border border-[#182643] shadow-2xl flex flex-col xl:flex-row xl:items-center justify-between gap-6 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-rose-600/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none" />
         
@@ -192,23 +207,8 @@ export const SiteCostExpensesModule: React.FC = () => {
             <div className="text-[9px] sm:text-[10px] font-black tracking-widest uppercase text-rose-500 bg-rose-950/40 border border-rose-900/50 px-2 py-0.5 rounded-md inline-block">
               DEDICATED SITE COST & EXPENSE LEDGER
             </div>
-            <div className="relative group mt-1">
-              <select
-                value={activeSiteName}
-                onChange={(e) => setActiveSiteName(e.target.value)}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-              >
-                {siteSheets.map((s: any) => (
-                  <option key={s.siteId} value={s.siteName}>{s.siteName}</option>
-                ))}
-                {!siteSheets.some((s: any) => s.siteName === activeSiteName) && (
-                  <option value={activeSiteName}>{activeSiteName}</option>
-                )}
-              </select>
-              <div className="flex items-center gap-2 text-2xl sm:text-3xl lg:text-4xl font-black text-white uppercase tracking-tight group-hover:text-slate-200 transition-colors">
-                <span className="truncate">{activeSiteName}</span>
-                <ChevronDown className="w-5 h-5 sm:w-6 sm:h-6 text-slate-500 shrink-0" />
-              </div>
+            <div className="flex items-center gap-2 text-2xl sm:text-3xl lg:text-4xl font-black text-white uppercase tracking-tight mt-1">
+              <span className="truncate">{activeSiteName}</span>
             </div>
           </div>
         </div>
@@ -216,7 +216,7 @@ export const SiteCostExpensesModule: React.FC = () => {
         <div className="relative z-10 flex flex-wrap items-center gap-3 shrink-0 w-full xl:w-auto mt-2 xl:mt-0">
           <button 
             onClick={handleExportCSV}
-            className="flex-1 sm:flex-none justify-center px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl bg-[#121927] hover:bg-[#1b263b] border border-[#1E293B] text-emerald-400 text-xs font-bold flex items-center gap-2 transition-all shadow-sm"
+            className="flex-1 sm:flex-none justify-center px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl bg-[#121927] hover:bg-[#1b263b] border border-[#1E293B] text-emerald-400 text-xs font-bold flex items-center gap-2 transition-all shadow-sm cursor-pointer"
           >
             <Download className="w-4 h-4" />
             <span>Export Statement</span>
@@ -366,7 +366,7 @@ export const SiteCostExpensesModule: React.FC = () => {
               {filteredVouchers.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-10 text-center text-slate-500">
-                    No direct expenses recorded for this site yet.
+                    No direct expenses recorded for {activeSiteName} yet.
                   </td>
                 </tr>
               ) : (
@@ -441,7 +441,7 @@ export const SiteCostExpensesModule: React.FC = () => {
                   type="text"
                   readOnly
                   value={activeSiteName}
-                  className="w-full px-4 py-3 bg-[#080d19] border border-[#1E293B] rounded-xl text-slate-500 font-bold outline-none cursor-not-allowed"
+                  className="w-full px-4 py-3 bg-[#080d19] border border-[#1E293B] rounded-xl text-slate-400 font-bold outline-none cursor-not-allowed"
                 />
               </div>
 

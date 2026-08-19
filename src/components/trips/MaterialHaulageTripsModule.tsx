@@ -57,7 +57,7 @@ const INITIAL_HAULAGE_TRIPS: HaulageTripRecord[] = [
 export const MaterialHaulageTripsModule: React.FC = () => {
   const { siteSheets = [] } = useERP();
 
-  // Load Trips
+  // Load Trips safely
   const [trips, setTrips] = useState<HaulageTripRecord[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_HAULAGE_KEY);
@@ -67,7 +67,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
     }
   });
 
-  // Load Categories (Dynamic Presets)
+  // Load Categories safely
   const [categories, setCategories] = useState<RoadMaterialCategory[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_ROAD_CATS_KEY);
@@ -105,18 +105,19 @@ export const MaterialHaulageTripsModule: React.FC = () => {
     }
   };
 
-  // Re-fetch categories when modal opens in case user added new ones in Categories Tab
+  // Re-fetch categories when modal opens in case user added new ones elsewhere
   useEffect(() => {
     if (isModalOpen && !editingId) {
       try {
         const saved = localStorage.getItem(STORAGE_ROAD_CATS_KEY);
         if (saved) {
           const parsed = JSON.parse(saved);
-          setCategories(parsed);
-          
-          if (!materialName && parsed.length > 0) {
-            setMaterialName(`${parsed[0].name} (₹${parsed[0].standardRate}/${parsed[0].unit})`);
-            setRatePerBrass(parsed[0].standardRate);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setCategories(parsed);
+            if (!materialName) {
+              setMaterialName(`${parsed[0].name} (₹${parsed[0].standardRate}/${parsed[0].unit})`);
+              setRatePerBrass(parsed[0].standardRate);
+            }
           }
         }
       } catch (error) {
@@ -125,8 +126,13 @@ export const MaterialHaulageTripsModule: React.FC = () => {
     }
   }, [isModalOpen, materialName, editingId]);
 
+  // Persist trips on change
   useEffect(() => {
-    localStorage.setItem(STORAGE_HAULAGE_KEY, JSON.stringify(trips));
+    try {
+      localStorage.setItem(STORAGE_HAULAGE_KEY, JSON.stringify(trips));
+    } catch (error) {
+      console.error("Failed to save trips to localStorage", error);
+    }
   }, [trips]);
 
   const computedTotalAmount = useMemo(() => {
@@ -151,8 +157,8 @@ export const MaterialHaulageTripsModule: React.FC = () => {
 
   const handleOpenAdd = () => {
     setEditingId(null);
-    setTripDate('2026-08-19');
-    setSiteName('SINDAGI - ALMEL ROAD');
+    setTripDate(new Date().toISOString().split('T')[0]);
+    setSiteName(siteSheets[0]?.siteName || 'SINDAGI - ALMEL ROAD');
     setVehicleNumber('TOTAL TRIPS');
     setMaterialName(defaultCategory);
     setDayTrips(10);
@@ -181,7 +187,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!dayTrips || !brassPerTrip || !ratePerBrass) return;
+    if (dayTrips === '' || brassPerTrip === '' || ratePerBrass === '') return;
 
     const record: HaulageTripRecord = {
       id: editingId || `TRIP-${Date.now().toString().slice(-4)}`,
@@ -228,7 +234,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
         </button>
       </div>
 
-      {/* Search & Filter Bar */}
+      {/* Search Bar */}
       <div className="p-3 sm:p-4 rounded-[1.2rem] sm:rounded-3xl bg-[#0c1427] border border-[#182643] flex items-center gap-3 text-xs">
         <div className="relative flex-1">
           <Search className="absolute left-3.5 top-2.5 sm:top-3 w-4 h-4 text-slate-500" />
@@ -308,7 +314,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
         </div>
       </div>
 
-      {/* Log Total Day Haulage Trips Modal */}
+      {/* Modal Form */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
           <div className="bg-[#121927] border border-[#1E293B] rounded-[1.5rem] sm:rounded-3xl w-full max-w-lg p-5 sm:p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto text-slate-100">
@@ -373,7 +379,6 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                 />
               </div>
 
-              {/* Dynamic Material Name Selector Link to Categories */}
               <div>
                 <label className="block text-slate-300 font-bold mb-1 flex justify-between items-center">
                   <span>Material Name *</span>

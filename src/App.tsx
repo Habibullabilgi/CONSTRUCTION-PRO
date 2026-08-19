@@ -6,7 +6,6 @@ import { ProjectTypeSelectionPage } from './components/auth/ProjectTypeSelection
 import { SiteSelectionPage } from './components/auth/SiteSelectionPage';
 import { Header } from './components/Header';
 
-// Assuming you have these components in your respective folders. 
 import { SiteCentricMidnightDashboard } from './components/dashboard/SiteCentricMidnightDashboard';
 import { RoadSitesManagerModule } from './components/sites/RoadSitesManagerModule';
 import { MaterialHaulageTripsModule } from './components/trips/MaterialHaulageTripsModule';
@@ -24,7 +23,7 @@ import {
 } from 'lucide-react';
 
 // ==========================================
-// Generic Scaffold View for Pending Tabs (Fixes the Error)
+// Generic Scaffold View for Pending Tabs
 // ==========================================
 const GenericView: React.FC<{
   title: string;
@@ -48,14 +47,13 @@ const GenericView: React.FC<{
 );
 
 // ==========================================
-// Sidebar Component (Mobile Friendly)
+// Sidebar Component
 // ==========================================
 interface SidebarProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
   projectType?: 'ROAD' | 'BUILDING';
   onSwitchDomain?: () => void;
-  onClose?: () => void;
 }
 
 interface NavItem {
@@ -70,8 +68,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   activeTab,
   setActiveTab,
   projectType = 'ROAD',
-  onSwitchDomain,
-  onClose
+  onSwitchDomain
 }) => {
   const { currentUser, logout } = useERP();
   const isBuilding = projectType === 'BUILDING';
@@ -130,10 +127,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           return (
             <button
               key={item.id}
-              onClick={() => {
-                setActiveTab(item.id);
-                if (onClose) onClose(); // Auto-close on mobile
-              }}
+              onClick={() => setActiveTab(item.id)}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 isActive ? 'bg-[#2563EB] text-white shadow-lg shadow-blue-600/30' : 'text-[#94A3B8] hover:bg-[#162032] hover:text-white'
               }`}
@@ -158,7 +152,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <aside className="w-64 bg-[#0D111D] border-r border-[#1E293B] flex flex-col justify-between shrink-0 h-full overflow-y-auto select-none font-sans z-30 scrollbar-thin scrollbar-thumb-[#1E293B]">
       <div className="p-3.5 space-y-5">
         <div className="p-3 bg-[#121927] border border-[#1E293B] rounded-2xl flex items-center justify-between shadow-sm relative">
-          <div className="flex items-center gap-2.5 overflow-hidden pr-6">
+          <div className="flex items-center gap-2.5 overflow-hidden pr-2">
             <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-white font-black shrink-0 shadow-md ${isBuilding ? 'bg-gradient-to-br from-emerald-600 to-teal-700' : 'bg-gradient-to-br from-blue-600 to-indigo-700'}`}>
               {isBuilding ? <Building2 className="w-4 h-4" /> : <HardHat className="w-4 h-4" />}
             </div>
@@ -169,11 +163,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
             </div>
           </div>
-          {onClose && (
-            <button onClick={onClose} className="absolute right-3 lg:hidden text-slate-400 hover:text-white p-1">
-              <X className="w-4 h-4" />
-            </button>
-          )}
         </div>
 
         {isBuilding ? (
@@ -194,7 +183,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="p-3 border-t border-[#1E293B] bg-[#080C14] space-y-2 sticky bottom-0 z-10">
         {onSwitchDomain && (
           <button
-            onClick={() => { onSwitchDomain(); if (onClose) onClose(); }}
+            onClick={onSwitchDomain}
             className="w-full py-1.5 px-2 bg-[#121927] hover:bg-[#1b263b] border border-[#1E293B] rounded-xl text-[11px] font-bold text-slate-300 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
           >
             <span>Switch to {isBuilding ? 'Roads' : 'Buildings'}</span>
@@ -221,7 +210,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 };
 
 // ==========================================
-// Road Material Categories & Rates Module (Mobile Friendly)
+// Road Material Categories & Rates Module
 // ==========================================
 export interface RoadMaterialCategory {
   id: string;
@@ -462,7 +451,7 @@ export const RoadMaterialCategoriesModule: React.FC = () => {
 
 
 // ==========================================
-// Main Application Router (Mobile Overlay Setup)
+// Main Application Router
 // ==========================================
 export const AppContent: React.FC = () => {
   const { isAuthenticated, selectedSiteId, setSelectedSiteId, siteSheets } = useERP();
@@ -484,7 +473,6 @@ export const AppContent: React.FC = () => {
   });
 
   const [activeTab, setActiveTab] = useState<string>('dashboard');
-  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false); // Hidden on mobile initially
 
   if (!isAuthenticated) {
     return <LoginPage />;
@@ -525,38 +513,24 @@ export const AppContent: React.FC = () => {
       <Header
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
       />
 
       <div className="flex flex-1 relative h-[calc(100vh-48px)] overflow-hidden">
         
-        {/* Mobile Sidebar Overlay Backdrop */}
-        {isSidebarOpen && (
-          <div 
-            className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-40 lg:hidden animate-in fade-in"
-            onClick={() => setIsSidebarOpen(false)}
-          />
-        )}
-
-        {/* Sliding Sidebar Container */}
-        <div className={`fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:h-[calc(100vh-48px)] shadow-2xl lg:shadow-none ${
-            isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
-          }`}>
-          <Sidebar
-            activeTab={activeTab}
-            setActiveTab={setActiveTab}
-            projectType={projectType}
-            onClose={() => setIsSidebarOpen(false)} // Pass close handler
-            onSwitchDomain={() => {
-              const next = projectType === 'ROAD' ? 'BUILDING' : 'ROAD';
-              setProjectType(next);
-              sessionStorage.setItem('CONSTRUCTION_PRO_DOMAIN_SESSION', next);
-            }}
-          />
-        </div>
+        {/* Desktop Sidebar Container */}
+        <Sidebar
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          projectType={projectType}
+          onSwitchDomain={() => {
+            const next = projectType === 'ROAD' ? 'BUILDING' : 'ROAD';
+            setProjectType(next);
+            sessionStorage.setItem('CONSTRUCTION_PRO_DOMAIN_SESSION', next);
+          }}
+        />
 
         {/* Main Content Area */}
-        <main className="flex-1 w-full min-w-0 p-4 sm:p-6 overflow-y-auto max-h-[calc(100vh-48px)] scrollbar-thin scrollbar-thumb-[#1E293B] scrollbar-track-transparent">
+        <main className="flex-1 w-full min-w-0 p-6 overflow-y-auto max-h-[calc(100vh-48px)] scrollbar-thin scrollbar-thumb-[#1E293B] scrollbar-track-transparent">
           <div className="max-w-7xl mx-auto pb-12 w-full overflow-x-hidden">
             
             {/* Shared Route */}

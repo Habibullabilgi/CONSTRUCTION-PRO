@@ -20,13 +20,18 @@ interface Props {
 export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab }) => {
   const { siteSheets = [], selectedSiteId } = useERP();
 
-  // 1. Identify the currently active site
-  const activeSite = siteSheets.find((s: any) => s.siteId === selectedSiteId) || {
-    siteId: 'default-001',
-    siteName: 'SINDAGI - ALMEL ROAD'
-  };
+  // 1. Identify active site from context
+  const activeSite = useMemo(() => {
+    return (
+      siteSheets.find((s: any) => s.siteId === selectedSiteId) ||
+      siteSheets[0] || {
+        siteId: 'default-001',
+        siteName: 'SINDAGI - ALMEL ROAD'
+      }
+    );
+  }, [siteSheets, selectedSiteId]);
 
-  // 2. Load Live Data from LocalStorage
+  // 2. Load and listen to local record stores
   const [trips, setTrips] = useState<any[]>([]);
   const [diesel, setDiesel] = useState<any[]>([]);
   const [expenses, setExpenses] = useState<any[]>([]);
@@ -42,24 +47,48 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
       const savedExpenses = localStorage.getItem('CONSTRUCTION_PRO_SITE_EXPENSES_V1');
       if (savedExpenses) setExpenses(JSON.parse(savedExpenses));
     } catch (e) {
-      console.error('Error loading dashboard data', e);
+      console.error('Error loading dashboard records', e);
     }
-  }, []);
+  }, [selectedSiteId]);
 
-  // 3. Compute Live Metrics for the Active Site
+  // 3. Compute live metrics scoped to active site
   const today = new Date().toISOString().substring(0, 10);
 
-  const siteTrips = useMemo(() => trips.filter((t) => t.siteName === activeSite.siteName), [trips, activeSite.siteName]);
-  const todayTrips = useMemo(() => siteTrips.filter((t) => t.tripDate === today), [siteTrips, today]);
+  const siteTrips = useMemo(
+    () => trips.filter((t) => t.siteName === activeSite.siteName),
+    [trips, activeSite.siteName]
+  );
+  const todayTrips = useMemo(
+    () => siteTrips.filter((t) => t.tripDate === today),
+    [siteTrips, today]
+  );
 
-  const siteDiesel = useMemo(() => diesel.filter((d) => d.siteName === activeSite.siteName), [diesel, activeSite.siteName]);
-  const siteExpenses = useMemo(() => expenses.filter((e) => e.siteName === activeSite.siteName), [expenses, activeSite.siteName]);
+  const siteDiesel = useMemo(
+    () => diesel.filter((d) => d.siteName === activeSite.siteName),
+    [diesel, activeSite.siteName]
+  );
+  const siteExpenses = useMemo(
+    () => expenses.filter((e) => e.siteName === activeSite.siteName),
+    [expenses, activeSite.siteName]
+  );
 
   // KPIs
-  const totalBrassToday = todayTrips.reduce((sum, t) => sum + (Number(t.dayTrips) * Number(t.brassPerTrip)), 0);
-  const activeTripsCount = todayTrips.reduce((sum, t) => sum + Number(t.dayTrips), 0);
-  const totalDieselDispensed = siteDiesel.reduce((sum, d) => sum + Number(d.litres), 0);
-  const totalSiteExpense = siteExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  const totalBrassToday = todayTrips.reduce(
+    (sum, t) => sum + (Number(t.dayTrips) || 0) * (Number(t.brassPerTrip) || 0),
+    0
+  );
+  const activeTripsCount = todayTrips.reduce(
+    (sum, t) => sum + (Number(t.dayTrips) || 0),
+    0
+  );
+  const totalDieselDispensed = siteDiesel.reduce(
+    (sum, d) => sum + (Number(d.litres) || 0),
+    0
+  );
+  const totalSiteExpense = siteExpenses.reduce(
+    (sum, e) => sum + (Number(e.amount) || 0),
+    0
+  );
 
   return (
     <div className="space-y-4 sm:space-y-6 font-sans text-slate-100 animate-in fade-in duration-300">
@@ -74,7 +103,9 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
               <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-500 animate-pulse" />
               <span>Site Operations Command</span>
               <span className="text-slate-600 hidden sm:inline">•</span>
-              <span className="text-slate-500 font-mono lowercase tracking-normal hidden sm:inline">{activeSite.siteId}</span>
+              <span className="text-slate-500 font-mono lowercase tracking-normal hidden sm:inline">
+                {activeSite.siteId}
+              </span>
             </div>
             <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black text-white tracking-tight uppercase break-words">
               {activeSite.siteName}
@@ -84,7 +115,7 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
             </p>
           </div>
 
-          {/* Action Buttons (Wired to Navigation & Mobile Optimized Grid) */}
+          {/* Action Buttons */}
           <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 sm:gap-3 shrink-0 w-full xl:w-auto">
             <button 
               onClick={() => onNavigateTab('road-sites')}
@@ -125,7 +156,7 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
         </div>
       </div>
 
-      {/* 4 KPI Metric Cards (Wired to Navigation) */}
+      {/* KPI Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         
         {/* Card 1: Material Laid */}
@@ -135,20 +166,26 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
         >
           <div className="space-y-3 sm:space-y-4">
             <div className="flex justify-between items-start">
-              <div className="text-[10px] sm:text-[11px] font-bold text-slate-400 tracking-wider">TOTAL MATERIAL LAID<br/>(TODAY)</div>
+              <div className="text-[10px] sm:text-[11px] font-bold text-slate-400 tracking-wider">
+                TOTAL MATERIAL LAID<br/>(TODAY)
+              </div>
               <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-blue-900/30 flex items-center justify-center border border-blue-800/50 shrink-0">
                 <Layers className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-400" />
               </div>
             </div>
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl sm:text-4xl font-black text-white font-mono tracking-tight">{totalBrassToday}</span>
+              <span className="text-3xl sm:text-4xl font-black text-white font-mono tracking-tight">
+                {totalBrassToday}
+              </span>
               <span className="text-xs sm:text-sm font-medium text-slate-500">Brass</span>
             </div>
           </div>
           <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-[#1E293B] space-y-2 sm:space-y-3">
             <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-medium text-blue-400 truncate">
               <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
-              <span className="truncate">{totalBrassToday > 0 ? `${todayTrips.length} material batches logged` : 'No material logged yet'}</span>
+              <span className="truncate">
+                {totalBrassToday > 0 ? `${todayTrips.length} material batches logged` : 'No material logged yet'}
+              </span>
             </div>
             <div className="flex items-center gap-1 text-[10px] sm:text-[11px] font-bold text-slate-400 group-hover:text-blue-400 transition-colors">
               <span>View haulage logs</span>
@@ -164,7 +201,9 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
         >
           <div className="space-y-3 sm:space-y-4">
             <div className="flex justify-between items-start">
-              <div className="text-[10px] sm:text-[11px] font-bold text-slate-400 tracking-wider">TOTAL SITE EXPENSE</div>
+              <div className="text-[10px] sm:text-[11px] font-bold text-slate-400 tracking-wider">
+                TOTAL SITE EXPENSE
+              </div>
               <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-emerald-900/30 flex items-center justify-center border border-emerald-800/50 shrink-0">
                 <DollarSign className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400" />
               </div>
@@ -193,13 +232,17 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
         >
           <div className="space-y-3 sm:space-y-4">
             <div className="flex justify-between items-start">
-              <div className="text-[10px] sm:text-[11px] font-bold text-slate-400 tracking-wider">ACTIVE TRIPS TODAY</div>
+              <div className="text-[10px] sm:text-[11px] font-bold text-slate-400 tracking-wider">
+                ACTIVE TRIPS TODAY
+              </div>
               <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-cyan-900/30 flex items-center justify-center border border-cyan-800/50 shrink-0">
                 <Truck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-cyan-400" />
               </div>
             </div>
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl sm:text-4xl font-black text-white font-mono tracking-tight">{activeTripsCount}</span>
+              <span className="text-3xl sm:text-4xl font-black text-white font-mono tracking-tight">
+                {activeTripsCount}
+              </span>
               <span className="text-xs sm:text-sm font-medium text-slate-500">Trips</span>
             </div>
           </div>
@@ -221,13 +264,17 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
         >
           <div className="space-y-3 sm:space-y-4">
             <div className="flex justify-between items-start">
-              <div className="text-[10px] sm:text-[11px] font-bold text-slate-400 tracking-wider">DIESEL DISPENSED</div>
+              <div className="text-[10px] sm:text-[11px] font-bold text-slate-400 tracking-wider">
+                DIESEL DISPENSED
+              </div>
               <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-amber-900/30 flex items-center justify-center border border-amber-800/50 shrink-0">
                 <Fuel className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400" />
               </div>
             </div>
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl sm:text-4xl font-black text-amber-400 font-mono tracking-tight">{totalDieselDispensed}</span>
+              <span className="text-3xl sm:text-4xl font-black text-amber-400 font-mono tracking-tight">
+                {totalDieselDispensed}
+              </span>
               <span className="text-xs sm:text-sm font-medium text-slate-500">Litres</span>
             </div>
           </div>
@@ -266,17 +313,23 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 flex-1">
             <div className="p-3 sm:p-4 rounded-2xl bg-[#080C14] border border-[#1E293B] flex flex-col justify-center">
               <div className="text-[10px] font-bold text-slate-500 mb-1">Active Excavators</div>
-              <div className="text-xl sm:text-2xl font-black text-white mb-1 sm:mb-2">0 <span className="text-xs sm:text-sm font-medium text-slate-500">Units</span></div>
+              <div className="text-xl sm:text-2xl font-black text-white mb-1 sm:mb-2">
+                0 <span className="text-xs sm:text-sm font-medium text-slate-500">Units</span>
+              </div>
               <div className="text-[10px] text-slate-600">No active machinery</div>
             </div>
             <div className="p-3 sm:p-4 rounded-2xl bg-[#080C14] border border-[#1E293B] flex flex-col justify-center">
               <div className="text-[10px] font-bold text-slate-500 mb-1">Backhoe Loaders</div>
-              <div className="text-xl sm:text-2xl font-black text-white mb-1 sm:mb-2">0 <span className="text-xs sm:text-sm font-medium text-slate-500">Units</span></div>
+              <div className="text-xl sm:text-2xl font-black text-white mb-1 sm:mb-2">
+                0 <span className="text-xs sm:text-sm font-medium text-slate-500">Units</span>
+              </div>
               <div className="text-[10px] text-slate-600">No active machinery</div>
             </div>
             <div className="p-3 sm:p-4 rounded-2xl bg-[#080C14] border border-[#1E293B] flex flex-col justify-center">
               <div className="text-[10px] font-bold text-slate-500 mb-1">Tipper Dumpers</div>
-              <div className="text-xl sm:text-2xl font-black text-white mb-1 sm:mb-2">0 <span className="text-xs sm:text-sm font-medium text-slate-500">Units</span></div>
+              <div className="text-xl sm:text-2xl font-black text-white mb-1 sm:mb-2">
+                0 <span className="text-xs sm:text-sm font-medium text-slate-500">Units</span>
+              </div>
               <div className="text-[10px] text-slate-600">No active tippers</div>
             </div>
           </div>
@@ -289,7 +342,9 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
               <Calculator className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-400 shrink-0" />
               <h2 className="text-sm sm:text-base font-bold text-white truncate">Engineering Shortcuts</h2>
             </div>
-            <span className="text-[8px] sm:text-[9px] font-mono text-slate-500 uppercase tracking-widest shrink-0">MoRTH 5th Rev</span>
+            <span className="text-[8px] sm:text-[9px] font-mono text-slate-500 uppercase tracking-widest shrink-0">
+              MoRTH 5th Rev
+            </span>
           </div>
 
           <div className="space-y-3 flex-1 flex flex-col justify-center">
@@ -298,8 +353,12 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
               className="w-full p-3 sm:p-4 rounded-2xl bg-[#080C14] border border-[#1E293B] hover:border-cyan-500/50 hover:bg-[#121c33]/50 transition-all text-left group flex items-center justify-between cursor-pointer"
             >
               <div>
-                <div className="text-xs font-bold text-white mb-1 group-hover:text-cyan-400 transition-colors">Road Layer Yield & Thickness Calc</div>
-                <div className="text-[10px] text-slate-500">Calculate GSB, WMM, DBM, BC tonnage & brass yield</div>
+                <div className="text-xs font-bold text-white mb-1 group-hover:text-cyan-400 transition-colors">
+                  Road Layer Yield & Thickness Calc
+                </div>
+                <div className="text-[10px] text-slate-500">
+                  Calculate GSB, WMM, DBM, BC tonnage & brass yield
+                </div>
               </div>
               <ArrowRight className="w-4 h-4 text-slate-600 group-hover:text-cyan-400 transition-transform group-hover:translate-x-1 shrink-0" />
             </button>
@@ -309,8 +368,12 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
               className="w-full p-3 sm:p-4 rounded-2xl bg-[#080C14] border border-[#1E293B] hover:border-blue-500/50 hover:bg-[#121c33]/50 transition-all text-left group flex items-center justify-between cursor-pointer"
             >
               <div>
-                <div className="text-xs font-bold text-white mb-1 group-hover:text-blue-400 transition-colors">Daily Progress Report (DPR)</div>
-                <div className="text-[10px] text-slate-500">Auto-generate aggregate consumption summary</div>
+                <div className="text-xs font-bold text-white mb-1 group-hover:text-blue-400 transition-colors">
+                  Daily Progress Report (DPR)
+                </div>
+                <div className="text-[10px] text-slate-500">
+                  Auto-generate aggregate consumption summary
+                </div>
               </div>
               <ArrowRight className="w-4 h-4 text-slate-600 group-hover:text-blue-400 transition-transform group-hover:translate-x-1 shrink-0" />
             </button>

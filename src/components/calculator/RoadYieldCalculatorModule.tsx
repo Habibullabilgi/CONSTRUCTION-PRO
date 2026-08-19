@@ -4,13 +4,12 @@ import {
   Calculator,
   Ruler,
   Trash2,
+  Edit2,
   MapPin,
   Layers,
-  Save,
-  Truck
+  Plus
 } from 'lucide-react';
 
-// Interfaces
 export interface YieldCalculation {
   id: string;
   date: string;
@@ -39,13 +38,14 @@ const STORAGE_ROAD_CATS_KEY = 'CONSTRUCTION_PRO_ROAD_CATEGORIES_V1';
 const INITIAL_ROAD_CATEGORIES: RoadMaterialCategory[] = [
   { id: 'RCAT-01', name: 'Bituminous Macadam (BM)', description: '', standardRate: 5000, unit: 'Brass' },
   { id: 'RCAT-02', name: 'Wet Mix Macadam (WMM Base)', description: '', standardRate: 4500, unit: 'Brass' },
-  { id: 'RCAT-03', name: 'Granular Sub-Base (GSB)', description: '', standardRate: 4200, unit: 'Brass' }
+  { id: 'RCAT-03', name: 'Granular Sub-Base (GSB)', description: '', standardRate: 4200, unit: 'Brass' },
+  { id: 'RCAT-04', name: 'Dense Bituminous Macadam (DBM)', description: '', standardRate: 5500, unit: 'Brass' },
+  { id: 'RCAT-05', name: 'Bituminous Concrete (BC)', description: '', standardRate: 6000, unit: 'Brass' }
 ];
 
 export const RoadYieldCalculatorModule: React.FC = () => {
   const { siteSheets = [], selectedSiteId } = useERP();
 
-  // Load Categories (Dynamic Presets)
   const [categories, setCategories] = useState<RoadMaterialCategory[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_ROAD_CATS_KEY);
@@ -55,7 +55,6 @@ export const RoadYieldCalculatorModule: React.FC = () => {
     }
   });
 
-  // Load Saved Calculations
   const [calculations, setCalculations] = useState<YieldCalculation[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_YIELD_KEY);
@@ -65,43 +64,48 @@ export const RoadYieldCalculatorModule: React.FC = () => {
     }
   });
 
+  // Re-sync categories from storage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_ROAD_CATS_KEY);
+      if (saved) {
+        setCategories(JSON.parse(saved));
+      }
+    } catch (e) {
+      console.error('Failed to sync categories', e);
+    }
+  }, []);
+
   useEffect(() => {
     localStorage.setItem(STORAGE_YIELD_KEY, JSON.stringify(calculations));
   }, [calculations]);
 
-  // Form States
   const currentActiveSite = siteSheets.find((s: any) => s.siteId === selectedSiteId);
   const defaultSiteName = currentActiveSite?.siteName || siteSheets[0]?.siteName || 'SINDAGI - ALMEL ROAD';
 
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [siteName, setSiteName] = useState(defaultSiteName);
   const [materialName, setMaterialName] = useState(categories[0]?.name || 'Wet Mix Macadam (WMM Base)');
-  
   const [roadLength, setRoadLength] = useState<number | ''>('');
   const [roadWidth, setRoadWidth] = useState<number | ''>('');
   const [thickness, setThickness] = useState<number | ''>('');
   const [tipperCapacity, setTipperCapacity] = useState<number | ''>('');
 
-  // Live Calculations
   const computedData = useMemo(() => {
     const l = Number(roadLength) || 0;
     const w = Number(roadWidth) || 0;
     const t_mm = Number(thickness) || 0;
-    const cap = Number(tipperCapacity) || 1; // prevent divide by zero
+    const cap = Number(tipperCapacity) || 1;
 
-    // Volume in Cubic Meters = L(m) * W(m) * T(m)
     const t_m = t_mm / 1000;
     const volumeCum = l * w * t_m;
-
-    // 1 Brass = 2.83 Cubic Meters (Standard India Construction Conversion)
     const brass = volumeCum / 2.83168;
-    
-    // Trips Required
     const trips = brass / cap;
 
     return {
       volumeCum: volumeCum.toFixed(2),
       brass: brass.toFixed(2),
-      trips: Math.ceil(trips) // Always round up for required trips
+      trips: Math.ceil(trips)
     };
   }, [roadLength, roadWidth, thickness, tipperCapacity]);
 
@@ -109,8 +113,8 @@ export const RoadYieldCalculatorModule: React.FC = () => {
     e.preventDefault();
     if (!roadLength || !roadWidth || !thickness || !tipperCapacity) return;
 
-    const newCalc: YieldCalculation = {
-      id: `CALC-${Date.now().toString().slice(-4)}`,
+    const payload: YieldCalculation = {
+      id: editingId || `CALC-${Date.now().toString().slice(-4)}`,
       date: new Date().toISOString().substring(0, 10),
       siteName,
       materialName,
@@ -123,9 +127,31 @@ export const RoadYieldCalculatorModule: React.FC = () => {
       tripsRequired: computedData.trips
     };
 
-    setCalculations([newCalc, ...calculations]);
-    
-    // Reset numerical fields after save
+    if (editingId) {
+      setCalculations(calculations.map((c) => (c.id === editingId ? payload : c)));
+      setEditingId(null);
+    } else {
+      setCalculations([payload, ...calculations]);
+    }
+
+    setRoadLength('');
+    setRoadWidth('');
+    setThickness('');
+    setTipperCapacity('');
+  };
+
+  const handleEdit = (calc: YieldCalculation) => {
+    setEditingId(calc.id);
+    setSiteName(calc.siteName);
+    setMaterialName(calc.materialName);
+    setRoadLength(calc.roadLength);
+    setRoadWidth(calc.roadWidth);
+    setThickness(calc.thickness);
+    setTipperCapacity(calc.tipperCapacity);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
     setRoadLength('');
     setRoadWidth('');
     setThickness('');
@@ -134,13 +160,15 @@ export const RoadYieldCalculatorModule: React.FC = () => {
 
   const handleDelete = (id: string) => {
     if (window.confirm('Delete this calculation?')) {
-      setCalculations(calculations.filter(c => c.id !== id));
+      setCalculations((prev) => prev.filter((c) => c.id !== id));
+      if (editingId === id) {
+        handleCancelEdit();
+      }
     }
   };
 
   return (
     <div className="space-y-6 font-sans text-slate-100">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-[#008B8B]/20 border border-[#008B8B]/30 flex items-center justify-center text-[#00FFFF]">
@@ -154,19 +182,28 @@ export const RoadYieldCalculatorModule: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
-        {/* LEFT COLUMN: Input Form */}
+        {/* Left Column: Parameter Form */}
         <div className="lg:col-span-5">
           <div className="p-6 rounded-[2rem] bg-[#0c1427] border border-[#182643] shadow-2xl">
-            
-            <div className="flex items-center gap-2 border-b border-[#1E293B] pb-4 mb-5">
-              <Ruler className="w-5 h-5 text-cyan-400" />
-              <h2 className="text-base font-bold text-white tracking-wide">Road Dimension Parameters</h2>
+            <div className="flex items-center justify-between border-b border-[#1E293B] pb-4 mb-5">
+              <div className="flex items-center gap-2">
+                <Ruler className="w-5 h-5 text-cyan-400" />
+                <h2 className="text-base font-bold text-white tracking-wide">
+                  {editingId ? 'Edit Parameters' : 'Road Dimension Parameters'}
+                </h2>
+              </div>
+              {editingId && (
+                <button
+                  type="button"
+                  onClick={handleCancelEdit}
+                  className="text-xs font-bold text-slate-400 hover:text-white transition-colors"
+                >
+                  Cancel Edit
+                </button>
+              )}
             </div>
 
             <form onSubmit={handleSaveCalculation} className="space-y-5 text-xs">
-              
-              {/* Site Name */}
               <div>
                 <label className="flex items-center gap-1.5 text-slate-300 font-bold mb-1.5">
                   <MapPin className="w-3.5 h-3.5 text-blue-400" />
@@ -193,16 +230,18 @@ export const RoadYieldCalculatorModule: React.FC = () => {
                 )}
               </div>
 
-              {/* Material Name (LINKED TO CATEGORIES) */}
               <div>
-                <label className="flex items-center gap-1.5 text-slate-300 font-bold mb-1.5">
-                  <Layers className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Material Name *</span>
+                <label className="flex items-center justify-between text-slate-300 font-bold mb-1.5">
+                  <span className="flex items-center gap-1.5">
+                    <Layers className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Material Name *</span>
+                  </span>
+                  <span className="text-[10px] text-blue-400 font-normal">Linked to Categories</span>
                 </label>
                 <select
                   value={materialName}
                   onChange={(e) => setMaterialName(e.target.value)}
-                  className="w-full px-3.5 py-3 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-bold outline-none cursor-pointer focus:border-cyan-500 transition-colors"
+                  className="w-full px-3.5 py-3 bg-[#162032] border border-[#1E293B] rounded-xl text-amber-300 font-bold outline-none cursor-pointer focus:border-cyan-500 transition-colors"
                 >
                   {categories.length === 0 && (
                     <option value="">No categories found. Please add in Categories tab.</option>
@@ -210,8 +249,6 @@ export const RoadYieldCalculatorModule: React.FC = () => {
                   {categories.map((c) => (
                     <option key={c.id} value={c.name}>{c.name}</option>
                   ))}
-                  
-                  {/* Fallback if current material got deleted from categories */}
                   {!categories.some((c) => c.name === materialName) && materialName && (
                     <option value={materialName}>{materialName}</option>
                   )}
@@ -219,7 +256,6 @@ export const RoadYieldCalculatorModule: React.FC = () => {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Length */}
                 <div>
                   <label className="block text-slate-300 font-bold mb-1.5">Road Length (Meters) *</label>
                   <input
@@ -236,7 +272,6 @@ export const RoadYieldCalculatorModule: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Width */}
                 <div>
                   <label className="block text-slate-300 font-bold mb-1.5">Road Width (Meters) *</label>
                   <input
@@ -254,7 +289,6 @@ export const RoadYieldCalculatorModule: React.FC = () => {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Thickness */}
                 <div>
                   <label className="block text-slate-300 font-bold mb-1.5">Thickness (mm) *</label>
                   <input
@@ -271,7 +305,6 @@ export const RoadYieldCalculatorModule: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Tipper Capacity */}
                 <div>
                   <label className="block text-slate-300 font-bold mb-1.5">Tipper Capacity (Brass) *</label>
                   <input
@@ -294,18 +327,16 @@ export const RoadYieldCalculatorModule: React.FC = () => {
                   className="w-full py-3.5 rounded-xl bg-[#008B8B] hover:bg-[#007070] text-white text-xs font-black tracking-widest uppercase flex items-center justify-center gap-2 transition-all shadow-lg shadow-[#008B8B]/30 cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
-                  <span>Save Section Calculation</span>
+                  <span>{editingId ? 'Update Calculation' : 'Save Section Calculation'}</span>
                 </button>
               </div>
             </form>
           </div>
         </div>
 
-        {/* RIGHT COLUMN: Live Output & History */}
+        {/* Right Column: Live Yield Output & History */}
         <div className="lg:col-span-7 space-y-6">
-          
-          {/* Live Output Card */}
-          <div className="p-6 rounded-[2rem] bg-[#0c1427] border border-[#1E293B] shadow-2xl">
+          <div className="p-6 rounded-[2rem] bg-[#0c1427] border border-[#182643] shadow-2xl">
             <h2 className="text-sm font-bold text-white mb-4">Live Yield Output</h2>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="p-4 rounded-2xl bg-[#080d19] border border-[#182643] flex flex-col items-center justify-center text-center">
@@ -326,13 +357,12 @@ export const RoadYieldCalculatorModule: React.FC = () => {
             </div>
           </div>
 
-          {/* Saved Calculations History */}
           <div className="p-6 rounded-[2rem] bg-[#0B1220] border border-[#1E293B] shadow-2xl">
             <div className="flex items-center justify-between border-b border-[#1E293B] pb-4 mb-4">
               <h2 className="text-sm font-bold text-white">Saved Calculations</h2>
               <span className="text-xs text-slate-500">{calculations.length} Records</span>
             </div>
-            
+
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
@@ -342,7 +372,7 @@ export const RoadYieldCalculatorModule: React.FC = () => {
                     <th className="py-3 px-4 text-right">VOL (Cu.m)</th>
                     <th className="py-3 px-4 text-right text-amber-400">BRASS</th>
                     <th className="py-3 px-4 text-right text-cyan-400">TRIPS</th>
-                    <th className="py-3 px-4 text-right">DEL</th>
+                    <th className="py-3 px-4 text-right">ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#1E293B]/60 text-slate-300">
@@ -366,12 +396,24 @@ export const RoadYieldCalculatorModule: React.FC = () => {
                         <td className="py-3 px-4 text-right font-mono font-bold text-amber-400">{c.totalBrass.toFixed(2)}</td>
                         <td className="py-3 px-4 text-right font-mono font-black text-cyan-400">{c.tripsRequired}</td>
                         <td className="py-3 px-4 text-right">
-                          <button
-                            onClick={() => handleDelete(c.id)}
-                            className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 transition-colors cursor-pointer"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleEdit(c)}
+                              title="Edit Calculation"
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-cyan-400 hover:bg-cyan-950/40 transition-colors cursor-pointer"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(c.id)}
+                              title="Delete Calculation"
+                              className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -380,9 +422,10 @@ export const RoadYieldCalculatorModule: React.FC = () => {
               </table>
             </div>
           </div>
-
         </div>
       </div>
     </div>
   );
 };
+
+export default RoadYieldCalculatorModule;

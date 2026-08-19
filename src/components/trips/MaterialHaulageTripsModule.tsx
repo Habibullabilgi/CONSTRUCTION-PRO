@@ -21,7 +21,24 @@ export interface HaulageTripRecord {
   totalAmount: number;
 }
 
+export interface RoadMaterialCategory {
+  id: string;
+  name: string;
+  description: string;
+  standardRate: number;
+  unit: string;
+}
+
 const STORAGE_HAULAGE_KEY = 'CONSTRUCTION_PRO_HAULAGE_TRIPS_V2';
+const STORAGE_ROAD_CATS_KEY = 'CONSTRUCTION_PRO_ROAD_CATEGORIES_V1';
+
+const INITIAL_ROAD_CATEGORIES: RoadMaterialCategory[] = [
+  { id: 'RCAT-01', name: 'Bituminous Macadam (BM)', description: 'Dense bituminous macadam binder course', standardRate: 5000, unit: 'Brass' },
+  { id: 'RCAT-02', name: 'Wet Mix Macadam (WMM)', description: 'Crushed stone aggregate base/sub-base layer', standardRate: 4500, unit: 'Brass' },
+  { id: 'RCAT-03', name: 'Granular Sub-Base (GSB)', description: 'Coarse graded granular material sub-base', standardRate: 4200, unit: 'Brass' },
+  { id: 'RCAT-04', name: 'Dense Bituminous Macadam (DBM)', description: 'Structural layer in flexible pavements', standardRate: 5500, unit: 'Brass' },
+  { id: 'RCAT-05', name: 'Bituminous Concrete (BC)', description: 'High quality wearing course finish', standardRate: 6000, unit: 'Brass' }
+];
 
 const INITIAL_HAULAGE_TRIPS: HaulageTripRecord[] = [
   {
@@ -29,7 +46,7 @@ const INITIAL_HAULAGE_TRIPS: HaulageTripRecord[] = [
     tripDate: '2026-08-19',
     siteName: 'SINDAGI - ALMEL ROAD',
     vehicleNumber: 'TOTAL TRIPS',
-    materialName: 'BM (₹5000/Brass)',
+    materialName: 'Bituminous Macadam (BM) (₹5000/Brass)',
     dayTrips: 10,
     brassPerTrip: 6,
     ratePerBrass: 5000,
@@ -37,24 +54,26 @@ const INITIAL_HAULAGE_TRIPS: HaulageTripRecord[] = [
   }
 ];
 
-const MATERIAL_PRESETS = [
-  { name: 'BM (₹5000/Brass)', defaultRate: 5000 },
-  { name: 'GSB (₹4200/Brass)', defaultRate: 4200 },
-  { name: 'WMM (₹4500/Brass)', defaultRate: 4500 },
-  { name: 'Wet Mix (₹4600/Brass)', defaultRate: 4600 },
-  { name: 'DBM (₹5500/Brass)', defaultRate: 5500 },
-  { name: 'BC (₹6000/Brass)', defaultRate: 6000 }
-];
-
 export const MaterialHaulageTripsModule: React.FC = () => {
   const { siteSheets = [] } = useERP();
 
+  // Load Trips
   const [trips, setTrips] = useState<HaulageTripRecord[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_HAULAGE_KEY);
       return saved ? JSON.parse(saved) : INITIAL_HAULAGE_TRIPS;
     } catch {
       return INITIAL_HAULAGE_TRIPS;
+    }
+  });
+
+  // Load Categories (Dynamic Presets)
+  const [categories, setCategories] = useState<RoadMaterialCategory[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_ROAD_CATS_KEY);
+      return saved ? JSON.parse(saved) : INITIAL_ROAD_CATEGORIES;
+    } catch {
+      return INITIAL_ROAD_CATEGORIES;
     }
   });
 
@@ -65,19 +84,48 @@ export const MaterialHaulageTripsModule: React.FC = () => {
   const [tripDate, setTripDate] = useState('2026-08-19');
   const [siteName, setSiteName] = useState('SINDAGI - ALMEL ROAD');
   const [vehicleNumber, setVehicleNumber] = useState('TOTAL TRIPS');
-  const [materialName, setMaterialName] = useState(MATERIAL_PRESETS[0].name);
+  
+  // Set default material dropdown state based on dynamic categories
+  const defaultCategory = categories[0] 
+    ? `${categories[0].name} (₹${categories[0].standardRate}/${categories[0].unit})` 
+    : '';
+    
+  const [materialName, setMaterialName] = useState(defaultCategory);
   const [dayTrips, setDayTrips] = useState<number | ''>(10);
   const [brassPerTrip, setBrassPerTrip] = useState<number | ''>(6);
-  const [ratePerBrass, setRatePerBrass] = useState<number | ''>(5000);
+  const [ratePerBrass, setRatePerBrass] = useState<number | ''>(categories[0]?.standardRate || 5000);
 
-  // Update default rate when material preset changes
-  const handleMaterialChange = (selectedName: string) => {
-    setMaterialName(selectedName);
-    const found = MATERIAL_PRESETS.find((m) => m.name === selectedName);
+  // Auto-Update rate when material preset changes
+  const handleMaterialChange = (selectedFormattedName: string) => {
+    setMaterialName(selectedFormattedName);
+    
+    // Reverse lookup the category by its formatted label string
+    const found = categories.find((c) => `${c.name} (₹${c.standardRate}/${c.unit})` === selectedFormattedName);
     if (found) {
-      setRatePerBrass(found.defaultRate);
+      setRatePerBrass(found.standardRate);
     }
   };
+
+  // Re-fetch categories when modal opens in case user added new ones in Categories Tab
+  useEffect(() => {
+    if (isModalOpen) {
+      try {
+        const saved = localStorage.getItem(STORAGE_ROAD_CATS_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          setCategories(parsed);
+          
+          // Re-sync initial select value if it's currently empty
+          if (!materialName && parsed.length > 0) {
+            setMaterialName(`${parsed[0].name} (₹${parsed[0].standardRate}/${parsed[0].unit})`);
+            setRatePerBrass(parsed[0].standardRate);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to load categories", error);
+      }
+    }
+  }, [isModalOpen, materialName]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_HAULAGE_KEY, JSON.stringify(trips));
@@ -177,8 +225,8 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                 <th className="py-3.5 px-6">VEHICLE / BATCH</th>
                 <th className="py-3.5 px-6">MATERIAL NAME</th>
                 <th className="py-3.5 px-4 text-center">TRIPS</th>
-                <th className="py-3.5 px-4 text-right">BRASS/TRIP</th>
-                <th className="py-3.5 px-4 text-right">RATE/BRASS</th>
+                <th className="py-3.5 px-4 text-right">QTY/TRIP</th>
+                <th className="py-3.5 px-4 text-right">RATE/UNIT</th>
                 <th className="py-3.5 px-6 text-right">TOTAL AMOUNT</th>
                 <th className="py-3.5 px-6 text-right">ACTION</th>
               </tr>
@@ -251,15 +299,28 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-slate-300 font-bold mb-1">Site Name *</label>
-                  <select
-                    value={siteName}
-                    onChange={(e) => setSiteName(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-cyan-400 font-medium outline-none cursor-pointer"
-                  >
-                    <option value="SINDAGI - ALMEL ROAD">SINDAGI - ALMEL ROAD</option>
-                    <option value="TOWER-A BUILDING">TOWER-A BUILDING</option>
-                    <option value="CENTRAL CAMPUS">CENTRAL CAMPUS</option>
-                  </select>
+                  {siteSheets.length > 0 ? (
+                    <select
+                      value={siteName}
+                      onChange={(e) => setSiteName(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-cyan-400 font-medium outline-none cursor-pointer"
+                    >
+                      {siteSheets.map((s: any) => (
+                        <option key={s.siteId} value={s.siteName}>
+                          {s.siteName}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      required
+                      placeholder="SINDAGI - ALMEL ROAD"
+                      value={siteName}
+                      onChange={(e) => setSiteName(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-cyan-400 font-medium outline-none"
+                    />
+                  )}
                 </div>
               </div>
 
@@ -275,19 +336,28 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                 />
               </div>
 
-              {/* Material Name Selector */}
+              {/* Dynamic Material Name Selector Link to Categories */}
               <div>
-                <label className="block text-slate-300 font-bold mb-1">Material Name *</label>
+                <label className="block text-slate-300 font-bold mb-1 flex justify-between items-center">
+                  <span>Material Name *</span>
+                  <span className="text-[10px] text-blue-400 font-normal">Sourced from Categories Tab</span>
+                </label>
                 <select
                   value={materialName}
                   onChange={(e) => handleMaterialChange(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-amber-300 font-bold outline-none cursor-pointer"
                 >
-                  {MATERIAL_PRESETS.map((m) => (
-                    <option key={m.name} value={m.name}>
-                      {m.name}
-                    </option>
-                  ))}
+                  {categories.length === 0 && (
+                    <option value="">No categories found. Please add in Categories tab.</option>
+                  )}
+                  {categories.map((c) => {
+                    const label = `${c.name} (₹${c.standardRate}/${c.unit})`;
+                    return (
+                      <option key={c.id} value={label}>
+                        {label}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 
@@ -304,7 +374,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-300 font-bold mb-1">Brass/Trip *</label>
+                  <label className="block text-slate-300 font-bold mb-1">Quantity/Trip *</label>
                   <input
                     type="number"
                     min="1"
@@ -315,7 +385,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-300 font-bold mb-1">Rate / Brass *</label>
+                  <label className="block text-slate-300 font-bold mb-1">Rate/Unit (₹) *</label>
                   <input
                     type="number"
                     min="1"

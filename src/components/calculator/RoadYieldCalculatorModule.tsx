@@ -1,406 +1,378 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useERP } from '../../context/ERPContext';
 import {
   Calculator,
-  Truck,
-  Layers,
-  Building2,
-  Plus,
+  Ruler,
   Trash2,
-  Ruler
+  MapPin,
+  Layers,
+  Save,
+  Truck
 } from 'lucide-react';
 
-interface SavedYieldCalculation {
+// Interfaces
+export interface YieldCalculation {
   id: string;
+  date: string;
   siteName: string;
   materialName: string;
-  lengthMeters: number;
-  widthMeters: number;
-  thicknessMm: number;
-  volumeCubicMeters: number;
+  roadLength: number;
+  roadWidth: number;
+  thickness: number;
+  tipperCapacity: number;
+  totalVolumeCum: number;
   totalBrass: number;
-  tipperCapacityBrass: number;
   tripsRequired: number;
-  date: string;
 }
 
-const MATERIAL_PRESETS = [
-  { name: 'Wet Mix Macadam (WMM Base)', brassConversionFactor: 0.35315 },
-  { name: 'Granular Sub-Base (GSB)', brassConversionFactor: 0.35315 },
-  { name: 'Murum Subgrade Fill', brassConversionFactor: 0.35315 },
-  { name: 'M-Sand / Crushed Sand', brassConversionFactor: 0.35315 },
-  { name: '20mm Aggregate Metal', brassConversionFactor: 0.35315 },
-  { name: '40mm Ballast Base', brassConversionFactor: 0.35315 }
+export interface RoadMaterialCategory {
+  id: string;
+  name: string;
+  description: string;
+  standardRate: number;
+  unit: string;
+}
+
+const STORAGE_YIELD_KEY = 'CONSTRUCTION_PRO_YIELD_CALCS_V1';
+const STORAGE_ROAD_CATS_KEY = 'CONSTRUCTION_PRO_ROAD_CATEGORIES_V1';
+
+const INITIAL_ROAD_CATEGORIES: RoadMaterialCategory[] = [
+  { id: 'RCAT-01', name: 'Bituminous Macadam (BM)', description: '', standardRate: 5000, unit: 'Brass' },
+  { id: 'RCAT-02', name: 'Wet Mix Macadam (WMM Base)', description: '', standardRate: 4500, unit: 'Brass' },
+  { id: 'RCAT-03', name: 'Granular Sub-Base (GSB)', description: '', standardRate: 4200, unit: 'Brass' }
 ];
 
-const STORAGE_CALCULATIONS_KEY = 'CONSTRUCTION_PRO_ROAD_YIELD_CALCS_V1';
-
 export const RoadYieldCalculatorModule: React.FC = () => {
-  const { siteSheets = [], selectedSiteId, currentUser, userRole } = useERP();
+  const { siteSheets = [], selectedSiteId } = useERP();
 
-  const currentRoleStr = String(currentUser?.role || userRole || '').toLowerCase();
-  const isAdmin = currentRoleStr.includes('admin');
-
-  const siteList = Array.isArray(siteSheets) && siteSheets.length > 0
-    ? siteSheets.map((s) => s.siteName)
-    : ['SINDAGI - ALMEL ROAD', 'Mulwad Ongoing Stretch', 'NH-50 Flexible Pavement Section'];
-
-  const defaultSiteName = Array.isArray(siteSheets)
-    ? siteSheets.find((s) => s.siteId === selectedSiteId)?.siteName || siteList[0]
-    : siteList[0];
-
-  // Default input states to empty so outputs display 0 until entered
-  const [siteName, setSiteName] = useState<string>(defaultSiteName);
-  const [materialName, setMaterialName] = useState<string>(MATERIAL_PRESETS[0].name);
-  const [lengthMeters, setLengthMeters] = useState<number | ''>('');
-  const [widthMeters, setWidthMeters] = useState<number | ''>('');
-  const [thicknessMm, setThicknessMm] = useState<number | ''>('');
-  const [tipperCapacityBrass, setTipperCapacityBrass] = useState<number | ''>('');
-
-  useEffect(() => {
-    if (defaultSiteName) {
-      setSiteName(defaultSiteName);
-    }
-  }, [defaultSiteName]);
-
-  // Saved calculations state
-  const [savedRecords, setSavedRecords] = useState<SavedYieldCalculation[]>(() => {
+  // Load Categories (Dynamic Presets)
+  const [categories, setCategories] = useState<RoadMaterialCategory[]>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_CALCULATIONS_KEY);
-      if (saved) return JSON.parse(saved);
+      const saved = localStorage.getItem(STORAGE_ROAD_CATS_KEY);
+      return saved ? JSON.parse(saved) : INITIAL_ROAD_CATEGORIES;
     } catch {
-      // Fallback on corrupt JSON
+      return INITIAL_ROAD_CATEGORIES;
     }
-    return [];
+  });
+
+  // Load Saved Calculations
+  const [calculations, setCalculations] = useState<YieldCalculation[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_YIELD_KEY);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
   });
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_CALCULATIONS_KEY, JSON.stringify(savedRecords));
-  }, [savedRecords]);
+    localStorage.setItem(STORAGE_YIELD_KEY, JSON.stringify(calculations));
+  }, [calculations]);
 
-  // Real-time calculation: evaluates to 0 if inputs are missing or <= 0
-  const L = typeof lengthMeters === 'number' && lengthMeters > 0 ? lengthMeters : 0;
-  const W = typeof widthMeters === 'number' && widthMeters > 0 ? widthMeters : 0;
-  const T_meters = typeof thicknessMm === 'number' && thicknessMm > 0 ? thicknessMm / 1000 : 0;
-  const cap = typeof tipperCapacityBrass === 'number' && tipperCapacityBrass > 0 ? tipperCapacityBrass : 0;
+  // Form States
+  const currentActiveSite = siteSheets.find((s: any) => s.siteId === selectedSiteId);
+  const defaultSiteName = currentActiveSite?.siteName || siteSheets[0]?.siteName || 'SINDAGI - ALMEL ROAD';
 
-  const volumeCubicMeters = L > 0 && W > 0 && T_meters > 0 ? L * W * T_meters : 0;
-  const totalBrass = volumeCubicMeters > 0 ? volumeCubicMeters * 0.35315 : 0;
-  const tripsRequired = totalBrass > 0 && cap > 0 ? Math.ceil(totalBrass / cap) : 0;
+  const [siteName, setSiteName] = useState(defaultSiteName);
+  const [materialName, setMaterialName] = useState(categories[0]?.name || 'Wet Mix Macadam (WMM Base)');
+  
+  const [roadLength, setRoadLength] = useState<number | ''>('');
+  const [roadWidth, setRoadWidth] = useState<number | ''>('');
+  const [thickness, setThickness] = useState<number | ''>('');
+  const [tipperCapacity, setTipperCapacity] = useState<number | ''>('');
+
+  // Live Calculations
+  const computedData = useMemo(() => {
+    const l = Number(roadLength) || 0;
+    const w = Number(roadWidth) || 0;
+    const t_mm = Number(thickness) || 0;
+    const cap = Number(tipperCapacity) || 1; // prevent divide by zero
+
+    // Volume in Cubic Meters = L(m) * W(m) * T(m)
+    const t_m = t_mm / 1000;
+    const volumeCum = l * w * t_m;
+
+    // 1 Brass = 2.83 Cubic Meters (Standard India Construction Conversion)
+    const brass = volumeCum / 2.83168;
+    
+    // Trips Required
+    const trips = brass / cap;
+
+    return {
+      volumeCum: volumeCum.toFixed(2),
+      brass: brass.toFixed(2),
+      trips: Math.ceil(trips) // Always round up for required trips
+    };
+  }, [roadLength, roadWidth, thickness, tipperCapacity]);
 
   const handleSaveCalculation = (e: React.FormEvent) => {
     e.preventDefault();
-    if (L <= 0 || W <= 0 || T_meters <= 0 || cap <= 0) {
-      alert('Please fill in road length, width, thickness, and tipper capacity.');
-      return;
-    }
+    if (!roadLength || !roadWidth || !thickness || !tipperCapacity) return;
 
-    const newRecord: SavedYieldCalculation = {
-      id: `calc-${Date.now()}`,
+    const newCalc: YieldCalculation = {
+      id: `CALC-${Date.now().toString().slice(-4)}`,
+      date: new Date().toISOString().substring(0, 10),
       siteName,
       materialName,
-      lengthMeters: L,
-      widthMeters: W,
-      thicknessMm: Number(thicknessMm || 0),
-      volumeCubicMeters,
-      totalBrass,
-      tipperCapacityBrass: cap,
-      tripsRequired,
-      date: new Date().toISOString().split('T')[0]
+      roadLength: Number(roadLength),
+      roadWidth: Number(roadWidth),
+      thickness: Number(thickness),
+      tipperCapacity: Number(tipperCapacity),
+      totalVolumeCum: Number(computedData.volumeCum),
+      totalBrass: Number(computedData.brass),
+      tripsRequired: computedData.trips
     };
 
-    setSavedRecords([newRecord, ...savedRecords]);
+    setCalculations([newCalc, ...calculations]);
+    
+    // Reset numerical fields after save
+    setRoadLength('');
+    setRoadWidth('');
+    setThickness('');
+    setTipperCapacity('');
   };
 
-  const handleDeleteRecord = (id: string) => {
-    if (!isAdmin) {
-      alert('Action Restricted: Only Administrators are authorized to delete calculation records.');
-      return;
-    }
-    if (window.confirm('Delete this section calculation?')) {
-      setSavedRecords(savedRecords.filter((r) => r.id !== id));
+  const handleDelete = (id: string) => {
+    if (window.confirm('Delete this calculation?')) {
+      setCalculations(calculations.filter(c => c.id !== id));
     }
   };
 
   return (
-    <div className="space-y-6 font-sans text-slate-100 selection:bg-blue-600 selection:text-white">
-      {/* 1. Header Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#121927] border border-[#1E293B] p-5 rounded-3xl shadow-lg">
-        <div className="flex items-center gap-3.5">
-          <div className="w-12 h-12 rounded-2xl bg-cyan-600/20 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shrink-0 shadow-md shadow-cyan-600/20">
-            <Calculator className="w-6 h-6" />
+    <div className="space-y-6 font-sans text-slate-100">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-[#008B8B]/20 border border-[#008B8B]/30 flex items-center justify-center text-[#00FFFF]">
+            <Calculator className="w-5 h-5" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 rounded-full bg-cyan-950/60 text-cyan-400 border border-cyan-800 text-[10px] font-black uppercase">
-                Trip Estimator
-              </span>
-              <span className="text-xs text-slate-400 font-semibold">
-                MoRTH Flexible Pavement Estimation
-              </span>
-            </div>
-            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight mt-0.5">
-              Road Trip Calculator
-            </h1>
+            <h1 className="text-2xl font-black text-white tracking-tight">Road Trip Calculator</h1>
+            <p className="text-xs text-slate-400 mt-0.5">Calculate layer yields, brass requirements, and required tipper trips.</p>
           </div>
         </div>
       </div>
 
-      {/* 2. Top 3 Auto-Calculation Output Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {/* Compacted Volume */}
-        <div className="p-5 rounded-3xl bg-[#0c1427] border border-[#182643] shadow-xl flex flex-col justify-between">
-          <div className="flex items-center justify-between text-xs font-bold text-slate-400">
-            <span>Compacted Volume (V)</span>
-            <Layers className="w-4 h-4 text-cyan-400" />
-          </div>
-          <div className="my-2">
-            <div className="text-3xl font-black text-cyan-400 font-mono">
-              {volumeCubicMeters > 0
-                ? volumeCubicMeters.toLocaleString('en-IN', { maximumFractionDigits: 1 })
-                : '0'}{' '}
-              <span className="text-sm font-normal text-slate-400">m³</span>
-            </div>
-            <div className="text-[11px] text-slate-400 mt-1 font-mono">
-              {volumeCubicMeters > 0
-                ? `V = ${L}m × ${W}m × ${T_meters.toFixed(3)}m`
-                : 'V = L × W × Thickness'}
-            </div>
-          </div>
-        </div>
-
-        {/* Total Material Volume (Brass) */}
-        <div className="p-5 rounded-3xl bg-[#0c1427] border border-[#182643] shadow-xl flex flex-col justify-between">
-          <div className="flex items-center justify-between text-xs font-bold text-slate-400">
-            <span>Total Material Volume</span>
-            <Ruler className="w-4 h-4 text-amber-400" />
-          </div>
-          <div className="my-2">
-            <div className="text-3xl font-black text-amber-400 font-mono">
-              {totalBrass > 0 ? totalBrass.toLocaleString('en-IN', { maximumFractionDigits: 1 }) : '0.0'}{' '}
-              <span className="text-sm font-normal text-slate-400">Brass</span>
-            </div>
-            <div className="text-[11px] text-slate-400 mt-1 font-mono">
-              {totalBrass > 0
-                ? `~ ${(totalBrass * 100).toLocaleString('en-IN')} Cubic Feet`
-                : 'Enter dimensions below'}
-            </div>
-          </div>
-        </div>
-
-        {/* Dump Truck Trips Needed */}
-        <div className="p-5 rounded-3xl bg-[#141b12] border border-emerald-900/60 shadow-xl flex flex-col justify-between">
-          <div className="flex items-center justify-between text-xs font-bold text-slate-400">
-            <span>Dump Truck Trips Needed</span>
-            <Truck className="w-4 h-4 text-emerald-400" />
-          </div>
-          <div className="my-2">
-            <div className="text-3xl font-black text-emerald-400 font-mono">
-              {tripsRequired > 0 ? tripsRequired.toLocaleString('en-IN') : '0'}{' '}
-              <span className="text-sm font-normal text-slate-400">Trips</span>
-            </div>
-            <div className="text-[11px] text-emerald-400/80 mt-1">
-              {cap > 0 ? `Based on ${cap} Brass payload per tipper` : 'Specify tipper capacity'}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 3. Main Grid: Parameter Inputs & Ledger */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Form (5 Cols) */}
-        <div className="lg:col-span-5 bg-[#0C1427] border border-[#182643] rounded-3xl p-6 shadow-xl space-y-4">
-          <div className="flex items-center gap-2 pb-3 border-b border-[#182643] text-sm font-bold text-white">
-            <Ruler className="w-4 h-4 text-cyan-400" />
-            <span>Road Dimension Parameters</span>
+        
+        {/* LEFT COLUMN: Input Form */}
+        <div className="lg:col-span-5">
+          <div className="p-6 rounded-[2rem] bg-[#0c1427] border border-[#182643] shadow-2xl">
+            
+            <div className="flex items-center gap-2 border-b border-[#1E293B] pb-4 mb-5">
+              <Ruler className="w-5 h-5 text-cyan-400" />
+              <h2 className="text-base font-bold text-white tracking-wide">Road Dimension Parameters</h2>
+            </div>
+
+            <form onSubmit={handleSaveCalculation} className="space-y-5 text-xs">
+              
+              {/* Site Name */}
+              <div>
+                <label className="flex items-center gap-1.5 text-slate-300 font-bold mb-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Site Name *</span>
+                </label>
+                {siteSheets.length > 0 ? (
+                  <select
+                    value={siteName}
+                    onChange={(e) => setSiteName(e.target.value)}
+                    className="w-full px-3.5 py-3 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-bold outline-none cursor-pointer focus:border-cyan-500 transition-colors"
+                  >
+                    {siteSheets.map((s: any) => (
+                      <option key={s.siteId} value={s.siteName}>{s.siteName}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    required
+                    value={siteName}
+                    onChange={(e) => setSiteName(e.target.value)}
+                    className="w-full px-3.5 py-3 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-bold outline-none focus:border-cyan-500 transition-colors"
+                  />
+                )}
+              </div>
+
+              {/* Material Name (LINKED TO CATEGORIES) */}
+              <div>
+                <label className="flex items-center gap-1.5 text-slate-300 font-bold mb-1.5">
+                  <Layers className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Material Name *</span>
+                </label>
+                <select
+                  value={materialName}
+                  onChange={(e) => setMaterialName(e.target.value)}
+                  className="w-full px-3.5 py-3 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-bold outline-none cursor-pointer focus:border-cyan-500 transition-colors"
+                >
+                  {categories.length === 0 && (
+                    <option value="">No categories found. Please add in Categories tab.</option>
+                  )}
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.name}>{c.name}</option>
+                  ))}
+                  
+                  {/* Fallback if current material got deleted from categories */}
+                  {!categories.some((c) => c.name === materialName) && materialName && (
+                    <option value={materialName}>{materialName}</option>
+                  )}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Length */}
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1.5">Road Length (Meters) *</label>
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    placeholder="e.g. 2500"
+                    value={roadLength}
+                    onChange={(e) => setRoadLength(e.target.value === '' ? '' : Number(e.target.value))}
+                    className="w-full px-3.5 py-3 bg-[#162032] border border-[#1E293B] rounded-xl text-emerald-400 font-mono font-bold outline-none focus:border-cyan-500 transition-colors placeholder-[#334155]"
+                  />
+                  <div className="text-[10px] text-slate-500 mt-1.5 font-mono">
+                    = {roadLength ? (Number(roadLength) / 1000).toFixed(2) : '0.00'} KM
+                  </div>
+                </div>
+
+                {/* Width */}
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1.5">Road Width (Meters) *</label>
+                  <input
+                    type="number"
+                    required
+                    min="0.1"
+                    step="0.1"
+                    placeholder="e.g. 9.0"
+                    value={roadWidth}
+                    onChange={(e) => setRoadWidth(e.target.value === '' ? '' : Number(e.target.value))}
+                    className="w-full px-3.5 py-3 bg-[#162032] border border-[#1E293B] rounded-xl text-emerald-400 font-mono font-bold outline-none focus:border-cyan-500 transition-colors placeholder-[#334155]"
+                  />
+                  <div className="text-[10px] text-slate-500 mt-1.5">Carriageway width</div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Thickness */}
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1.5">Thickness (mm) *</label>
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    placeholder="e.g. 250"
+                    value={thickness}
+                    onChange={(e) => setThickness(e.target.value === '' ? '' : Number(e.target.value))}
+                    className="w-full px-3.5 py-3 bg-[#162032] border border-[#1E293B] rounded-xl text-cyan-400 font-mono font-bold outline-none focus:border-cyan-500 transition-colors placeholder-[#334155]"
+                  />
+                  <div className="text-[10px] text-slate-500 mt-1.5 font-mono">
+                    = {thickness ? (Number(thickness) / 1000).toFixed(3) : '0.000'} Meters
+                  </div>
+                </div>
+
+                {/* Tipper Capacity */}
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1.5">Tipper Capacity (Brass) *</label>
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    step="0.1"
+                    placeholder="e.g. 6"
+                    value={tipperCapacity}
+                    onChange={(e) => setTipperCapacity(e.target.value === '' ? '' : Number(e.target.value))}
+                    className="w-full px-3.5 py-3 bg-[#162032] border border-[#1E293B] rounded-xl text-amber-400 font-mono font-bold outline-none focus:border-cyan-500 transition-colors placeholder-[#334155]"
+                  />
+                  <div className="text-[10px] text-slate-500 mt-1.5">Standard 10-wheel/12-wheel</div>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  className="w-full py-3.5 rounded-xl bg-[#008B8B] hover:bg-[#007070] text-white text-xs font-black tracking-widest uppercase flex items-center justify-center gap-2 transition-all shadow-lg shadow-[#008B8B]/30 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Save Section Calculation</span>
+                </button>
+              </div>
+            </form>
           </div>
-
-          <form onSubmit={handleSaveCalculation} className="space-y-3.5 text-xs">
-            {/* Site Name */}
-            <div>
-              <label className="block text-slate-300 font-bold mb-1.5 flex items-center gap-1">
-                <Building2 className="w-3.5 h-3.5 text-blue-400" />
-                <span>Site Name *</span>
-              </label>
-              <select
-                value={siteName}
-                onChange={(e) => setSiteName(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-cyan-500 cursor-pointer font-medium"
-              >
-                {siteList.map((site) => (
-                  <option key={site} value={site}>
-                    {site}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Material Name */}
-            <div>
-              <label className="block text-slate-300 font-bold mb-1.5 flex items-center gap-1">
-                <Layers className="w-3.5 h-3.5 text-amber-400" />
-                <span>Material Name *</span>
-              </label>
-              <select
-                value={materialName}
-                onChange={(e) => setMaterialName(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white outline-none focus:border-cyan-500 cursor-pointer font-medium"
-              >
-                {MATERIAL_PRESETS.map((m) => (
-                  <option key={m.name} value={m.name}>
-                    {m.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Road Length & Road Width */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-slate-300 font-bold mb-1.5">
-                  Road Length (Meters) *
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  placeholder="e.g. 2500"
-                  value={lengthMeters}
-                  onChange={(e) => setLengthMeters(e.target.value === '' ? '' : Number(e.target.value))}
-                  className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono font-bold outline-none focus:border-cyan-500"
-                />
-                <span className="text-[10px] text-slate-500 mt-0.5 block font-mono">
-                  {L > 0 ? `= ${(L / 1000).toFixed(2)} KM` : '= 0.00 KM'}
-                </span>
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-bold mb-1.5">
-                  Road Width (Meters) *
-                </label>
-                <input
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  placeholder="e.g. 9.0"
-                  value={widthMeters}
-                  onChange={(e) => setWidthMeters(e.target.value === '' ? '' : Number(e.target.value))}
-                  className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-white font-mono font-bold outline-none focus:border-cyan-500"
-                />
-                <span className="text-[10px] text-slate-500 mt-0.5 block">
-                  Carriageway width
-                </span>
-              </div>
-            </div>
-
-            {/* Thickness & Tipper Capacity */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-slate-300 font-bold mb-1.5">
-                  Thickness (mm) *
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  placeholder="e.g. 250"
-                  value={thicknessMm}
-                  onChange={(e) => setThicknessMm(e.target.value === '' ? '' : Number(e.target.value))}
-                  className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-cyan-400 font-mono font-bold outline-none focus:border-cyan-500"
-                />
-                <span className="text-[10px] text-slate-500 mt-0.5 block font-mono">
-                  {T_meters > 0 ? `= ${T_meters.toFixed(3)} Meters` : '= 0.000 Meters'}
-                </span>
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-bold mb-1.5">
-                  Tipper Capacity (Brass) *
-                </label>
-                <input
-                  type="number"
-                  step="0.5"
-                  min="0"
-                  placeholder="e.g. 6"
-                  value={tipperCapacityBrass}
-                  onChange={(e) => setTipperCapacityBrass(e.target.value === '' ? '' : Number(e.target.value))}
-                  className="w-full px-3.5 py-2.5 bg-[#162032] border border-[#1E293B] rounded-xl text-emerald-400 font-mono font-bold outline-none focus:border-cyan-500"
-                />
-                <span className="text-[10px] text-slate-500 mt-0.5 block">
-                  Standard 10-wheel/12-wheel
-                </span>
-              </div>
-            </div>
-
-            {/* Save Button */}
-            <button
-              type="submit"
-              className="w-full py-3 bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-black rounded-xl transition-all shadow-lg shadow-cyan-600/30 flex items-center justify-center gap-1.5 cursor-pointer text-xs uppercase tracking-wider mt-2"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Save Section Calculation</span>
-            </button>
-          </form>
         </div>
 
-        {/* Right Table: Calculations Ledger (7 Cols) */}
-        <div className="lg:col-span-7 bg-[#0B1220] border border-[#1E293B] rounded-3xl overflow-hidden shadow-2xl flex flex-col justify-between">
-          <div>
-            <div className="p-4 border-b border-[#1E293B] bg-[#0d1527]/50 flex items-center justify-between">
-              <div className="font-bold text-sm text-white">Active Section Calculations Ledger</div>
-              <div className="text-xs text-slate-400">{savedRecords.length} Sections Saved</div>
+        {/* RIGHT COLUMN: Live Output & History */}
+        <div className="lg:col-span-7 space-y-6">
+          
+          {/* Live Output Card */}
+          <div className="p-6 rounded-[2rem] bg-[#0c1427] border border-[#1E293B] shadow-2xl">
+            <h2 className="text-sm font-bold text-white mb-4">Live Yield Output</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="p-4 rounded-2xl bg-[#080d19] border border-[#182643] flex flex-col items-center justify-center text-center">
+                <div className="text-[10px] font-bold text-slate-500 mb-1">TOTAL VOLUME</div>
+                <div className="text-2xl font-black text-white font-mono">{computedData.volumeCum}</div>
+                <div className="text-[10px] text-slate-400 mt-0.5">Cu.m</div>
+              </div>
+              <div className="p-4 rounded-2xl bg-[#080d19] border border-amber-900/40 flex flex-col items-center justify-center text-center">
+                <div className="text-[10px] font-bold text-amber-500/70 mb-1">TOTAL BRASS</div>
+                <div className="text-2xl font-black text-amber-400 font-mono">{computedData.brass}</div>
+                <div className="text-[10px] text-amber-500/50 mt-0.5">Yield</div>
+              </div>
+              <div className="p-4 rounded-2xl bg-[#080d19] border border-cyan-900/40 flex flex-col items-center justify-center text-center">
+                <div className="text-[10px] font-bold text-cyan-500/70 mb-1">REQUIRED TRIPS</div>
+                <div className="text-2xl font-black text-cyan-400 font-mono">{computedData.trips}</div>
+                <div className="text-[10px] text-cyan-500/50 mt-0.5">Tippers Needed</div>
+              </div>
             </div>
+          </div>
 
+          {/* Saved Calculations History */}
+          <div className="p-6 rounded-[2rem] bg-[#0B1220] border border-[#1E293B] shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[#1E293B] pb-4 mb-4">
+              <h2 className="text-sm font-bold text-white">Saved Calculations</h2>
+              <span className="text-xs text-slate-500">{calculations.length} Records</span>
+            </div>
+            
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="border-b border-[#1E293B] text-[10px] font-extrabold uppercase tracking-wider text-slate-400 bg-[#080d19]/80">
-                    <th className="py-3 px-4">Site & Material</th>
-                    <th className="py-3 px-4 text-center">Dimensions (L × W × T)</th>
-                    <th className="py-3 px-4 text-right">Volume (m³)</th>
-                    <th className="py-3 px-4 text-right">Total Brass</th>
-                    <th className="py-3 px-4 text-center">Trips Req.</th>
-                    {isAdmin && <th className="py-3 px-4 text-center">Action</th>}
+                  <tr className="border-b border-[#1E293B] text-[10px] font-extrabold uppercase tracking-wider text-slate-500 bg-[#080d19]/80">
+                    <th className="py-3 px-4">SITE & MAT.</th>
+                    <th className="py-3 px-4">DIMS (L×W×T)</th>
+                    <th className="py-3 px-4 text-right">VOL (Cu.m)</th>
+                    <th className="py-3 px-4 text-right text-amber-400">BRASS</th>
+                    <th className="py-3 px-4 text-right text-cyan-400">TRIPS</th>
+                    <th className="py-3 px-4 text-right">DEL</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#1E293B]/60 text-slate-200">
-                  {savedRecords.length === 0 ? (
+                <tbody className="divide-y divide-[#1E293B]/60 text-slate-300">
+                  {calculations.length === 0 ? (
                     <tr>
-                      <td colSpan={isAdmin ? 6 : 5} className="py-12 text-center text-slate-500 text-xs">
-                        No active pavement sections saved yet.
+                      <td colSpan={6} className="py-8 text-center text-slate-500">
+                        No saved calculations yet.
                       </td>
                     </tr>
                   ) : (
-                    savedRecords.map((rec) => (
-                      <tr key={rec.id} className="hover:bg-[#121c33]/50 transition-colors">
-                        <td className="py-3.5 px-4">
-                          <div className="font-bold text-white">{rec.materialName}</div>
-                          <div className="text-[11px] text-slate-400">{rec.siteName}</div>
+                    calculations.map((c) => (
+                      <tr key={c.id} className="hover:bg-[#121c33]/50 transition-colors">
+                        <td className="py-3 px-4">
+                          <div className="font-bold text-white truncate max-w-[150px]">{c.siteName}</div>
+                          <div className="text-[10px] text-slate-400 truncate max-w-[150px]">{c.materialName}</div>
                         </td>
-                        <td className="py-3.5 px-4 text-center font-mono text-slate-300">
-                          {rec.lengthMeters}m × {rec.widthMeters}m × {rec.thicknessMm}mm
+                        <td className="py-3 px-4 font-mono text-[10px]">
+                          {c.roadLength}m × {c.roadWidth}m × {c.thickness}mm
                         </td>
-                        <td className="py-3.5 px-4 text-right font-mono font-semibold text-cyan-400">
-                          {rec.volumeCubicMeters.toLocaleString('en-IN', { maximumFractionDigits: 1 })} m³
+                        <td className="py-3 px-4 text-right font-mono">{c.totalVolumeCum.toFixed(2)}</td>
+                        <td className="py-3 px-4 text-right font-mono font-bold text-amber-400">{c.totalBrass.toFixed(2)}</td>
+                        <td className="py-3 px-4 text-right font-mono font-black text-cyan-400">{c.tripsRequired}</td>
+                        <td className="py-3 px-4 text-right">
+                          <button
+                            onClick={() => handleDelete(c.id)}
+                            className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </td>
-                        <td className="py-3.5 px-4 text-right font-mono font-bold text-amber-400">
-                          {rec.totalBrass.toFixed(1)}
-                        </td>
-                        <td className="py-3.5 px-4 text-center">
-                          <span className="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-400 font-mono font-black text-xs border border-emerald-500/30">
-                            {rec.tripsRequired} Trips
-                          </span>
-                        </td>
-                        {isAdmin && (
-                          <td className="py-3.5 px-4 text-center">
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteRecord(rec.id)}
-                              className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 transition-colors cursor-pointer"
-                              title="Delete Record (Admin Only)"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </td>
-                        )}
                       </tr>
                     ))
                   )}
@@ -408,10 +380,9 @@ export const RoadYieldCalculatorModule: React.FC = () => {
               </table>
             </div>
           </div>
+
         </div>
       </div>
     </div>
   );
 };
-
-export default RoadYieldCalculatorModule;

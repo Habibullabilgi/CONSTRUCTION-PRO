@@ -86,7 +86,6 @@ export const MaterialHaulageTripsModule: React.FC = () => {
   const [siteName, setSiteName] = useState('SINDAGI - ALMEL ROAD');
   const [vehicleNumber, setVehicleNumber] = useState('TOTAL TRIPS');
   
-  // Set default material dropdown state based on dynamic categories
   const defaultCategory = categories[0] 
     ? `${categories[0].name} (₹${categories[0].standardRate}/${categories[0].unit})` 
     : '';
@@ -100,7 +99,6 @@ export const MaterialHaulageTripsModule: React.FC = () => {
   const handleMaterialChange = (selectedFormattedName: string) => {
     setMaterialName(selectedFormattedName);
     
-    // Reverse lookup the category by its formatted label string
     const found = categories.find((c) => `${c.name} (₹${c.standardRate}/${c.unit})` === selectedFormattedName);
     if (found) {
       setRatePerBrass(found.standardRate);
@@ -116,7 +114,6 @@ export const MaterialHaulageTripsModule: React.FC = () => {
           const parsed = JSON.parse(saved);
           setCategories(parsed);
           
-          // Re-sync initial select value if it's currently empty
           if (!materialName && parsed.length > 0) {
             setMaterialName(`${parsed[0].name} (₹${parsed[0].standardRate}/${parsed[0].unit})`);
             setRatePerBrass(parsed[0].standardRate);
@@ -154,7 +151,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
 
   const handleOpenAdd = () => {
     setEditingId(null);
-    setTripDate('2026-08-19'); // Reset to default/current date
+    setTripDate('2026-08-19');
     setSiteName('SINDAGI - ALMEL ROAD');
     setVehicleNumber('TOTAL TRIPS');
     setMaterialName(defaultCategory);
@@ -209,32 +206,32 @@ export const MaterialHaulageTripsModule: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 font-sans text-slate-100">
+    <div className="space-y-4 sm:space-y-6 font-sans text-slate-100">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400">
+          <div className="w-10 h-10 rounded-2xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0">
             <Truck className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-2xl font-black text-white tracking-tight">Material Haulage Trips</h1>
-            <p className="text-xs text-slate-400 mt-0.5">Track daily trip counts, material volumes, and haulage expenses.</p>
+            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">Material Haulage Trips</h1>
+            <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5">Track daily trip counts, material volumes, and haulage expenses.</p>
           </div>
         </div>
 
         <button
           onClick={handleOpenAdd}
-          className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-black flex items-center gap-1.5 transition-all shadow-lg shadow-blue-600/30 cursor-pointer w-fit"
+          className="w-full sm:w-auto justify-center px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-black flex items-center gap-1.5 transition-all shadow-lg shadow-blue-600/30 cursor-pointer"
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="w-4 h-4 shrink-0" />
           <span>+ Log Haulage Trips</span>
         </button>
       </div>
 
       {/* Search & Filter Bar */}
-      <div className="p-4 rounded-3xl bg-[#0c1427] border border-[#182643] flex items-center gap-3 text-xs">
+      <div className="p-3 sm:p-4 rounded-[1.2rem] sm:rounded-3xl bg-[#0c1427] border border-[#182643] flex items-center gap-3 text-xs">
         <div className="relative flex-1">
-          <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-500" />
+          <Search className="absolute left-3.5 top-2.5 sm:top-3 w-4 h-4 text-slate-500" />
           <input
             type="text"
             placeholder="Search by site, vehicle, material name..."
@@ -246,20 +243,20 @@ export const MaterialHaulageTripsModule: React.FC = () => {
       </div>
 
       {/* Trips Table */}
-      <div className="bg-[#0B1220] border border-[#1E293B] rounded-3xl overflow-hidden shadow-2xl">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
+      <div className="bg-[#0B1220] border border-[#1E293B] rounded-[1.2rem] sm:rounded-3xl overflow-hidden shadow-2xl">
+        <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-[#1E293B]">
+          <table className="w-full text-left text-[10px] sm:text-xs border-collapse">
             <thead>
-              <tr className="border-b border-[#1E293B] text-[10px] font-extrabold uppercase tracking-wider text-slate-400 bg-[#080d19]/80">
-                <th className="py-3.5 px-6">TRIP ID & DATE</th>
-                <th className="py-3.5 px-6">SITE NAME</th>
-                <th className="py-3.5 px-6">VEHICLE / BATCH</th>
-                <th className="py-3.5 px-6">MATERIAL NAME</th>
-                <th className="py-3.5 px-4 text-center">TRIPS</th>
-                <th className="py-3.5 px-4 text-right">QTY/TRIP</th>
-                <th className="py-3.5 px-4 text-right">RATE/UNIT</th>
-                <th className="py-3.5 px-6 text-right">TOTAL AMOUNT</th>
-                <th className="py-3.5 px-6 text-right">ACTION</th>
+              <tr className="border-b border-[#1E293B] text-[9px] sm:text-[10px] font-extrabold uppercase tracking-wider text-slate-400 bg-[#080d19]/80">
+                <th className="py-3 px-4 sm:px-6 whitespace-nowrap">TRIP ID & DATE</th>
+                <th className="py-3 px-4 sm:px-6 whitespace-nowrap">SITE NAME</th>
+                <th className="py-3 px-4 sm:px-6 whitespace-nowrap">VEHICLE / BATCH</th>
+                <th className="py-3 px-4 sm:px-6 whitespace-nowrap">MATERIAL NAME</th>
+                <th className="py-3 px-4 text-center whitespace-nowrap">TRIPS</th>
+                <th className="py-3 px-4 text-right whitespace-nowrap">QTY/TRIP</th>
+                <th className="py-3 px-4 text-right whitespace-nowrap">RATE/UNIT</th>
+                <th className="py-3 px-4 sm:px-6 text-right whitespace-nowrap">TOTAL AMOUNT</th>
+                <th className="py-3 px-4 sm:px-6 text-right whitespace-nowrap">ACTION</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#1E293B]/60 text-slate-200">
@@ -272,34 +269,34 @@ export const MaterialHaulageTripsModule: React.FC = () => {
               ) : (
                 filtered.map((t) => (
                   <tr key={t.id} className="hover:bg-[#121c33]/50 transition-colors">
-                    <td className="py-3.5 px-6 font-mono">
+                    <td className="py-3 sm:py-3.5 px-4 sm:px-6 font-mono whitespace-nowrap">
                       <div className="font-bold text-white">{t.id}</div>
-                      <div className="text-[10px] text-slate-400">{t.tripDate}</div>
+                      <div className="text-[9px] sm:text-[10px] text-slate-400">{t.tripDate}</div>
                     </td>
-                    <td className="py-3.5 px-6 font-bold text-cyan-400">{t.siteName}</td>
-                    <td className="py-3.5 px-6 font-mono font-bold text-slate-300">{t.vehicleNumber}</td>
-                    <td className="py-3.5 px-6 font-bold text-amber-300">{t.materialName}</td>
-                    <td className="py-3.5 px-4 text-center font-mono font-bold">{t.dayTrips}</td>
-                    <td className="py-3.5 px-4 text-right font-mono">{t.brassPerTrip}</td>
-                    <td className="py-3.5 px-4 text-right font-mono text-emerald-400">₹{t.ratePerBrass.toLocaleString()}</td>
-                    <td className="py-3.5 px-6 text-right font-mono font-black text-amber-400 text-sm">
+                    <td className="py-3 sm:py-3.5 px-4 sm:px-6 font-bold text-cyan-400 whitespace-nowrap">{t.siteName}</td>
+                    <td className="py-3 sm:py-3.5 px-4 sm:px-6 font-mono font-bold text-slate-300 whitespace-nowrap">{t.vehicleNumber}</td>
+                    <td className="py-3 sm:py-3.5 px-4 sm:px-6 font-bold text-amber-300 whitespace-nowrap">{t.materialName}</td>
+                    <td className="py-3 sm:py-3.5 px-4 text-center font-mono font-bold whitespace-nowrap">{t.dayTrips}</td>
+                    <td className="py-3 sm:py-3.5 px-4 text-right font-mono whitespace-nowrap">{t.brassPerTrip}</td>
+                    <td className="py-3 sm:py-3.5 px-4 text-right font-mono text-emerald-400 whitespace-nowrap">₹{t.ratePerBrass.toLocaleString()}</td>
+                    <td className="py-3 sm:py-3.5 px-4 sm:px-6 text-right font-mono font-black text-amber-400 text-[11px] sm:text-sm whitespace-nowrap">
                       ₹{t.totalAmount.toLocaleString()}
                     </td>
-                    <td className="py-3.5 px-6 text-right">
-                      <div className="flex items-center justify-end gap-2">
+                    <td className="py-3 sm:py-3.5 px-4 sm:px-6 text-right whitespace-nowrap">
+                      <div className="flex items-center justify-end gap-1.5 sm:gap-2">
                         <button
                           onClick={() => handleEdit(t)}
                           title="Edit Record"
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-blue-400 hover:bg-blue-950/40 transition-colors cursor-pointer"
+                          className="p-1 sm:p-1.5 rounded-lg text-slate-400 hover:text-blue-400 hover:bg-blue-950/40 transition-colors cursor-pointer"
                         >
-                          <Edit2 className="w-4 h-4" />
+                          <Edit2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         </button>
                         <button
                           onClick={() => handleDelete(t.id)}
                           title="Delete Record"
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 transition-colors cursor-pointer"
+                          className="p-1 sm:p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 transition-colors cursor-pointer"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         </button>
                       </div>
                     </td>
@@ -314,19 +311,19 @@ export const MaterialHaulageTripsModule: React.FC = () => {
       {/* Log Total Day Haulage Trips Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-[#121927] border border-[#1E293B] rounded-3xl w-full max-w-lg p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto text-slate-100">
+          <div className="bg-[#121927] border border-[#1E293B] rounded-[1.5rem] sm:rounded-3xl w-full max-w-lg p-5 sm:p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto text-slate-100">
             <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <Truck className="w-4 h-4 text-blue-400" />
+              <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                <Truck className="w-4 h-4 text-blue-400 shrink-0" />
                 <span>{editingId ? 'Edit Haulage Trip' : 'Log Total Day Haulage Trips'}</span>
               </h3>
-              <button onClick={() => { setIsModalOpen(false); setEditingId(null); }} className="text-slate-400 hover:text-white p-1">
+              <button onClick={() => { setIsModalOpen(false); setEditingId(null); }} className="text-slate-400 hover:text-white p-1 cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSave} className="space-y-4 text-xs">
-              <div className="grid grid-cols-2 gap-3">
+            <form onSubmit={handleSave} className="space-y-4 text-[11px] sm:text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-300 font-bold mb-1">Trip Date *</label>
                   <input
@@ -380,7 +377,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
               <div>
                 <label className="block text-slate-300 font-bold mb-1 flex justify-between items-center">
                   <span>Material Name *</span>
-                  <span className="text-[10px] text-blue-400 font-normal">Sourced from Categories Tab</span>
+                  <span className="text-[10px] text-blue-400 font-normal hidden sm:inline">Sourced from Categories Tab</span>
                 </label>
                 <select
                   value={materialName}
@@ -399,14 +396,13 @@ export const MaterialHaulageTripsModule: React.FC = () => {
                     );
                   })}
                   
-                  {/* Keep current selection available even if category was removed */}
                   {!categories.some((c) => `${c.name} (₹${c.standardRate}/${c.unit})` === materialName) && materialName && (
                     <option value={materialName}>{materialName}</option>
                   )}
                 </select>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-slate-300 font-bold mb-1">Day Trips *</label>
                   <input
@@ -443,24 +439,24 @@ export const MaterialHaulageTripsModule: React.FC = () => {
               </div>
 
               {/* Live Calculated Total Amount Display */}
-              <div className="p-4 rounded-2xl bg-[#080d19] border border-[#1E293B] flex items-center justify-between">
-                <span className="text-sm font-bold text-slate-300">Total Day Amount:</span>
-                <span className="text-xl font-black text-amber-400 font-mono">
+              <div className="p-3 sm:p-4 rounded-2xl bg-[#080d19] border border-[#1E293B] flex items-center justify-between mt-2">
+                <span className="text-xs sm:text-sm font-bold text-slate-300">Total Day Amount:</span>
+                <span className="text-lg sm:text-xl font-black text-amber-400 font-mono">
                   ₹{computedTotalAmount.toLocaleString()}
                 </span>
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-[#1E293B]">
+              <div className="flex sm:flex-row flex-col justify-end gap-2 pt-3 border-t border-[#1E293B]">
                 <button
                   type="button"
                   onClick={() => { setIsModalOpen(false); setEditingId(null); }}
-                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white cursor-pointer"
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-slate-400 hover:text-white cursor-pointer font-bold"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black shadow-lg shadow-blue-600/30 cursor-pointer"
+                  className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black shadow-lg shadow-blue-600/30 cursor-pointer"
                 >
                   {editingId ? 'Update Record' : 'Save Record'}
                 </button>

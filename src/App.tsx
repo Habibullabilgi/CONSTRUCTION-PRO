@@ -1,14 +1,12 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ERPProvider, useERP } from './context/ERPContext';
 import { RoadERPProvider } from './context/RoadERPContext';
 import { LoginPage } from './components/auth/LoginPage';
 import { ProjectTypeSelectionPage } from './components/auth/ProjectTypeSelectionPage';
 import { SiteSelectionPage } from './components/auth/SiteSelectionPage';
 import { Header } from './components/Header';
-import { Sidebar } from './components/Sidebar';
 
 // Assuming you have these components in your respective folders. 
-// If any are missing, replace them with a simple <div> placeholder for now.
 import { SiteCentricMidnightDashboard } from './components/dashboard/SiteCentricMidnightDashboard';
 import { RoadSitesManagerModule } from './components/sites/RoadSitesManagerModule';
 import { MaterialHaulageTripsModule } from './components/trips/MaterialHaulageTripsModule';
@@ -19,30 +17,211 @@ import { MachineryFleetModule } from './components/machinery/MachineryFleetModul
 import StockTransactionsModule from './components/building/StockTransactionsModule';
 
 import {
-  Users,
-  Plus,
-  Edit2,
-  Trash2,
-  X,
-  Shield,
-  Clock,
-  CheckCircle2,
-  Search,
-  Download,
-  Package,
-  ArrowLeftRight,
-  FileText,
-  Bell,
-  ShoppingCart,
-  CalendarCheck,
-  Tag,
-  Archive,
-  TrendingUp,
-  TrendingDown
+  LayoutDashboard, Truck, Fuel, DollarSign, Calculator, HardHat,
+  LogOut, Milestone, Users, Package, ArrowLeftRight, FileText,
+  Bell, ShoppingCart, Cpu, CalendarCheck, Tag, Archive, Building2,
+  X, Plus, Edit2, Trash2
 } from 'lucide-react';
 
 // ==========================================
-// Road Material Categories & Rates Module
+// Generic Scaffold View for Pending Tabs (Fixes the Error)
+// ==========================================
+const GenericView: React.FC<{
+  title: string;
+  subtitle: string;
+  icon: React.ComponentType<{ className?: string }>;
+}> = ({ title, subtitle, icon: Icon }) => (
+  <div className="p-6 rounded-3xl bg-[#0c1427] border border-[#182643] shadow-2xl space-y-4 font-sans text-slate-100">
+    <div className="flex items-center gap-3">
+      <div className="w-10 h-10 rounded-2xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400">
+        <Icon className="w-5 h-5" />
+      </div>
+      <div>
+        <h1 className="text-xl font-black text-white tracking-tight">{title}</h1>
+        <p className="text-xs text-slate-400">{subtitle}</p>
+      </div>
+    </div>
+    <div className="p-8 rounded-2xl bg-[#080d19] border border-[#182643] text-center text-slate-400 text-xs">
+      {title} telemetry and operations active.
+    </div>
+  </div>
+);
+
+// ==========================================
+// Sidebar Component (Mobile Friendly)
+// ==========================================
+interface SidebarProps {
+  activeTab: string;
+  setActiveTab: (tab: string) => void;
+  projectType?: 'ROAD' | 'BUILDING';
+  onSwitchDomain?: () => void;
+  onClose?: () => void;
+}
+
+interface NavItem {
+  id: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  badge?: string | number;
+  badgeStyle?: string;
+}
+
+export const Sidebar: React.FC<SidebarProps> = ({
+  activeTab,
+  setActiveTab,
+  projectType = 'ROAD',
+  onSwitchDomain,
+  onClose
+}) => {
+  const { currentUser, logout } = useERP();
+  const isBuilding = projectType === 'BUILDING';
+
+  const roadOperationsItems: NavItem[] = [
+    { id: 'dashboard', label: 'Site Overview', icon: LayoutDashboard },
+    { id: 'road-sites', label: 'Ongoing Site', icon: Milestone, badge: 'Sites', badgeStyle: 'bg-blue-900/40 text-blue-300 border border-blue-500/40' },
+    { id: 'haulage-trips', label: 'Trips', icon: Truck, badge: 'Trips', badgeStyle: 'bg-[#064E3B] text-[#34D399] border border-[#065F46]' },
+    { id: 'diesel', label: 'Diesel', icon: Fuel, badge: 'Diesel', badgeStyle: 'bg-amber-950/60 text-amber-300 border border-amber-800' },
+    { id: 'site-expenses', label: 'Site Expense', icon: DollarSign, badge: 'Petty Cash', badgeStyle: 'bg-[#162032] text-blue-400 border border-[#1E293B]' }
+  ];
+
+  const roadEngineeringItems: NavItem[] = [
+    { id: 'yield_calculator', label: 'Road Trip Calculator', icon: Calculator, badge: 'MoRTH', badgeStyle: 'bg-blue-900/60 text-blue-300 border border-blue-500/40 font-mono' },
+    { id: 'machinery_fleet', label: 'Machinery', icon: HardHat }
+  ];
+
+  const roadConfigItems: NavItem[] = [
+    { id: 'categories', label: 'Categories', icon: Tag, badge: 'Rates', badgeStyle: 'bg-emerald-950/60 text-emerald-300 border border-emerald-800' },
+    { id: 'users', label: 'User Management', icon: Users, badge: 'RBAC', badgeStyle: 'bg-indigo-900/40 text-indigo-300 border border-indigo-500/40' }
+  ];
+
+  const buildingCoreItems: NavItem[] = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'road-sites', label: 'Ongoing Site', icon: Milestone, badge: 'Sites', badgeStyle: 'bg-emerald-950 text-emerald-400 border border-emerald-800' },
+    { id: 'products', label: 'Products', icon: Package },
+    { id: 'transactions', label: 'Transactions', icon: ArrowLeftRight }
+  ];
+
+  const buildingAnalysisItems: NavItem[] = [
+    { id: 'reports', label: 'Reports', icon: FileText },
+    { id: 'alerts', label: 'Alerts', icon: Bell, badge: 3, badgeStyle: 'bg-rose-600 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-black' },
+    { id: 'reorder-suggestions', label: 'Reorder Suggestions', icon: ShoppingCart },
+    { id: 'equipment-register', label: 'Equipment Register', icon: Cpu },
+    { id: 'attendance-salary', label: 'Attendance & Salary', icon: CalendarCheck }
+  ];
+
+  const buildingConfigItems: NavItem[] = [
+    { id: 'categories', label: 'Categories', icon: Tag },
+    { id: 'users', label: 'User Management', icon: Users },
+    { id: 'yearly-archive', label: 'Yearly Archive', icon: Archive }
+  ];
+
+  const renderNavGroup = (title: string | null, items: NavItem[]) => (
+    <div className="space-y-1">
+      {title && (
+        <div className="px-3 text-[10px] font-extrabold uppercase tracking-widest text-[#94A3B8] mb-1">
+          {title}
+        </div>
+      )}
+      <nav className="space-y-0.5">
+        {items.map((item) => {
+          const Icon = item.icon;
+          const isActive = activeTab === item.id;
+
+          return (
+            <button
+              key={item.id}
+              onClick={() => {
+                setActiveTab(item.id);
+                if (onClose) onClose(); // Auto-close on mobile
+              }}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                isActive ? 'bg-[#2563EB] text-white shadow-lg shadow-blue-600/30' : 'text-[#94A3B8] hover:bg-[#162032] hover:text-white'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-[#94A3B8]'}`} />
+                <span>{item.label}</span>
+              </div>
+              {item.badge !== undefined && (
+                <span className={item.badgeStyle || `text-[9px] px-1.5 py-0.5 rounded font-black ${isActive ? 'bg-white/20 text-white' : 'bg-blue-900/40 text-blue-300 border border-blue-500/40'}`}>
+                  {item.badge}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </nav>
+    </div>
+  );
+
+  return (
+    <aside className="w-64 bg-[#0D111D] border-r border-[#1E293B] flex flex-col justify-between shrink-0 h-full overflow-y-auto select-none font-sans z-30 scrollbar-thin scrollbar-thumb-[#1E293B]">
+      <div className="p-3.5 space-y-5">
+        <div className="p-3 bg-[#121927] border border-[#1E293B] rounded-2xl flex items-center justify-between shadow-sm relative">
+          <div className="flex items-center gap-2.5 overflow-hidden pr-6">
+            <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-white font-black shrink-0 shadow-md ${isBuilding ? 'bg-gradient-to-br from-emerald-600 to-teal-700' : 'bg-gradient-to-br from-blue-600 to-indigo-700'}`}>
+              {isBuilding ? <Building2 className="w-4 h-4" /> : <HardHat className="w-4 h-4" />}
+            </div>
+            <div className="truncate">
+              <div className="text-xs font-black text-white uppercase tracking-wider truncate">CONSTRUCTION PRO</div>
+              <div className="text-[10px] text-blue-400 font-mono truncate">
+                {isBuilding ? 'Building Construction ERP' : 'Road Construction ERP'}
+              </div>
+            </div>
+          </div>
+          {onClose && (
+            <button onClick={onClose} className="absolute right-3 lg:hidden text-slate-400 hover:text-white p-1">
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
+        {isBuilding ? (
+          <>
+            {renderNavGroup(null, buildingCoreItems)}
+            {renderNavGroup('ANALYSIS', buildingAnalysisItems)}
+            {renderNavGroup('CONFIGURATION', buildingConfigItems)}
+          </>
+        ) : (
+          <>
+            {renderNavGroup('SITE OPERATIONS', roadOperationsItems)}
+            {renderNavGroup('ENGINEERING', roadEngineeringItems)}
+            {renderNavGroup('CONFIGURATION', roadConfigItems)}
+          </>
+        )}
+      </div>
+
+      <div className="p-3 border-t border-[#1E293B] bg-[#080C14] space-y-2 sticky bottom-0 z-10">
+        {onSwitchDomain && (
+          <button
+            onClick={() => { onSwitchDomain(); if (onClose) onClose(); }}
+            className="w-full py-1.5 px-2 bg-[#121927] hover:bg-[#1b263b] border border-[#1E293B] rounded-xl text-[11px] font-bold text-slate-300 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <span>Switch to {isBuilding ? 'Roads' : 'Buildings'}</span>
+          </button>
+        )}
+
+        <div className="p-2 rounded-xl bg-[#121927] border border-[#1E293B] flex items-center justify-between">
+          <div className="flex items-center gap-2.5 overflow-hidden">
+            <div className="w-8 h-8 rounded-full bg-blue-600/20 border border-blue-500/30 flex items-center justify-center font-bold text-xs text-blue-400 shrink-0">
+              {currentUser?.name ? currentUser.name.charAt(0).toUpperCase() : 'H'}
+            </div>
+            <div className="truncate">
+              <div className="text-xs font-bold text-white truncate">{currentUser?.name || 'Habibulla Bilgi'}</div>
+              <div className="text-[10px] text-[#94A3B8] truncate">Site Engineer & Admin</div>
+            </div>
+          </div>
+          <button onClick={logout} title="Logout" className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-[#162032] transition-colors cursor-pointer">
+            <LogOut className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    </aside>
+  );
+};
+
+// ==========================================
+// Road Material Categories & Rates Module (Mobile Friendly)
 // ==========================================
 export interface RoadMaterialCategory {
   id: string;
@@ -158,9 +337,9 @@ export const RoadMaterialCategoriesModule: React.FC = () => {
               {categories.map((cat) => (
                 <tr key={cat.id} className="hover:bg-[#121c33]/50 transition-colors">
                   <td className="py-4 px-6 font-mono font-bold text-slate-400">{cat.id}</td>
-                  <td className="py-4 px-6 font-bold text-white text-xs">{cat.name}</td>
-                  <td className="py-4 px-6 text-slate-300">{cat.description}</td>
-                  <td className="py-4 px-6 text-right font-mono font-black text-emerald-400 text-sm">
+                  <td className="py-4 px-6 font-bold text-white text-xs whitespace-nowrap">{cat.name}</td>
+                  <td className="py-4 px-6 text-slate-300 min-w-[200px]">{cat.description}</td>
+                  <td className="py-4 px-6 text-right font-mono font-black text-emerald-400 text-sm whitespace-nowrap">
                     ₹{cat.standardRate.toLocaleString()} <span className="text-[10px] text-slate-400 font-normal">/ {cat.unit}</span>
                   </td>
                   <td className="py-4 px-6 text-right">
@@ -197,7 +376,7 @@ export const RoadMaterialCategoriesModule: React.FC = () => {
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-[#121927] border border-[#1E293B] rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4 text-slate-100">
+          <div className="bg-[#121927] border border-[#1E293B] rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4 text-slate-100 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
               <h3 className="text-base font-bold text-white">
                 {editingId ? 'Edit Material Category' : 'Add Road Material Category'}
@@ -231,7 +410,7 @@ export const RoadMaterialCategoriesModule: React.FC = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-300 font-bold mb-1">Standard Rate (₹) *</label>
                   <input
@@ -283,31 +462,7 @@ export const RoadMaterialCategoriesModule: React.FC = () => {
 
 
 // ==========================================
-// Generic Scaffold View for Pending Tabs
-// ==========================================
-const GenericView: React.FC<{
-  title: string;
-  subtitle: string;
-  icon: React.ComponentType<{ className?: string }>;
-}> = ({ title, subtitle, icon: Icon }) => (
-  <div className="p-6 rounded-3xl bg-[#0c1427] border border-[#182643] shadow-2xl space-y-4 font-sans text-slate-100">
-    <div className="flex items-center gap-3">
-      <div className="w-10 h-10 rounded-2xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400">
-        <Icon className="w-5 h-5" />
-      </div>
-      <div>
-        <h1 className="text-xl font-black text-white tracking-tight">{title}</h1>
-        <p className="text-xs text-slate-400">{subtitle}</p>
-      </div>
-    </div>
-    <div className="p-8 rounded-2xl bg-[#080d19] border border-[#182643] text-center text-slate-400 text-xs">
-      {title} telemetry and operations active.
-    </div>
-  </div>
-);
-
-// ==========================================
-// Main Application Router
+// Main Application Router (Mobile Overlay Setup)
 // ==========================================
 export const AppContent: React.FC = () => {
   const { isAuthenticated, selectedSiteId, setSelectedSiteId, siteSheets } = useERP();
@@ -329,7 +484,7 @@ export const AppContent: React.FC = () => {
   });
 
   const [activeTab, setActiveTab] = useState<string>('dashboard');
-  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false); // Hidden on mobile initially
 
   if (!isAuthenticated) {
     return <LoginPage />;
@@ -373,22 +528,36 @@ export const AppContent: React.FC = () => {
         onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
       />
 
-      <div className="flex flex-1 relative min-h-[calc(100vh-48px)]">
+      <div className="flex flex-1 relative h-[calc(100vh-48px)] overflow-hidden">
+        
+        {/* Mobile Sidebar Overlay Backdrop */}
         {isSidebarOpen && (
+          <div 
+            className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-40 lg:hidden animate-in fade-in"
+            onClick={() => setIsSidebarOpen(false)}
+          />
+        )}
+
+        {/* Sliding Sidebar Container */}
+        <div className={`fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:h-[calc(100vh-48px)] shadow-2xl lg:shadow-none ${
+            isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}>
           <Sidebar
             activeTab={activeTab}
             setActiveTab={setActiveTab}
             projectType={projectType}
+            onClose={() => setIsSidebarOpen(false)} // Pass close handler
             onSwitchDomain={() => {
               const next = projectType === 'ROAD' ? 'BUILDING' : 'ROAD';
               setProjectType(next);
               sessionStorage.setItem('CONSTRUCTION_PRO_DOMAIN_SESSION', next);
             }}
           />
-        )}
+        </div>
 
-        <main className="flex-1 p-4 sm:p-6 overflow-y-auto max-h-[calc(100vh-48px)] scrollbar-thin scrollbar-thumb-[#1E293B] scrollbar-track-transparent">
-          <div className="max-w-7xl mx-auto pb-12">
+        {/* Main Content Area */}
+        <main className="flex-1 w-full min-w-0 p-4 sm:p-6 overflow-y-auto max-h-[calc(100vh-48px)] scrollbar-thin scrollbar-thumb-[#1E293B] scrollbar-track-transparent">
+          <div className="max-w-7xl mx-auto pb-12 w-full overflow-x-hidden">
             
             {/* Shared Route */}
             {activeTab === 'dashboard' && <SiteCentricMidnightDashboard onNavigateTab={setActiveTab} />}
@@ -404,8 +573,6 @@ export const AppContent: React.FC = () => {
                 {activeTab === 'site-expenses' && <SiteCostExpensesModule />}
                 {(activeTab === 'yield_calculator' || activeTab === 'road-yield') && <RoadYieldCalculatorModule />}
                 {(activeTab === 'machinery_fleet' || activeTab === 'machinery') && <MachineryFleetModule />}
-                
-                {/* 🔴 HERE IS THE FIX: Routing to the Categories component when activeTab === 'categories' */}
                 {activeTab === 'categories' && <RoadMaterialCategoriesModule />}
 
                 {/* Road Config Fallbacks */}

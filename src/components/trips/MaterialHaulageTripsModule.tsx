@@ -55,13 +55,22 @@ const INITIAL_HAULAGE_TRIPS: HaulageTripRecord[] = [
 ];
 
 export const MaterialHaulageTripsModule: React.FC = () => {
-  const { siteSheets = [] } = useERP();
+  const { siteSheets = [], selectedSiteId } = useERP();
+
+  // Resolve active site based on global header selection
+  const currentActiveSite = siteSheets.find((s: any) => s.siteId === selectedSiteId);
+  const activeSiteName = currentActiveSite?.siteName || siteSheets[0]?.siteName || 'SINDAGI - ALMEL ROAD';
 
   // Load Trips safely
   const [trips, setTrips] = useState<HaulageTripRecord[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_HAULAGE_KEY);
-      return saved ? JSON.parse(saved) : INITIAL_HAULAGE_TRIPS;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+      localStorage.setItem(STORAGE_HAULAGE_KEY, JSON.stringify(INITIAL_HAULAGE_TRIPS));
+      return INITIAL_HAULAGE_TRIPS;
     } catch {
       return INITIAL_HAULAGE_TRIPS;
     }
@@ -83,7 +92,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
 
   // Form States
   const [tripDate, setTripDate] = useState('2026-08-19');
-  const [siteName, setSiteName] = useState('SINDAGI - ALMEL ROAD');
+  const [siteName, setSiteName] = useState(activeSiteName);
   const [vehicleNumber, setVehicleNumber] = useState('TOTAL TRIPS');
   
   const defaultCategory = categories[0] 
@@ -142,23 +151,24 @@ export const MaterialHaulageTripsModule: React.FC = () => {
     return tripsNum * brassNum * rateNum;
   }, [dayTrips, brassPerTrip, ratePerBrass]);
 
+  // Dynamically filter trips by the active site header
   const filtered = useMemo(() => {
     return trips.filter((t) => {
+      const matchSite = t.siteName === activeSiteName;
       const q = searchQuery.toLowerCase();
-      return (
+      const matchQuery =
         !q ||
-        t.siteName.toLowerCase().includes(q) ||
         t.vehicleNumber.toLowerCase().includes(q) ||
         t.materialName.toLowerCase().includes(q) ||
-        t.id.toLowerCase().includes(q)
-      );
+        t.id.toLowerCase().includes(q);
+      return matchSite && matchQuery;
     });
-  }, [trips, searchQuery]);
+  }, [trips, activeSiteName, searchQuery]);
 
   const handleOpenAdd = () => {
     setEditingId(null);
     setTripDate(new Date().toISOString().split('T')[0]);
-    setSiteName(siteSheets[0]?.siteName || 'SINDAGI - ALMEL ROAD');
+    setSiteName(activeSiteName);
     setVehicleNumber('TOTAL TRIPS');
     setMaterialName(defaultCategory);
     setDayTrips(10);
@@ -192,7 +202,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
     const record: HaulageTripRecord = {
       id: editingId || `TRIP-${Date.now().toString().slice(-4)}`,
       tripDate,
-      siteName: siteName.trim() || 'SINDAGI - ALMEL ROAD',
+      siteName: siteName.trim() || activeSiteName,
       vehicleNumber: vehicleNumber.trim() || 'TOTAL TRIPS',
       materialName,
       dayTrips: Number(dayTrips),
@@ -221,7 +231,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
           </div>
           <div>
             <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">Material Haulage Trips</h1>
-            <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5">Track daily trip counts, material volumes, and haulage expenses.</p>
+            <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5">Track daily trip counts, material volumes, and haulage expenses for {activeSiteName}.</p>
           </div>
         </div>
 
@@ -240,7 +250,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
           <Search className="absolute left-3.5 top-2.5 sm:top-3 w-4 h-4 text-slate-500" />
           <input
             type="text"
-            placeholder="Search by site, vehicle, material name..."
+            placeholder="Search by vehicle, material name..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-2 bg-[#080d19] border border-[#1E293B] rounded-xl text-white outline-none placeholder-slate-500"
@@ -269,7 +279,7 @@ export const MaterialHaulageTripsModule: React.FC = () => {
               {filtered.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="py-8 text-center text-slate-500">
-                    No haulage trip records found.
+                    No haulage trip records found for {activeSiteName}.
                   </td>
                 </tr>
               ) : (

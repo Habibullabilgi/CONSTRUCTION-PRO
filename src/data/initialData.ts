@@ -18,10 +18,6 @@ import {
   RoadSection,
   BuildingFloor,
   BBSItem,
-  RCCFootingInput,
-  RCCColumnInput,
-  RCCBeamInput,
-  RCCSlabInput,
   SiteMatrixSheet,
   SiteExpenseRecord
 } from '../types/erp';
@@ -222,7 +218,51 @@ export const INITIAL_NOTIFICATIONS: ERPNotification[] = [];
 export const INITIAL_AUDIT_LOGS: AuditLogEntry[] = [];
 
 // ==========================================
-// 5. Zero-Quantity Matrix Rows Helper
+// 5. Unified Pre-Populated Sample Datasets
+// ==========================================
+export const INITIAL_HAULAGE_TRIPS = [
+  {
+    id: 'TRIP-101',
+    tripDate: '2026-08-19',
+    siteName: 'Ongoing Highway Site (Active Stretch)',
+    vehicleNumber: '8797',
+    materialName: 'Bituminous Macadam (BM) (₹5000/Brass)',
+    dayTrips: 10,
+    brassPerTrip: 6,
+    ratePerBrass: 5000,
+    totalAmount: 300000
+  }
+];
+
+export const INITIAL_DIESEL_LOGS_SAMPLE = [
+  {
+    id: 'DSL-101',
+    date: '2026-08-19',
+    siteName: 'Ongoing Highway Site (Active Stretch)',
+    vehicleNumber: '8797',
+    driverName: 'Santosh Kamble',
+    slipNumber: 'V-001',
+    litres: 100,
+    ratePerLitre: 92.5,
+    totalCost: 9250.00
+  }
+];
+
+export const INITIAL_SITE_EXPENSES_SAMPLE = [
+  {
+    id: 'EXP-101',
+    date: '2026-08-19',
+    siteName: 'Ongoing Highway Site (Active Stretch)',
+    title: 'Weekly Labor Payout',
+    vendor: 'Local Contractor',
+    category: 'Labor/Wages',
+    amount: 45000,
+    status: 'Paid'
+  }
+];
+
+// ==========================================
+// 6. Zero-Quantity Matrix Rows Helper
 // ==========================================
 const ongoingVehicles = ['8797', '7352', '7353', '9579', '9580'];
 
@@ -248,7 +288,7 @@ const buildCleanTabRows = (itemName: string, defaultRate: number, unit: string) 
 };
 
 // ==========================================
-// 6. Single Live Ongoing Site Matrix Sheet
+// 7. Single Live Ongoing Site Matrix Sheet
 // ==========================================
 export const INITIAL_SITE_SHEETS: SiteMatrixSheet[] = [
   {

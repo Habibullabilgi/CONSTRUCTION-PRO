@@ -28,7 +28,7 @@ interface Props {
   setActiveTab: (tab: string) => void;
   projectType?: 'ROAD' | 'BUILDING';
   onSwitchDomain?: () => void;
-  onClose?: () => void; // Mobile drawer close handler
+  onClose?: () => void;
 }
 
 interface NavItem {
@@ -49,9 +49,6 @@ export const Sidebar: React.FC<Props> = ({
   const { currentUser, logout } = useERP();
   const isBuilding = projectType === 'BUILDING';
 
-  // ==========================================
-  // ROAD CONSTRUCTION NAVIGATION ITEMS
-  // ==========================================
   const roadOperationsItems: NavItem[] = [
     { id: 'dashboard', label: 'Site Overview', icon: LayoutDashboard },
     {
@@ -116,9 +113,6 @@ export const Sidebar: React.FC<Props> = ({
     }
   ];
 
-  // ==========================================
-  // BUILDING CONSTRUCTION NAVIGATION ITEMS
-  // ==========================================
   const buildingCoreItems: NavItem[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     {
@@ -169,7 +163,7 @@ export const Sidebar: React.FC<Props> = ({
               key={item.id}
               onClick={() => {
                 setActiveTab(item.id);
-                if (onClose) onClose(); // Automatically close mobile drawer on selection
+                if (onClose) onClose();
               }}
               className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer active:scale-[0.98] ${
                 isActive
@@ -201,10 +195,8 @@ export const Sidebar: React.FC<Props> = ({
   );
 
   return (
-    <aside className="w-full h-full bg-[#0D111D] border-r border-[#1E293B] flex flex-col justify-between shrink-0 overflow-y-auto select-none font-sans scrollbar-thin scrollbar-thumb-[#1E293B] pb-safe">
+    <aside className="w-full h-full bg-[#0D111D] border-r border-[#1E293B] flex flex-col justify-between shrink-0 overflow-y-auto select-none font-sans scrollbar-thin scrollbar-thumb-[#1E293B]">
       <div className="p-3.5 sm:p-4 space-y-6">
-        
-        {/* Brand Header with Mobile Close Button */}
         <div className="p-3.5 bg-[#121927] border border-[#1E293B] rounded-2xl flex items-center justify-between shadow-sm relative">
           <div className="flex items-center gap-3 overflow-hidden pr-8">
             <div
@@ -226,7 +218,6 @@ export const Sidebar: React.FC<Props> = ({
             </div>
           </div>
           
-          {/* Mobile Drawer Close Button */}
           {onClose && (
             <button 
               onClick={onClose} 
@@ -238,7 +229,6 @@ export const Sidebar: React.FC<Props> = ({
           )}
         </div>
 
-        {/* Navigation Group Layout */}
         {isBuilding ? (
           <div className="space-y-4">
             {renderNavGroup(null, buildingCoreItems)}
@@ -254,7 +244,6 @@ export const Sidebar: React.FC<Props> = ({
         )}
       </div>
 
-      {/* Bottom Footer Area (Domain Switcher & User Profile) */}
       <div className="p-3.5 border-t border-[#1E293B] bg-[#080C14] space-y-2.5 sticky bottom-0 z-10 shadow-lg">
         {onSwitchDomain && (
           <button

@@ -5,7 +5,7 @@ import { LoginPage } from './components/auth/LoginPage';
 import { ProjectTypeSelectionPage } from './components/auth/ProjectTypeSelectionPage';
 import { SiteSelectionPage } from './components/auth/SiteSelectionPage';
 import { Header } from './components/Header';
-import { Sidebar, RoadMaterialCategoriesModule } from './App'; // Or from your sidebar file path
+import { Sidebar, RoadMaterialCategoriesModule } from './Sidebar';
 
 import { SiteCentricMidnightDashboard } from './components/dashboard/SiteCentricMidnightDashboard';
 import { RoadSitesManagerModule } from './components/sites/RoadSitesManagerModule';

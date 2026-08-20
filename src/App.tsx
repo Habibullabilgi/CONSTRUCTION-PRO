@@ -456,6 +456,60 @@ export const RoadMaterialCategoriesModule: React.FC = () => {
 export const AppContent: React.FC = () => {
   const { isAuthenticated, selectedSiteId, setSelectedSiteId, siteSheets } = useERP();
 
+  // Auto-seed default master sample datasets on first load for any device
+  useEffect(() => {
+    try {
+      if (!localStorage.getItem('CONSTRUCTION_PRO_HAULAGE_TRIPS_V2')) {
+        localStorage.setItem('CONSTRUCTION_PRO_HAULAGE_TRIPS_V2', JSON.stringify([
+          {
+            id: 'TRIP-101',
+            tripDate: '2026-08-19',
+            siteName: 'Ongoing Highway Site (Active Stretch)',
+            vehicleNumber: '8797',
+            materialName: 'Bituminous Macadam (BM) (₹5000/Brass)',
+            dayTrips: 10,
+            brassPerTrip: 6,
+            ratePerBrass: 5000,
+            totalAmount: 300000
+          }
+        ]));
+      }
+
+      if (!localStorage.getItem('CONSTRUCTION_PRO_DIESEL_LOGS_V1')) {
+        localStorage.setItem('CONSTRUCTION_PRO_DIESEL_LOGS_V1', JSON.stringify([
+          {
+            id: 'DSL-101',
+            date: '2026-08-19',
+            siteName: 'Ongoing Highway Site (Active Stretch)',
+            vehicleNumber: '8797',
+            driverName: 'Santosh Kamble',
+            slipNumber: 'V-001',
+            litres: 100,
+            ratePerLitre: 92.5,
+            totalCost: 9250.00
+          }
+        ]));
+      }
+
+      if (!localStorage.getItem('CONSTRUCTION_PRO_SITE_EXPENSES_V1')) {
+        localStorage.setItem('CONSTRUCTION_PRO_SITE_EXPENSES_V1', JSON.stringify([
+          {
+            id: 'EXP-101',
+            date: '2026-08-19',
+            siteName: 'Ongoing Highway Site (Active Stretch)',
+            title: 'Weekly Labor Payout',
+            vendor: 'Local Contractor',
+            category: 'Labor/Wages',
+            amount: 45000,
+            status: 'Paid'
+          }
+        ]));
+      }
+    } catch (e) {
+      console.error('Failed to auto-seed initial data', e);
+    }
+  }, []);
+
   const [projectType, setProjectType] = useState<'ROAD' | 'BUILDING' | null>(() => {
     try {
       return (sessionStorage.getItem('CONSTRUCTION_PRO_DOMAIN_SESSION') as any) || null;

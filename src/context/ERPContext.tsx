@@ -49,7 +49,10 @@ import {
   INITIAL_NOTIFICATIONS,
   INITIAL_AUDIT_LOGS,
   INITIAL_SITE_SHEETS,
-  INITIAL_SITE_EXPENSES
+  INITIAL_SITE_EXPENSES,
+  INITIAL_HAULAGE_TRIPS,
+  INITIAL_DIESEL_LOGS_SAMPLE,
+  INITIAL_SITE_EXPENSES_SAMPLE
 } from '../data/initialData';
 
 export interface ManagedUser extends User {
@@ -141,7 +144,6 @@ interface ERPContextType {
   userRole: UserRole | string;
   setUserRole: (role: UserRole | string) => void;
 
-  // User Management
   usersList: ManagedUser[];
   addManagedUser: (user: Omit<ManagedUser, 'id'>) => void;
   updateManagedUser: (id: string, user: Partial<ManagedUser>) => void;
@@ -201,7 +203,6 @@ interface ERPContextType {
   deleteSiteExpense: (id: string) => void;
   updateSiteExpenseStatus: (id: string, status: 'PAID' | 'PENDING' | 'APPROVED') => void;
 
-  // Machinery & Heavy Fleet
   machinery: MachineryRecord[];
   addMachinery: (machine: Omit<MachineryRecord, 'id'>) => void;
   deleteMachinery: (id: string) => void;
@@ -411,11 +412,11 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     safeGetJSON(LOCAL_STORAGE_KEY + '_CONSUMPTION', INITIAL_CONSUMPTION_RECORDS)
   );
 
-  const [vehicleTrips, setVehicleTrips] = useState<VehicleTrip[]>(() =>
-    safeGetJSON(LOCAL_STORAGE_KEY + '_TRIPS', INITIAL_VEHICLE_TRIPS)
-  );
+  const [vehicleTrips, setVehicleTrips] = useState<VehicleTrip[]>(() => {
+    const saved = safeGetJSON(LOCAL_STORAGE_KEY + '_TRIPS', INITIAL_HAULAGE_TRIPS);
+    return Array.isArray(saved) && saved.length > 0 ? saved : INITIAL_HAULAGE_TRIPS;
+  });
 
-  // Machinery & Fleet State
   const [machinery, setMachinery] = useState<MachineryRecord[]>(() =>
     safeGetJSON(LOCAL_STORAGE_KEY + '_MACHINERY', [])
   );
@@ -438,9 +439,10 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     safeGetJSON(LOCAL_STORAGE_KEY + '_MACHINERY_LOGS', INITIAL_MACHINERY_LOGS)
   );
 
-  const [dieselLogs, setDieselLogs] = useState<DieselLog[]>(() =>
-    safeGetJSON(LOCAL_STORAGE_KEY + '_DIESEL_LOGS', INITIAL_DIESEL_LOGS)
-  );
+  const [dieselLogs, setDieselLogs] = useState<DieselLog[]>(() => {
+    const saved = safeGetJSON(LOCAL_STORAGE_KEY + '_DIESEL_LOGS', INITIAL_DIESEL_LOGS_SAMPLE);
+    return Array.isArray(saved) && saved.length > 0 ? saved : INITIAL_DIESEL_LOGS_SAMPLE;
+  });
 
   const [workers, setWorkers] = useState<Worker[]>(() =>
     safeGetJSON(LOCAL_STORAGE_KEY + '_WORKERS', INITIAL_WORKERS)
@@ -480,9 +482,10 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     safeGetJSON(LOCAL_STORAGE_KEY + '_AUDIT', INITIAL_AUDIT_LOGS)
   );
 
-  const [siteExpenses, setSiteExpenses] = useState<SiteExpenseRecord[]>(() =>
-    safeGetJSON(LOCAL_STORAGE_KEY + '_SITE_EXPENSES', INITIAL_SITE_EXPENSES)
-  );
+  const [siteExpenses, setSiteExpenses] = useState<SiteExpenseRecord[]>(() => {
+    const saved = safeGetJSON(LOCAL_STORAGE_KEY + '_SITE_EXPENSES', INITIAL_SITE_EXPENSES_SAMPLE);
+    return Array.isArray(saved) && saved.length > 0 ? saved : INITIAL_SITE_EXPENSES_SAMPLE;
+  });
 
   const currentProject = projects.find((p) => p.id === selectedProjectId) || projects[0];
   const currentSite = currentProject?.sites?.find((s) => s.id === selectedSiteId) || currentProject?.sites?.[0];
@@ -789,7 +792,6 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setBuildingFloors((prev) => [...prev, newFloor]);
   };
 
-  // Trips CRUD
   const addVehicleTrip = (tripData: Omit<VehicleTrip, 'id'>) => {
     const newId = 'trip-' + Date.now();
     setVehicleTrips((prev) => [{ ...tripData, id: newId }, ...prev]);
@@ -803,13 +805,11 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setVehicleTrips((prev) => prev.map((t) => (t.id === tripId ? { ...t, approvalStatus: status } : t)));
   };
 
-  // Machinery Logs CRUD
   const addMachineryLog = (logData: Omit<MachineryLog, 'id'>) => {
     const newId = 'mlog-' + Date.now();
     setMachineryLogs((prev) => [{ ...logData, id: newId }, ...prev]);
   };
 
-  // Diesel Logs CRUD
   const addDieselLog = (logData: Omit<DieselLog, 'id'>) => {
     const newId = 'dsl-' + Date.now();
     setDieselLogs((prev) => [{ ...logData, id: newId }, ...prev]);
@@ -1052,10 +1052,10 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setMaterials(INITIAL_MATERIALS);
     setStockLedger(INITIAL_STOCK_LEDGER);
     setConsumptionRecords(INITIAL_CONSUMPTION_RECORDS);
-    setVehicleTrips(INITIAL_VEHICLE_TRIPS);
+    setVehicleTrips(INITIAL_HAULAGE_TRIPS);
     setMachinery([]);
     setMachineryLogs(INITIAL_MACHINERY_LOGS);
-    setDieselLogs(INITIAL_DIESEL_LOGS);
+    setDieselLogs(INITIAL_DIESEL_LOGS_SAMPLE);
     setWorkers(INITIAL_WORKERS);
     setAttendanceRecords(INITIAL_ATTENDANCE);
     setRoadProductions(INITIAL_ROAD_PRODUCTION);
@@ -1066,7 +1066,7 @@ export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setNotifications(INITIAL_NOTIFICATIONS);
     setAuditLogs(INITIAL_AUDIT_LOGS);
     setSiteSheets(INITIAL_SITE_SHEETS);
-    setSiteExpenses(INITIAL_SITE_EXPENSES);
+    setSiteExpenses(INITIAL_SITE_EXPENSES_SAMPLE);
   };
 
   const exportDatabaseJSON = () => {

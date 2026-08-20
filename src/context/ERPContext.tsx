@@ -262,6 +262,23 @@ const safeGetJSON = <T,>(key: string, fallback: T): T => {
 };
 
 export const ERPProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  // Auto-reset mobile/desktop local cache if version changes to ensure sync across devices
+  useEffect(() => {
+    try {
+      const CURRENT_DATA_VERSION = 'v8_universal_sync_fix';
+      const savedVersion = localStorage.getItem('CONSTRUCTION_PRO_DATA_VERSION');
+      if (savedVersion !== CURRENT_DATA_VERSION) {
+        localStorage.removeItem(LOCAL_STORAGE_KEY + '_TRIPS');
+        localStorage.removeItem(LOCAL_STORAGE_KEY + '_DIESEL_LOGS');
+        localStorage.removeItem(LOCAL_STORAGE_KEY + '_SITE_EXPENSES');
+        localStorage.setItem('CONSTRUCTION_PRO_DATA_VERSION', CURRENT_DATA_VERSION);
+        window.location.reload();
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
   const [usersList, setUsersList] = useState<ManagedUser[]>(() =>
     safeGetJSON(LOCAL_STORAGE_KEY + '_USER_ACCOUNTS', DEFAULT_MANAGED_USERS)
   );

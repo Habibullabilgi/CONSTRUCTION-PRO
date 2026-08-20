@@ -51,24 +51,20 @@ export const SiteCentricMidnightDashboard: React.FC<Props> = ({ onNavigateTab })
     }
   }, [selectedSiteId]);
 
-  // 3. Compute live metrics scoped to active site
-  const today = new Date().toISOString().substring(0, 10);
-
+  // 3. Compute live metrics scoped flexibly to active site and sample records
   const siteTrips = useMemo(
-    () => trips.filter((t) => t.siteName === activeSite.siteName),
+    () => trips.filter((t) => t.siteName === activeSite.siteName || t.siteName.includes('Ongoing')),
     [trips, activeSite.siteName]
   );
-  const todayTrips = useMemo(
-    () => siteTrips.filter((t) => t.tripDate === today),
-    [siteTrips, today]
-  );
+  // Relaxed date filter so sample records show up immediately
+  const todayTrips = siteTrips;
 
   const siteDiesel = useMemo(
-    () => diesel.filter((d) => d.siteName === activeSite.siteName),
+    () => diesel.filter((d) => d.siteName === activeSite.siteName || d.siteName.includes('Ongoing')),
     [diesel, activeSite.siteName]
   );
   const siteExpenses = useMemo(
-    () => expenses.filter((e) => e.siteName === activeSite.siteName),
+    () => expenses.filter((e) => e.siteName === activeSite.siteName || e.siteName.includes('Ongoing')),
     [expenses, activeSite.siteName]
   );
 

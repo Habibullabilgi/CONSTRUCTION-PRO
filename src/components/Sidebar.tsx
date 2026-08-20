@@ -19,8 +19,7 @@ import {
   CalendarCheck,
   Tag,
   Archive,
-  Building2,
-  X
+  Building2
 } from 'lucide-react';
 
 interface Props {
@@ -28,7 +27,6 @@ interface Props {
   setActiveTab: (tab: string) => void;
   projectType?: 'ROAD' | 'BUILDING';
   onSwitchDomain?: () => void;
-  onClose?: () => void;
 }
 
 interface NavItem {
@@ -43,12 +41,14 @@ export const Sidebar: React.FC<Props> = ({
   activeTab,
   setActiveTab,
   projectType = 'ROAD',
-  onSwitchDomain,
-  onClose
+  onSwitchDomain
 }) => {
   const { currentUser, logout } = useERP();
   const isBuilding = projectType === 'BUILDING';
 
+  // ==========================================
+  // ROAD CONSTRUCTION NAVIGATION ITEMS
+  // ==========================================
   const roadOperationsItems: NavItem[] = [
     { id: 'dashboard', label: 'Site Overview', icon: LayoutDashboard },
     {
@@ -113,6 +113,9 @@ export const Sidebar: React.FC<Props> = ({
     }
   ];
 
+  // ==========================================
+  // BUILDING CONSTRUCTION NAVIGATION ITEMS
+  // ==========================================
   const buildingCoreItems: NavItem[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     {
@@ -147,13 +150,13 @@ export const Sidebar: React.FC<Props> = ({
   ];
 
   const renderNavGroup = (title: string | null, items: NavItem[]) => (
-    <div className="space-y-1.5">
+    <div className="space-y-1">
       {title && (
         <div className="px-3 text-[10px] font-extrabold uppercase tracking-widest text-[#94A3B8] mb-1">
           {title}
         </div>
       )}
-      <nav className="space-y-1">
+      <nav className="space-y-0.5">
         {items.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
@@ -161,29 +164,17 @@ export const Sidebar: React.FC<Props> = ({
           return (
             <button
               key={item.id}
-              onClick={() => {
-                setActiveTab(item.id);
-                if (onClose) onClose();
-              }}
-              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer active:scale-[0.98] ${
-                isActive
-                  ? 'bg-[#2563EB] text-white shadow-lg shadow-blue-600/30'
-                  : 'text-[#94A3B8] hover:bg-[#162032] hover:text-white'
+              onClick={() => setActiveTab(item.id)}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                isActive ? 'bg-[#2563EB] text-white shadow-lg shadow-blue-600/30' : 'text-[#94A3B8] hover:bg-[#162032] hover:text-white'
               }`}
             >
-              <div className="flex items-center gap-3">
-                <Icon className={`w-4 h-4 sm:w-5 sm:h-5 shrink-0 ${isActive ? 'text-white' : 'text-[#94A3B8]'}`} />
+              <div className="flex items-center gap-2.5">
+                <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-[#94A3B8]'}`} />
                 <span>{item.label}</span>
               </div>
               {item.badge !== undefined && (
-                <span
-                  className={
-                    item.badgeStyle ||
-                    `text-[9px] px-2 py-0.5 rounded font-black ${
-                      isActive ? 'bg-white/20 text-white' : 'bg-blue-900/40 text-blue-300 border border-blue-500/40'
-                    }`
-                  }
-                >
+                <span className={item.badgeStyle || `text-[9px] px-1.5 py-0.5 rounded font-black ${isActive ? 'bg-white/20 text-white' : 'bg-blue-900/40 text-blue-300 border border-blue-500/40'}`}>
                   {item.badge}
                 </span>
               )}
@@ -195,89 +186,59 @@ export const Sidebar: React.FC<Props> = ({
   );
 
   return (
-    <aside className="w-full h-full bg-[#0D111D] border-r border-[#1E293B] flex flex-col justify-between shrink-0 overflow-y-auto select-none font-sans scrollbar-thin scrollbar-thumb-[#1E293B]">
-      <div className="p-3.5 sm:p-4 space-y-6">
-        <div className="p-3.5 bg-[#121927] border border-[#1E293B] rounded-2xl flex items-center justify-between shadow-sm relative">
-          <div className="flex items-center gap-3 overflow-hidden pr-8">
-            <div
-              className={`w-9 h-9 rounded-xl flex items-center justify-center text-white font-black shrink-0 shadow-md ${
-                isBuilding
-                  ? 'bg-gradient-to-br from-emerald-600 to-teal-700 shadow-emerald-600/30'
-                  : 'bg-gradient-to-br from-blue-600 to-indigo-700 shadow-blue-600/30'
-              }`}
-            >
-              {isBuilding ? <Building2 className="w-5 h-5" /> : <HardHat className="w-5 h-5" />}
+    <aside className="w-64 bg-[#0D111D] border-r border-[#1E293B] flex flex-col justify-between shrink-0 h-full overflow-y-auto select-none font-sans z-30 scrollbar-thin scrollbar-thumb-[#1E293B]">
+      <div className="p-3.5 space-y-5">
+        <div className="p-3 bg-[#121927] border border-[#1E293B] rounded-2xl flex items-center justify-between shadow-sm relative">
+          <div className="flex items-center gap-2.5 overflow-hidden pr-2">
+            <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-white font-black shrink-0 shadow-md ${isBuilding ? 'bg-gradient-to-br from-emerald-600 to-teal-700' : 'bg-gradient-to-br from-blue-600 to-indigo-700'}`}>
+              {isBuilding ? <Building2 className="w-4 h-4" /> : <HardHat className="w-4 h-4" />}
             </div>
             <div className="truncate">
-              <div className="text-xs sm:text-sm font-black text-white uppercase tracking-wider truncate">
-                CONSTRUCTION PRO
-              </div>
-              <div className="text-[10px] sm:text-xs text-blue-400 font-mono truncate">
+              <div className="text-xs font-black text-white uppercase tracking-wider truncate">CONSTRUCTION PRO</div>
+              <div className="text-[10px] text-blue-400 font-mono truncate">
                 {isBuilding ? 'Building Construction ERP' : 'Road Construction ERP'}
               </div>
             </div>
           </div>
-          
-          {onClose && (
-            <button 
-              onClick={onClose} 
-              className="absolute right-3 p-1.5 rounded-xl bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700 transition-colors cursor-pointer lg:hidden"
-              title="Close Menu"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          )}
         </div>
 
         {isBuilding ? (
-          <div className="space-y-4">
+          <>
             {renderNavGroup(null, buildingCoreItems)}
             {renderNavGroup('ANALYSIS', buildingAnalysisItems)}
             {renderNavGroup('CONFIGURATION', buildingConfigItems)}
-          </div>
+          </>
         ) : (
-          <div className="space-y-4">
+          <>
             {renderNavGroup('SITE OPERATIONS', roadOperationsItems)}
             {renderNavGroup('ENGINEERING', roadEngineeringItems)}
             {renderNavGroup('CONFIGURATION', roadConfigItems)}
-          </div>
+          </>
         )}
       </div>
 
-      <div className="p-3.5 border-t border-[#1E293B] bg-[#080C14] space-y-2.5 sticky bottom-0 z-10 shadow-lg">
+      <div className="p-3 border-t border-[#1E293B] bg-[#080C14] space-y-2 sticky bottom-0 z-10">
         {onSwitchDomain && (
           <button
-            onClick={() => {
-              onSwitchDomain();
-              if (onClose) onClose();
-            }}
-            className="w-full py-2.5 px-3 bg-[#121927] hover:bg-[#1b263b] border border-[#1E293B] rounded-xl text-xs font-bold text-slate-300 flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-sm active:scale-[0.98]"
+            onClick={onSwitchDomain}
+            className="w-full py-1.5 px-2 bg-[#121927] hover:bg-[#1b263b] border border-[#1E293B] rounded-xl text-[11px] font-bold text-slate-300 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
           >
-            <span>Switch to {isBuilding ? 'Roads' : 'Buildings'} Mode</span>
+            <span>Switch to {isBuilding ? 'Roads' : 'Buildings'}</span>
           </button>
         )}
 
-        <div className="p-2.5 rounded-2xl bg-[#121927] border border-[#1E293B] flex items-center justify-between">
-          <div className="flex items-center gap-3 overflow-hidden">
-            <div className="w-9 h-9 rounded-full bg-blue-600/20 border border-blue-500/30 flex items-center justify-center font-bold text-xs sm:text-sm text-blue-400 shrink-0">
+        <div className="p-2 rounded-xl bg-[#121927] border border-[#1E293B] flex items-center justify-between">
+          <div className="flex items-center gap-2.5 overflow-hidden">
+            <div className="w-8 h-8 rounded-full bg-blue-600/20 border border-blue-500/30 flex items-center justify-center font-bold text-xs text-blue-400 shrink-0">
               {currentUser?.name ? currentUser.name.charAt(0).toUpperCase() : 'H'}
             </div>
             <div className="truncate">
-              <div className="text-xs sm:text-sm font-bold text-white truncate">
-                {currentUser?.name || 'Habibulla Bilgi'}
-              </div>
-              <div className="text-[10px] sm:text-xs text-[#94A3B8] truncate">
-                Site Engineer & Admin
-              </div>
+              <div className="text-xs font-bold text-white truncate">{currentUser?.name || 'Habibulla Bilgi'}</div>
+              <div className="text-[10px] text-[#94A3B8] truncate">Site Engineer & Admin</div>
             </div>
           </div>
-
-          <button
-            onClick={logout}
-            title="Logout"
-            className="p-2 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-[#162032] transition-colors cursor-pointer shrink-0"
-          >
-            <LogOut className="w-4 h-4 sm:w-5 sm:h-5" />
+          <button onClick={logout} title="Logout" className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-[#162032] transition-colors cursor-pointer">
+            <LogOut className="w-4 h-4" />
           </button>
         </div>
       </div>

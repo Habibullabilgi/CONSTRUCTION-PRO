@@ -4,8 +4,6 @@ import { RoadERPProvider } from './context/RoadERPContext';
 import { LoginPage } from './components/auth/LoginPage';
 import { ProjectTypeSelectionPage } from './components/auth/ProjectTypeSelectionPage';
 import { SiteSelectionPage } from './components/auth/SiteSelectionPage';
-import { Header } from './components/Header';
-import { Sidebar } from './Sidebar';
 
 import { SiteCentricMidnightDashboard } from './components/dashboard/SiteCentricMidnightDashboard';
 import { RoadSitesManagerModule } from './components/sites/RoadSitesManagerModule';
@@ -17,9 +15,10 @@ import { MachineryFleetModule } from './components/machinery/MachineryFleetModul
 import StockTransactionsModule from './components/building/StockTransactionsModule';
 
 import {
-  Users, Package, ArrowLeftRight, FileText,
-  Bell, ShoppingCart, Cpu, CalendarCheck, Tag, Archive,
-  Plus, Edit2, Trash2, X
+  LayoutDashboard, Truck, Fuel, DollarSign, Calculator, HardHat,
+  LogOut, Milestone, Users, Package, ArrowLeftRight, FileText,
+  Bell, ShoppingCart, Cpu, CalendarCheck, Tag, Archive, Building2,
+  X, Plus, Edit2, Trash2, Menu, ChevronDown, Check, AlertTriangle
 } from 'lucide-react';
 
 // ==========================================
@@ -45,6 +44,281 @@ const GenericView: React.FC<{
     </div>
   </div>
 );
+
+// ==========================================
+// Header Component with Mobile Menu Toggle
+// ==========================================
+interface HeaderProps {
+  activeTab: string;
+  setActiveTab: (tab: string) => void;
+  onToggleSidebar?: () => void;
+}
+
+export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
+  const erpContext = useERP();
+  const { selectedSiteId, setSelectedSiteId, siteSheets, userRole, logout } = erpContext;
+
+  const [isSiteOpen, setIsSiteOpen] = useState(false);
+  const isSuperAdmin = userRole === 'SUPER_ADMIN' || userRole === 'OWNER' || userRole === 'Admin';
+  const currentSiteSheet = siteSheets.find((s) => s.siteId === selectedSiteId) || siteSheets[0];
+
+  return (
+    <header className="h-14 bg-[#080C14] border-b border-[#1E293B] flex items-center justify-between px-3 sm:px-4 text-xs select-none font-sans z-40 relative">
+      <div className="flex items-center gap-2 sm:gap-3">
+        {/* Mobile Hamburger Toggle */}
+        <button
+          type="button"
+          onClick={() => {
+            if (onToggleSidebar) onToggleSidebar();
+          }}
+          className="p-2 lg:hidden rounded-xl bg-[#121927] hover:bg-[#162032] border border-[#1E293B] text-slate-300 hover:text-white transition-colors cursor-pointer"
+          title="Toggle Navigation"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+
+        {/* Site Selector Dropdown */}
+        <div className="relative">
+          <button
+            onClick={() => setIsSiteOpen(!isSiteOpen)}
+            className="flex items-center gap-1.5 sm:gap-2 px-2.5 py-1.5 bg-[#121927] hover:bg-[#162032] border border-[#1E293B] rounded-xl text-white font-bold text-xs transition-colors cursor-pointer"
+          >
+            <Building2 className="w-4 h-4 text-blue-400 shrink-0" />
+            <span className="font-mono text-blue-400 truncate max-w-[120px] sm:max-w-[200px]">
+              {currentSiteSheet ? currentSiteSheet.siteName : 'Select Site'}
+            </span>
+            <ChevronDown className="w-3.5 h-3.5 text-[#94A3B8] shrink-0" />
+          </button>
+
+          {isSiteOpen && (
+            <div className="absolute left-0 mt-2 w-[280px] sm:w-80 bg-[#121927] border border-[#1E293B] rounded-2xl shadow-2xl py-1.5 z-50">
+              <div className="px-3.5 py-2 text-[10px] font-extrabold uppercase tracking-wider text-[#94A3B8] border-b border-[#1E293B] flex items-center justify-between">
+                <span>Active Sites</span>
+                <span className="text-blue-400 font-mono">{siteSheets.length} Sites</span>
+              </div>
+              <div className="max-h-60 overflow-y-auto">
+                {siteSheets.map((s) => (
+                  <div
+                    key={s.siteId}
+                    className={`w-full px-3.5 py-2.5 text-xs flex items-center justify-between hover:bg-[#162032] transition-colors ${
+                      selectedSiteId === s.siteId ? 'bg-[#162032]/60' : ''
+                    }`}
+                  >
+                    <button
+                      onClick={() => {
+                        setSelectedSiteId(s.siteId);
+                        setIsSiteOpen(false);
+                      }}
+                      className="flex-1 text-left cursor-pointer truncate"
+                    >
+                      <div className={`font-semibold truncate ${selectedSiteId === s.siteId ? 'text-blue-400 font-bold' : 'text-white'}`}>
+                        {s.siteName}
+                      </div>
+                    </button>
+                    {selectedSiteId === s.siteId && <Check className="w-3.5 h-3.5 text-blue-400 shrink-0" />}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            if (window.confirm('Are you sure you want to log out?')) {
+              logout();
+            }
+          }}
+          title="Sign out"
+          className="px-2.5 py-1.5 rounded-xl bg-[#121927] hover:bg-rose-950/40 border border-[#1E293B] text-slate-400 hover:text-rose-400 transition-colors cursor-pointer flex items-center gap-1.5"
+        >
+          <LogOut className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
+          <span className="hidden sm:inline text-[11px] font-semibold">Logout</span>
+        </button>
+      </div>
+    </header>
+  );
+};
+
+// ==========================================
+// Sidebar Component
+// ==========================================
+interface SidebarProps {
+  activeTab: string;
+  setActiveTab: (tab: string) => void;
+  projectType?: 'ROAD' | 'BUILDING';
+  onSwitchDomain?: () => void;
+  onClose?: () => void;
+}
+
+interface NavItem {
+  id: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  badge?: string | number;
+  badgeStyle?: string;
+}
+
+export const Sidebar: React.FC<SidebarProps> = ({
+  activeTab,
+  setActiveTab,
+  projectType = 'ROAD',
+  onSwitchDomain,
+  onClose
+}) => {
+  const { currentUser, logout } = useERP();
+  const isBuilding = projectType === 'BUILDING';
+
+  const roadOperationsItems: NavItem[] = [
+    { id: 'dashboard', label: 'Site Overview', icon: LayoutDashboard },
+    { id: 'road-sites', label: 'Ongoing Site', icon: Milestone, badge: 'Sites', badgeStyle: 'bg-blue-900/40 text-blue-300 border border-blue-500/40' },
+    { id: 'haulage-trips', label: 'Trips', icon: Truck, badge: 'Trips', badgeStyle: 'bg-[#064E3B] text-[#34D399] border border-[#065F46]' },
+    { id: 'diesel', label: 'Diesel', icon: Fuel, badge: 'Diesel', badgeStyle: 'bg-amber-950/60 text-amber-300 border border-amber-800' },
+    { id: 'site-expenses', label: 'Site Expense', icon: DollarSign, badge: 'Petty Cash', badgeStyle: 'bg-[#162032] text-blue-400 border border-[#1E293B]' }
+  ];
+
+  const roadEngineeringItems: NavItem[] = [
+    { id: 'yield_calculator', label: 'Road Trip Calculator', icon: Calculator, badge: 'MoRTH', badgeStyle: 'bg-blue-900/60 text-blue-300 border border-blue-500/40 font-mono' },
+    { id: 'machinery_fleet', label: 'Machinery', icon: HardHat }
+  ];
+
+  const roadConfigItems: NavItem[] = [
+    { id: 'categories', label: 'Categories', icon: Tag, badge: 'Rates', badgeStyle: 'bg-emerald-950/60 text-emerald-300 border border-emerald-800' },
+    { id: 'users', label: 'User Management', icon: Users, badge: 'RBAC', badgeStyle: 'bg-indigo-900/40 text-indigo-300 border border-indigo-500/40' }
+  ];
+
+  const buildingCoreItems: NavItem[] = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'road-sites', label: 'Ongoing Site', icon: Milestone, badge: 'Sites', badgeStyle: 'bg-emerald-950 text-emerald-400 border border-emerald-800' },
+    { id: 'products', label: 'Products', icon: Package },
+    { id: 'transactions', label: 'Transactions', icon: ArrowLeftRight }
+  ];
+
+  const buildingAnalysisItems: NavItem[] = [
+    { id: 'reports', label: 'Reports', icon: FileText },
+    { id: 'alerts', label: 'Alerts', icon: Bell, badge: 3, badgeStyle: 'bg-rose-600 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-black' },
+    { id: 'reorder-suggestions', label: 'Reorder Suggestions', icon: ShoppingCart },
+    { id: 'equipment-register', label: 'Equipment Register', icon: Cpu },
+    { id: 'attendance-salary', label: 'Attendance & Salary', icon: CalendarCheck }
+  ];
+
+  const buildingConfigItems: NavItem[] = [
+    { id: 'categories', label: 'Categories', icon: Tag },
+    { id: 'users', label: 'User Management', icon: Users },
+    { id: 'yearly-archive', label: 'Yearly Archive', icon: Archive }
+  ];
+
+  const renderNavGroup = (title: string | null, items: NavItem[]) => (
+    <div className="space-y-1">
+      {title && (
+        <div className="px-3 text-[10px] font-extrabold uppercase tracking-widest text-[#94A3B8] mb-1">
+          {title}
+        </div>
+      )}
+      <nav className="space-y-0.5">
+        {items.map((item) => {
+          const Icon = item.icon;
+          const isActive = activeTab === item.id;
+
+          return (
+            <button
+              key={item.id}
+              onClick={() => {
+                setActiveTab(item.id);
+                if (onClose) onClose();
+              }}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                isActive ? 'bg-[#2563EB] text-white shadow-lg shadow-blue-600/30' : 'text-[#94A3B8] hover:bg-[#162032] hover:text-white'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-[#94A3B8]'}`} />
+                <span>{item.label}</span>
+              </div>
+              {item.badge !== undefined && (
+                <span className={item.badgeStyle || `text-[9px] px-1.5 py-0.5 rounded font-black ${isActive ? 'bg-white/20 text-white' : 'bg-blue-900/40 text-blue-300 border border-blue-500/40'}`}>
+                  {item.badge}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </nav>
+    </div>
+  );
+
+  return (
+    <aside className="w-full h-full bg-[#0D111D] border-r border-[#1E293B] flex flex-col justify-between shrink-0 overflow-y-auto select-none font-sans z-30 scrollbar-thin scrollbar-thumb-[#1E293B]">
+      <div className="p-3.5 space-y-5">
+        <div className="p-3 bg-[#121927] border border-[#1E293B] rounded-2xl flex items-center justify-between shadow-sm relative">
+          <div className="flex items-center gap-2.5 overflow-hidden pr-8">
+            <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-white font-black shrink-0 shadow-md ${isBuilding ? 'bg-gradient-to-br from-emerald-600 to-teal-700' : 'bg-gradient-to-br from-blue-600 to-indigo-700'}`}>
+              {isBuilding ? <Building2 className="w-4 h-4" /> : <HardHat className="w-4 h-4" />}
+            </div>
+            <div className="truncate">
+              <div className="text-xs font-black text-white uppercase tracking-wider truncate">CONSTRUCTION PRO</div>
+              <div className="text-[10px] text-blue-400 font-mono truncate">
+                {isBuilding ? 'Building Construction ERP' : 'Road Construction ERP'}
+              </div>
+            </div>
+          </div>
+
+          {onClose && (
+            <button onClick={onClose} className="absolute right-3 lg:hidden p-1.5 rounded-xl bg-slate-800 text-slate-300 hover:text-white cursor-pointer">
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
+        {isBuilding ? (
+          <>
+            {renderNavGroup(null, buildingCoreItems)}
+            {renderNavGroup('ANALYSIS', buildingAnalysisItems)}
+            {renderNavGroup('CONFIGURATION', buildingConfigItems)}
+          </>
+        ) : (
+          <>
+            {renderNavGroup('SITE OPERATIONS', roadOperationsItems)}
+            {renderNavGroup('ENGINEERING', roadEngineeringItems)}
+            {renderNavGroup('CONFIGURATION', roadConfigItems)}
+          </>
+        )}
+      </div>
+
+      <div className="p-3 border-t border-[#1E293B] bg-[#080C14] space-y-2 sticky bottom-0 z-10">
+        {onSwitchDomain && (
+          <button
+            onClick={() => {
+              onSwitchDomain();
+              if (onClose) onClose();
+            }}
+            className="w-full py-1.5 px-2 bg-[#121927] hover:bg-[#1b263b] border border-[#1E293B] rounded-xl text-[11px] font-bold text-slate-300 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <span>Switch to {isBuilding ? 'Roads' : 'Buildings'}</span>
+          </button>
+        )}
+
+        <div className="p-2 rounded-xl bg-[#121927] border border-[#1E293B] flex items-center justify-between">
+          <div className="flex items-center gap-2.5 overflow-hidden">
+            <div className="w-8 h-8 rounded-full bg-blue-600/20 border border-blue-500/30 flex items-center justify-center font-bold text-xs text-blue-400 shrink-0">
+              {currentUser?.name ? currentUser.name.charAt(0).toUpperCase() : 'H'}
+            </div>
+            <div className="truncate">
+              <div className="text-xs font-bold text-white truncate">{currentUser?.name || 'Habibulla Bilgi'}</div>
+              <div className="text-[10px] text-[#94A3B8] truncate">Site Engineer & Admin</div>
+            </div>
+          </div>
+          <button onClick={logout} title="Logout" className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-[#162032] transition-colors cursor-pointer">
+            <LogOut className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    </aside>
+  );
+};
 
 // ==========================================
 // Road Material Categories & Rates Module
@@ -287,7 +561,7 @@ export const RoadMaterialCategoriesModule: React.FC = () => {
 };
 
 // ==========================================
-// Main Application Router Content
+// Main Application Router
 // ==========================================
 export const AppContent: React.FC = () => {
   const { isAuthenticated, selectedSiteId, setSelectedSiteId, siteSheets } = useERP();
@@ -309,6 +583,7 @@ export const AppContent: React.FC = () => {
   });
 
   const [activeTab, setActiveTab] = useState<string>('dashboard');
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState<boolean>(false);
 
   if (!isAuthenticated) {
     return <LoginPage />;
@@ -349,33 +624,55 @@ export const AppContent: React.FC = () => {
       <Header
         activeTab={activeTab}
         setActiveTab={setActiveTab}
+        onToggleSidebar={() => setMobileSidebarOpen(true)}
       />
 
       <div className="flex flex-1 relative h-[calc(100vh-48px)] overflow-hidden">
         
-        {/* Desktop Sidebar Container */}
-        <Sidebar
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          projectType={projectType}
-          onSwitchDomain={() => {
-            const next = projectType === 'ROAD' ? 'BUILDING' : 'ROAD';
-            setProjectType(next);
-            sessionStorage.setItem('CONSTRUCTION_PRO_DOMAIN_SESSION', next);
-          }}
-        />
+        {/* Desktop Sidebar Container (Hidden on mobile) */}
+        <div className="hidden lg:block h-full shrink-0">
+          <Sidebar
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            projectType={projectType}
+            onSwitchDomain={() => {
+              const next = projectType === 'ROAD' ? 'BUILDING' : 'ROAD';
+              setProjectType(next);
+              sessionStorage.setItem('CONSTRUCTION_PRO_DOMAIN_SESSION', next);
+            }}
+          />
+        </div>
+
+        {/* Mobile Slide-over Sidebar Drawer */}
+        {mobileSidebarOpen && (
+          <div className="fixed inset-0 z-50 lg:hidden flex">
+            <div 
+              className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm" 
+              onClick={() => setMobileSidebarOpen(false)}
+            />
+            <div className="relative flex-1 max-w-[260px] w-full bg-[#0D111D] h-full flex flex-col z-50 shadow-2xl">
+              <Sidebar
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                projectType={projectType}
+                onSwitchDomain={() => {
+                  const next = projectType === 'ROAD' ? 'BUILDING' : 'ROAD';
+                  setProjectType(next);
+                  sessionStorage.setItem('CONSTRUCTION_PRO_DOMAIN_SESSION', next);
+                }}
+                onClose={() => setMobileSidebarOpen(false)}
+              />
+            </div>
+          </div>
+        )}
 
         {/* Main Content Area */}
         <main className="flex-1 w-full min-w-0 p-6 overflow-y-auto max-h-[calc(100vh-48px)] scrollbar-thin scrollbar-thumb-[#1E293B] scrollbar-track-transparent">
           <div className="max-w-7xl mx-auto pb-12 w-full overflow-x-hidden">
-            
-            {/* Shared Route */}
             {activeTab === 'dashboard' && <SiteCentricMidnightDashboard onNavigateTab={setActiveTab} />}
             {(activeTab === 'road-sites' || activeTab === 'sites') && (
               <RoadSitesManagerModule projectType={projectType || 'ROAD'} onNavigateTab={setActiveTab} />
             )}
-
-            {/* ROAD CONSTRUCTION ROUTES */}
             {projectType === 'ROAD' && (
               <>
                 {activeTab === 'haulage-trips' && <MaterialHaulageTripsModule />}
@@ -384,43 +681,6 @@ export const AppContent: React.FC = () => {
                 {(activeTab === 'yield_calculator' || activeTab === 'road-yield') && <RoadYieldCalculatorModule />}
                 {(activeTab === 'machinery_fleet' || activeTab === 'machinery') && <MachineryFleetModule />}
                 {activeTab === 'categories' && <RoadMaterialCategoriesModule />}
-
-                {/* Road Config Fallbacks */}
-                {activeTab === 'users' && (
-                  <GenericView title="User Management" subtitle="Manage RBAC access." icon={Users} />
-                )}
-              </>
-            )}
-
-            {/* BUILDING CONSTRUCTION ROUTES */}
-            {projectType === 'BUILDING' && (
-              <>
-                {activeTab === 'products' && (
-                  <GenericView title="Products Catalog" subtitle="Building materials." icon={Package} />
-                )}
-                {activeTab === 'transactions' && <StockTransactionsModule />}
-                {activeTab === 'reports' && (
-                  <GenericView title="Reports & Analytics" subtitle="Material consumption." icon={FileText} />
-                )}
-                {activeTab === 'alerts' && (
-                  <GenericView title="Low Stock Alerts" subtitle="Reorder buffers." icon={Bell} />
-                )}
-                {activeTab === 'reorder-suggestions' && (
-                  <GenericView title="Reorder Suggestions" subtitle="Procurement indents." icon={ShoppingCart} />
-                )}
-                {activeTab === 'equipment-register' && <MachineryFleetModule />}
-                {activeTab === 'attendance-salary' && (
-                  <GenericView title="Attendance & Payroll" subtitle="Salary payouts." icon={CalendarCheck} />
-                )}
-                {activeTab === 'categories' && (
-                  <GenericView title="Material Categories" subtitle="Item classifications." icon={Tag} />
-                )}
-                {activeTab === 'users' && (
-                  <GenericView title="User Management" subtitle="Manage RBAC access." icon={Users} />
-                )}
-                {activeTab === 'yearly-archive' && (
-                  <GenericView title="Yearly Archive" subtitle="Historical audits." icon={Archive} />
-                )}
               </>
             )}
           </div>

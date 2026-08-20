@@ -5,7 +5,7 @@ import { LoginPage } from './components/auth/LoginPage';
 import { ProjectTypeSelectionPage } from './components/auth/ProjectTypeSelectionPage';
 import { SiteSelectionPage } from './components/auth/SiteSelectionPage';
 import { Header } from './components/Header';
-import Sidebar from './Sidebar'; // Import Sidebar from its proper default/named export
+import { Sidebar } from './Sidebar';
 
 import { SiteCentricMidnightDashboard } from './components/dashboard/SiteCentricMidnightDashboard';
 import { RoadSitesManagerModule } from './components/sites/RoadSitesManagerModule';
@@ -292,60 +292,6 @@ export const RoadMaterialCategoriesModule: React.FC = () => {
 export const AppContent: React.FC = () => {
   const { isAuthenticated, selectedSiteId, setSelectedSiteId, siteSheets } = useERP();
 
-  // Auto-seed default master sample datasets on first load for any device
-  useEffect(() => {
-    try {
-      if (!localStorage.getItem('CONSTRUCTION_PRO_HAULAGE_TRIPS_V2')) {
-        localStorage.setItem('CONSTRUCTION_PRO_HAULAGE_TRIPS_V2', JSON.stringify([
-          {
-            id: 'TRIP-101',
-            tripDate: '2026-08-19',
-            siteName: 'Ongoing Highway Site (Active Stretch)',
-            vehicleNumber: '8797',
-            materialName: 'Bituminous Macadam (BM) (₹5000/Brass)',
-            dayTrips: 10,
-            brassPerTrip: 6,
-            ratePerBrass: 5000,
-            totalAmount: 300000
-          }
-        ]));
-      }
-
-      if (!localStorage.getItem('CONSTRUCTION_PRO_DIESEL_LOGS_V1')) {
-        localStorage.setItem('CONSTRUCTION_PRO_DIESEL_LOGS_V1', JSON.stringify([
-          {
-            id: 'DSL-101',
-            date: '2026-08-19',
-            siteName: 'Ongoing Highway Site (Active Stretch)',
-            vehicleNumber: '8797',
-            driverName: 'Santosh Kamble',
-            slipNumber: 'V-001',
-            litres: 100,
-            ratePerLitre: 92.5,
-            totalCost: 9250.00
-          }
-        ]));
-      }
-
-      if (!localStorage.getItem('CONSTRUCTION_PRO_SITE_EXPENSES_V1')) {
-        localStorage.setItem('CONSTRUCTION_PRO_SITE_EXPENSES_V1', JSON.stringify([
-          {
-            id: 'EXP-101',
-            date: '2026-08-19',
-            siteName: 'Ongoing Highway Site (Active Stretch)',
-            title: 'Weekly Labor Payout',
-            vendor: 'Local Contractor',
-            category: 'Labor/Wages',
-            amount: 45000,
-            status: 'Paid'
-          }
-        ]));
-      }
-    } catch (e) {
-      console.error('Failed to auto-seed initial data', e);
-    }
-  }, []);
-
   const [projectType, setProjectType] = useState<'ROAD' | 'BUILDING' | null>(() => {
     try {
       return (sessionStorage.getItem('CONSTRUCTION_PRO_DOMAIN_SESSION') as any) || null;
@@ -363,7 +309,6 @@ export const AppContent: React.FC = () => {
   });
 
   const [activeTab, setActiveTab] = useState<string>('dashboard');
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState<boolean>(false);
 
   if (!isAuthenticated) {
     return <LoginPage />;
@@ -404,53 +349,24 @@ export const AppContent: React.FC = () => {
       <Header
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        onToggleSidebar={() => setMobileSidebarOpen(true)}
       />
 
       <div className="flex flex-1 relative h-[calc(100vh-48px)] overflow-hidden">
         
-        {/* Desktop Sidebar Container (Hidden on Mobile) */}
-        <div className="hidden lg:block h-full shrink-0">
-          <Sidebar
-            activeTab={activeTab}
-            setActiveTab={setActiveTab}
-            projectType={projectType}
-            onSwitchDomain={() => {
-              const next = projectType === 'ROAD' ? 'BUILDING' : 'ROAD';
-              setProjectType(next);
-              sessionStorage.setItem('CONSTRUCTION_PRO_DOMAIN_SESSION', next);
-            }}
-          />
-        </div>
-
-        {/* Mobile Slide-over Sidebar Drawer */}
-        {mobileSidebarOpen && (
-          <div className="fixed inset-0 z-50 lg:hidden flex">
-            {/* Backdrop overlay */}
-            <div 
-              className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm transition-opacity" 
-              onClick={() => setMobileSidebarOpen(false)}
-            />
-            
-            {/* Sidebar drawer container */}
-            <div className="relative flex-1 max-w-xs w-full bg-[#0D111D] h-full flex flex-col z-50 animate-in slide-in-from-left duration-200 shadow-2xl">
-              <Sidebar
-                activeTab={activeTab}
-                setActiveTab={setActiveTab}
-                projectType={projectType}
-                onSwitchDomain={() => {
-                  const next = projectType === 'ROAD' ? 'BUILDING' : 'ROAD';
-                  setProjectType(next);
-                  sessionStorage.setItem('CONSTRUCTION_PRO_DOMAIN_SESSION', next);
-                }}
-                onClose={() => setMobileSidebarOpen(false)}
-              />
-            </div>
-          </div>
-        )}
+        {/* Desktop Sidebar Container */}
+        <Sidebar
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          projectType={projectType}
+          onSwitchDomain={() => {
+            const next = projectType === 'ROAD' ? 'BUILDING' : 'ROAD';
+            setProjectType(next);
+            sessionStorage.setItem('CONSTRUCTION_PRO_DOMAIN_SESSION', next);
+          }}
+        />
 
         {/* Main Content Area */}
-        <main className="flex-1 w-full min-w-0 p-4 sm:p-6 overflow-y-auto max-h-[calc(100vh-48px)] scrollbar-thin scrollbar-thumb-[#1E293B] scrollbar-track-transparent">
+        <main className="flex-1 w-full min-w-0 p-6 overflow-y-auto max-h-[calc(100vh-48px)] scrollbar-thin scrollbar-thumb-[#1E293B] scrollbar-track-transparent">
           <div className="max-w-7xl mx-auto pb-12 w-full overflow-x-hidden">
             
             {/* Shared Route */}

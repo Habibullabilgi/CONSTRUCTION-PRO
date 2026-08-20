@@ -19,7 +19,8 @@ import {
   CalendarCheck,
   Tag,
   Archive,
-  Building2
+  Building2,
+  X
 } from 'lucide-react';
 
 interface Props {
@@ -27,6 +28,7 @@ interface Props {
   setActiveTab: (tab: string) => void;
   projectType?: 'ROAD' | 'BUILDING';
   onSwitchDomain?: () => void;
+  onClose?: () => void; // Added for mobile drawer auto-close
 }
 
 interface NavItem {
@@ -41,7 +43,8 @@ export const Sidebar: React.FC<Props> = ({
   activeTab,
   setActiveTab,
   projectType = 'ROAD',
-  onSwitchDomain
+  onSwitchDomain,
+  onClose
 }) => {
   const { currentUser, logout } = useERP();
   const isBuilding = projectType === 'BUILDING';
@@ -156,7 +159,7 @@ export const Sidebar: React.FC<Props> = ({
           {title}
         </div>
       )}
-      <nav className="space-y-0.5">
+      <nav className="space-y-1">
         {items.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
@@ -164,8 +167,11 @@ export const Sidebar: React.FC<Props> = ({
           return (
             <button
               key={item.id}
-              onClick={() => setActiveTab(item.id)}
-              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              onClick={() => {
+                setActiveTab(item.id);
+                if (onClose) onClose(); // Auto-close drawer on mobile when clicking a link
+              }}
+              className={`w-full flex items-center justify-between px-3 py-2.5 sm:py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer active:scale-[0.98] ${
                 isActive ? 'bg-[#2563EB] text-white shadow-lg shadow-blue-600/30' : 'text-[#94A3B8] hover:bg-[#162032] hover:text-white'
               }`}
             >
@@ -186,10 +192,10 @@ export const Sidebar: React.FC<Props> = ({
   );
 
   return (
-    <aside className="w-64 bg-[#0D111D] border-r border-[#1E293B] flex flex-col justify-between shrink-0 h-full overflow-y-auto select-none font-sans z-30 scrollbar-thin scrollbar-thumb-[#1E293B]">
+    <aside className="w-full h-full bg-[#0D111D] border-r border-[#1E293B] flex flex-col justify-between shrink-0 overflow-y-auto select-none font-sans z-30 scrollbar-thin scrollbar-thumb-[#1E293B]">
       <div className="p-3.5 space-y-5">
         <div className="p-3 bg-[#121927] border border-[#1E293B] rounded-2xl flex items-center justify-between shadow-sm relative">
-          <div className="flex items-center gap-2.5 overflow-hidden pr-2">
+          <div className="flex items-center gap-2.5 overflow-hidden pr-8">
             <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-white font-black shrink-0 shadow-md ${isBuilding ? 'bg-gradient-to-br from-emerald-600 to-teal-700' : 'bg-gradient-to-br from-blue-600 to-indigo-700'}`}>
               {isBuilding ? <Building2 className="w-4 h-4" /> : <HardHat className="w-4 h-4" />}
             </div>
@@ -200,28 +206,42 @@ export const Sidebar: React.FC<Props> = ({
               </div>
             </div>
           </div>
+
+          {/* Mobile Close Button */}
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="absolute right-3 lg:hidden p-1.5 rounded-xl bg-slate-800 text-slate-300 hover:text-white cursor-pointer"
+              title="Close Menu"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
         {isBuilding ? (
-          <>
+          <div className="space-y-4">
             {renderNavGroup(null, buildingCoreItems)}
             {renderNavGroup('ANALYSIS', buildingAnalysisItems)}
             {renderNavGroup('CONFIGURATION', buildingConfigItems)}
-          </>
+          </div>
         ) : (
-          <>
+          <div className="space-y-4">
             {renderNavGroup('SITE OPERATIONS', roadOperationsItems)}
             {renderNavGroup('ENGINEERING', roadEngineeringItems)}
             {renderNavGroup('CONFIGURATION', roadConfigItems)}
-          </>
+          </div>
         )}
       </div>
 
-      <div className="p-3 border-t border-[#1E293B] bg-[#080C14] space-y-2 sticky bottom-0 z-10">
+      <div className="p-3 border-t border-[#1E293B] bg-[#080C14] space-y-2 sticky bottom-0 z-10 shadow-lg">
         {onSwitchDomain && (
           <button
-            onClick={onSwitchDomain}
-            className="w-full py-1.5 px-2 bg-[#121927] hover:bg-[#1b263b] border border-[#1E293B] rounded-xl text-[11px] font-bold text-slate-300 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+            onClick={() => {
+              onSwitchDomain();
+              if (onClose) onClose();
+            }}
+            className="w-full py-2.5 px-2 bg-[#121927] hover:bg-[#1b263b] border border-[#1E293B] rounded-xl text-xs font-bold text-slate-300 flex items-center justify-center gap-1.5 transition-colors cursor-pointer active:scale-[0.98]"
           >
             <span>Switch to {isBuilding ? 'Roads' : 'Buildings'}</span>
           </button>
@@ -237,7 +257,7 @@ export const Sidebar: React.FC<Props> = ({
               <div className="text-[10px] text-[#94A3B8] truncate">Site Engineer & Admin</div>
             </div>
           </div>
-          <button onClick={logout} title="Logout" className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-[#162032] transition-colors cursor-pointer">
+          <button onClick={logout} title="Logout" className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-[#162032] transition-colors cursor-pointer shrink-0">
             <LogOut className="w-4 h-4" />
           </button>
         </div>

@@ -88,32 +88,32 @@ export const Header: React.FC<Props> = ({
   return (
     <header className="h-14 bg-[#080C14] border-b border-[#1E293B] flex items-center justify-between px-3 sm:px-4 text-xs select-none font-sans z-40 relative">
       {/* Left: Menu Toggle + Site Selector */}
-      <div className="flex items-center gap-2 sm:gap-3">
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
         {/* MOBILE HAMBURGER MENU (Hidden on Desktop) */}
         <button
           onClick={onToggleSidebar}
-          className="p-1.5 sm:p-2 lg:hidden rounded-lg text-slate-400 hover:text-white hover:bg-[#162032] transition-colors cursor-pointer"
+          className="p-2 lg:hidden rounded-xl bg-[#121927] hover:bg-[#162032] border border-[#1E293B] text-slate-300 hover:text-white transition-colors cursor-pointer shrink-0"
           title="Toggle Navigation Menu"
         >
           <Menu className="w-5 h-5" />
         </button>
 
         {/* Site Selector Dropdown */}
-        <div className="relative">
+        <div className="relative min-w-0">
           <button
             onClick={() => setIsSiteOpen(!isSiteOpen)}
-            className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-[#121927] hover:bg-[#162032] border border-[#1E293B] rounded-xl text-white font-bold text-xs transition-colors cursor-pointer shadow-sm"
+            className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-2 bg-[#121927] hover:bg-[#162032] border border-[#1E293B] rounded-xl text-white font-bold text-xs transition-colors cursor-pointer shadow-sm truncate max-w-[200px] sm:max-w-xs md:max-w-md"
           >
-            <Building2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-400 shrink-0" />
-            <span className="font-mono text-blue-400 truncate max-w-[120px] sm:max-w-[220px] md:max-w-[340px]">
+            <Building2 className="w-4 h-4 text-blue-400 shrink-0" />
+            <span className="font-mono text-blue-400 truncate">
               {currentSiteSheet ? currentSiteSheet.siteName : 'Select Site'}
             </span>
-            <ChevronDown className="w-3.5 h-3.5 text-[#94A3B8] shrink-0" />
+            <ChevronDown className="w-3.5 h-3.5 text-[#94A3B8] shrink-0 ml-auto" />
           </button>
 
           {isSiteOpen && (
-            <div className="absolute left-0 mt-1.5 w-[280px] sm:w-84 bg-[#121927] border border-[#1E293B] rounded-2xl shadow-2xl py-1.5 z-50">
-              <div className="px-3.5 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-[#94A3B8] border-b border-[#1E293B] flex items-center justify-between">
+            <div className="absolute left-0 mt-2 w-[280px] sm:w-84 bg-[#121927] border border-[#1E293B] rounded-2xl shadow-2xl py-1.5 z-50">
+              <div className="px-3.5 py-2 text-[10px] font-extrabold uppercase tracking-wider text-[#94A3B8] border-b border-[#1E293B] flex items-center justify-between">
                 <span>Active Highway Stretches</span>
                 <span className="text-blue-400 font-mono">{siteSheets.length} Sites</span>
               </div>
@@ -131,10 +131,10 @@ export const Header: React.FC<Props> = ({
                         setSelectedSiteId(s.siteId);
                         setIsSiteOpen(false);
                       }}
-                      className="flex-1 text-left cursor-pointer"
+                      className="flex-1 text-left cursor-pointer truncate pr-2"
                     >
                       <div
-                        className={`font-semibold truncate max-w-[160px] sm:max-w-[200px] ${
+                        className={`font-semibold truncate ${
                           selectedSiteId === s.siteId ? 'text-blue-400 font-bold' : 'text-white'
                         }`}
                       >
@@ -145,7 +145,7 @@ export const Header: React.FC<Props> = ({
                       </div>
                     </button>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 shrink-0">
                       {selectedSiteId === s.siteId && <Check className="w-3.5 h-3.5 text-blue-400 shrink-0" />}
 
                       {isSuperAdmin && siteSheets.length > 1 && (
@@ -173,7 +173,7 @@ export const Header: React.FC<Props> = ({
                       setIsSiteOpen(false);
                       setIsAddRoadSiteOpen(true);
                     }}
-                    className="w-full py-2 px-3 rounded-xl bg-blue-600/20 hover:bg-blue-600 border border-blue-500/30 hover:border-blue-500 text-blue-300 hover:text-white font-black text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                    className="w-full py-2.5 px-3 rounded-xl bg-blue-600/20 hover:bg-blue-600 border border-blue-500/30 hover:border-blue-500 text-blue-300 hover:text-white font-black text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span>+ Add New Road Site</span>
@@ -186,12 +186,12 @@ export const Header: React.FC<Props> = ({
       </div>
 
       {/* Right: Logout Action */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 shrink-0">
         <button
           type="button"
           onClick={handleLogout}
           title="Sign out"
-          className="px-2 sm:px-3 py-1.5 sm:py-2 rounded-xl bg-[#121927] hover:bg-rose-950/40 border border-[#1E293B] hover:border-rose-700/50 text-slate-400 hover:text-rose-400 transition-colors cursor-pointer flex items-center gap-1.5"
+          className="px-2.5 sm:px-3 py-2 rounded-xl bg-[#121927] hover:bg-rose-950/40 border border-[#1E293B] hover:border-rose-700/50 text-slate-400 hover:text-rose-400 transition-colors cursor-pointer flex items-center gap-1.5"
         >
           <LogOut className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
           <span className="hidden sm:inline text-[11px] font-semibold">Logout</span>

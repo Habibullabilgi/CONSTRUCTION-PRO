@@ -17,14 +17,9 @@ interface Props {
   activeTab: string;
   setActiveTab: (tab: string) => void;
   onToggleSidebar?: () => void;
-  onOpenArchitecture?: () => void;
 }
 
-export const Header: React.FC<Props> = ({
-  activeTab,
-  setActiveTab,
-  onToggleSidebar,
-}) => {
+export const Header: React.FC<Props> = ({ onToggleSidebar }) => {
   const erpContext = useERP();
   const {
     selectedSiteId,
@@ -43,7 +38,6 @@ export const Header: React.FC<Props> = ({
 
   const handleExecuteDeleteSite = () => {
     if (!siteToDelete) return;
-
     const targetId = siteToDelete.id;
 
     if (typeof (erpContext as any).deleteSite === 'function') {
@@ -56,19 +50,11 @@ export const Header: React.FC<Props> = ({
           list.push(targetId);
           localStorage.setItem('CONSTRUCTION_PRO_DELETED_SITE_IDS', JSON.stringify(list));
         }
-
-        const savedSheets = localStorage.getItem('INFRABUILD_ERP_STATE_V1_SITE_SHEETS');
-        if (savedSheets) {
-          const parsed = JSON.parse(savedSheets);
-          const filtered = parsed.filter((s: any) => s.siteId !== targetId);
-          localStorage.setItem('INFRABUILD_ERP_STATE_V1_SITE_SHEETS', JSON.stringify(filtered));
-        }
       } catch (e) {
         console.error(e);
       }
       window.location.reload();
     }
-
     setSiteToDelete(null);
     setIsSiteOpen(false);
   };
@@ -79,7 +65,6 @@ export const Header: React.FC<Props> = ({
         logout();
       } else {
         sessionStorage.clear();
-        localStorage.removeItem('INFRABUILD_ERP_STATE_V1_AUTH');
         window.location.reload();
       }
     }
@@ -87,42 +72,44 @@ export const Header: React.FC<Props> = ({
 
   return (
     <header className="h-14 bg-[#080C14] border-b border-[#1E293B] flex items-center justify-between px-3 sm:px-4 text-xs select-none font-sans z-40 relative">
-      {/* Left: Menu Toggle + Site Selector */}
-      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-        {/* MOBILE HAMBURGER MENU (Hidden on Desktop) */}
+      <div className="flex items-center gap-2 sm:gap-3">
+        {/* MOBILE HAMBURGER TOGGLE BUTTON */}
         <button
-          onClick={onToggleSidebar}
-          className="p-2 lg:hidden rounded-xl bg-[#121927] hover:bg-[#162032] border border-[#1E293B] text-slate-300 hover:text-white transition-colors cursor-pointer shrink-0"
+          type="button"
+          onClick={() => {
+            if (onToggleSidebar) onToggleSidebar();
+          }}
+          className="p-2 lg:hidden rounded-xl bg-[#121927] hover:bg-[#162032] border border-[#1E293B] text-slate-300 hover:text-white transition-colors cursor-pointer"
           title="Toggle Navigation Menu"
         >
           <Menu className="w-5 h-5" />
         </button>
 
         {/* Site Selector Dropdown */}
-        <div className="relative min-w-0">
+        <div className="relative">
           <button
             onClick={() => setIsSiteOpen(!isSiteOpen)}
-            className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-2 bg-[#121927] hover:bg-[#162032] border border-[#1E293B] rounded-xl text-white font-bold text-xs transition-colors cursor-pointer shadow-sm truncate max-w-[200px] sm:max-w-xs md:max-w-md"
+            className="flex items-center gap-1.5 sm:gap-2 px-2.5 py-1.5 bg-[#121927] hover:bg-[#162032] border border-[#1E293B] rounded-xl text-white font-bold text-xs transition-colors cursor-pointer"
           >
             <Building2 className="w-4 h-4 text-blue-400 shrink-0" />
-            <span className="font-mono text-blue-400 truncate">
+            <span className="font-mono text-blue-400 truncate max-w-[120px] sm:max-w-[200px]">
               {currentSiteSheet ? currentSiteSheet.siteName : 'Select Site'}
             </span>
-            <ChevronDown className="w-3.5 h-3.5 text-[#94A3B8] shrink-0 ml-auto" />
+            <ChevronDown className="w-3.5 h-3.5 text-[#94A3B8] shrink-0" />
           </button>
 
           {isSiteOpen && (
-            <div className="absolute left-0 mt-2 w-[280px] sm:w-84 bg-[#121927] border border-[#1E293B] rounded-2xl shadow-2xl py-1.5 z-50">
+            <div className="absolute left-0 mt-2 w-[280px] sm:w-80 bg-[#121927] border border-[#1E293B] rounded-2xl shadow-2xl py-1.5 z-50">
               <div className="px-3.5 py-2 text-[10px] font-extrabold uppercase tracking-wider text-[#94A3B8] border-b border-[#1E293B] flex items-center justify-between">
-                <span>Active Highway Stretches</span>
+                <span>Active Sites</span>
                 <span className="text-blue-400 font-mono">{siteSheets.length} Sites</span>
               </div>
 
-              <div className="max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-[#1E293B]">
+              <div className="max-h-60 overflow-y-auto">
                 {siteSheets.map((s) => (
                   <div
                     key={s.siteId}
-                    className={`w-full px-3.5 py-2.5 text-xs flex items-center justify-between hover:bg-[#162032] transition-colors group ${
+                    className={`w-full px-3.5 py-2.5 text-xs flex items-center justify-between hover:bg-[#162032] transition-colors ${
                       selectedSiteId === s.siteId ? 'bg-[#162032]/60' : ''
                     }`}
                   >
@@ -131,52 +118,28 @@ export const Header: React.FC<Props> = ({
                         setSelectedSiteId(s.siteId);
                         setIsSiteOpen(false);
                       }}
-                      className="flex-1 text-left cursor-pointer truncate pr-2"
+                      className="flex-1 text-left cursor-pointer truncate"
                     >
-                      <div
-                        className={`font-semibold truncate ${
-                          selectedSiteId === s.siteId ? 'text-blue-400 font-bold' : 'text-white'
-                        }`}
-                      >
+                      <div className={`font-semibold truncate ${selectedSiteId === s.siteId ? 'text-blue-400 font-bold' : 'text-white'}`}>
                         {s.siteName}
                       </div>
-                      <div className="text-[10px] text-[#94A3B8]">
-                        {s.vehicles?.length || 0} Tippers Configured
-                      </div>
                     </button>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      {selectedSiteId === s.siteId && <Check className="w-3.5 h-3.5 text-blue-400 shrink-0" />}
-
-                      {isSuperAdmin && siteSheets.length > 1 && (
-                        <button
-                          type="button"
-                          title={`Delete ${s.siteName}`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSiteToDelete({ id: s.siteId, name: s.siteName });
-                          }}
-                          className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-950/50 rounded-lg transition-all cursor-pointer shrink-0"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
+                    {selectedSiteId === s.siteId && <Check className="w-3.5 h-3.5 text-blue-400 shrink-0" />}
                   </div>
                 ))}
               </div>
 
               {isSuperAdmin && (
-                <div className="p-2 border-t border-[#1E293B] bg-[#0D111D] rounded-b-2xl">
+                <div className="p-2 border-t border-[#1E293B] bg-[#0D111D]">
                   <button
                     onClick={() => {
                       setIsSiteOpen(false);
                       setIsAddRoadSiteOpen(true);
                     }}
-                    className="w-full py-2.5 px-3 rounded-xl bg-blue-600/20 hover:bg-blue-600 border border-blue-500/30 hover:border-blue-500 text-blue-300 hover:text-white font-black text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                    className="w-full py-2 px-3 rounded-xl bg-blue-600/20 hover:bg-blue-600 border border-blue-500/30 text-blue-300 hover:text-white font-black text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    <span>+ Add New Road Site</span>
+                    <span>+ Add New Site</span>
                   </button>
                 </div>
               )}
@@ -185,78 +148,19 @@ export const Header: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* Right: Logout Action */}
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="flex items-center gap-2">
         <button
           type="button"
           onClick={handleLogout}
           title="Sign out"
-          className="px-2.5 sm:px-3 py-2 rounded-xl bg-[#121927] hover:bg-rose-950/40 border border-[#1E293B] hover:border-rose-700/50 text-slate-400 hover:text-rose-400 transition-colors cursor-pointer flex items-center gap-1.5"
+          className="px-2.5 py-1.5 rounded-xl bg-[#121927] hover:bg-rose-950/40 border border-[#1E293B] text-slate-400 hover:text-rose-400 transition-colors cursor-pointer flex items-center gap-1.5"
         >
           <LogOut className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
           <span className="hidden sm:inline text-[11px] font-semibold">Logout</span>
         </button>
       </div>
 
-      {/* Direct Confirmation Modal */}
-      {siteToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-in fade-in duration-150">
-          <div className="bg-[#121927] border border-rose-900/60 rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
-            <div className="px-5 py-4 border-b border-[#1E293B] flex items-center justify-between bg-rose-950/30">
-              <div className="flex items-center gap-2 text-rose-400 font-bold text-sm">
-                <AlertTriangle className="w-4 h-4 text-rose-500" />
-                <span>Delete Site</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSiteToDelete(null)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-5 space-y-3 text-xs text-slate-300">
-              <p>
-                Are you sure you want to permanently delete{' '}
-                <strong className="text-white font-bold">{siteToDelete.name}</strong>?
-              </p>
-              <div className="p-4 bg-rose-950/40 border border-rose-800/40 rounded-xl text-rose-300 text-[11px] space-y-1">
-                <p className="font-bold">This will permanently remove:</p>
-                <ul className="list-disc list-inside space-y-0.5 text-slate-300 pl-1">
-                  <li>All material matrix sheets (Murum, GSB, WMM, Diesel)</li>
-                  <li>All road chainage sections, layer logs, and trips</li>
-                </ul>
-              </div>
-            </div>
-
-            <div className="px-5 py-4 border-t border-[#1E293B] bg-[#0D111D] flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setSiteToDelete(null)}
-                className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 cursor-pointer transition-colors"
-              >
-                Cancel
-              </button>
-
-              <button
-                type="button"
-                onClick={handleExecuteDeleteSite}
-                className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-500 transition-colors shadow-lg shadow-rose-950/50 cursor-pointer"
-              >
-                <Trash2 className="w-4 h-4" />
-                <span>Delete Site Permanently</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Add Road Site Modal */}
-      <CreateRoadSiteModal
-        isOpen={isAddRoadSiteOpen}
-        onClose={() => setIsAddRoadSiteOpen(false)}
-      />
+      <CreateRoadSiteModal isOpen={isAddRoadSiteOpen} onClose={() => setIsAddRoadSiteOpen(false)} />
     </header>
   );
 };
